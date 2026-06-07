@@ -1,20 +1,5 @@
-import parser from "@typescript-eslint/parser"
-import { RuleTester } from "eslint"
-import { describe, it } from "vitest"
-
 import { banDiv } from "../src/rules/ban-div.ts"
-
-RuleTester.describe = describe
-RuleTester.it = it
-
-const ruleTester = new RuleTester({
-	languageOptions: {
-		parser,
-		parserOptions: {
-			ecmaFeatures: { jsx: true },
-		},
-	},
-})
+import { ruleTester } from "./rule-tester.ts"
 
 ruleTester.run(`ban-div`, banDiv, {
 	valid: [
