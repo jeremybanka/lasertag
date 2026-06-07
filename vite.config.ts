@@ -20,6 +20,14 @@ export default defineConfig({
 		"*": "vp check --fix",
 	},
 	test: {
-		include: ["packages/*/src/**/*.test.ts"],
+		exclude: [
+			"**/node_modules/**",
+			"**/.git/**",
+			"packages/*/eslint/tests/HIGH-QUALITY-EXAMPLE.test.ts",
+		],
+		include: [
+			"packages/*/src/**/*.test.ts",
+			"packages/*/eslint/tests/**/*.test.ts",
+		],
 	},
 })

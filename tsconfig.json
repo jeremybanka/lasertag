@@ -16,5 +16,6 @@
 		"target": "ES2024",
 		"types": []
 	},
-	"include": ["**/*.ts", "*.d.ts"]
+	"include": ["**/*.ts", "*.d.ts"],
+	"exclude": ["packages/uigui/eslint/tests/HIGH-QUALITY-EXAMPLE.test.ts"]
 }
