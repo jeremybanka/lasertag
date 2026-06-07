@@ -1,6 +1,6 @@
 # globals.css
 
-uigui encourages a small global stylesheet for the parts of an interface that should be shared everywhere: an uncontroversial reset, font imports, and a compact set of design tokens. Put it in `globals.css` and import it from the main entrypoint before mounting the UI.
+lasertag encourages a small global stylesheet for the parts of an interface that should be shared everywhere: an uncontroversial reset, font imports, and a compact set of design tokens. Put it in `globals.css` and import it from the main entrypoint before mounting the UI.
 
 ```ts
 import "./globals.css"
@@ -140,7 +140,7 @@ Dark mode should be the default. Use `@media (prefers-color-scheme: light)` to o
 
 ## Minimal Template
 
-uigui ships a starter template at `uigui/templates/globals.css`. It is intentionally small:
+lasertag ships a starter template at `lasertag/templates/globals.css`. It is intentionally small:
 
 - it sets predictable box sizing
 - it makes the document fill the viewport

@@ -1,6 +1,6 @@
-# uigui
+# lasertag
 
-uigui is a small, structural CSS Modules convention for JSX components: each exported component owns one sibling `.module.css` file, and that stylesheet contains one root class named `.class`.
+lasertag is a small, structural CSS Modules convention for JSX components: each exported component owns one sibling `.module.css` file, and that stylesheet contains one root class named `.class`.
 
 ## Component Modules
 
@@ -112,7 +112,7 @@ Avoid single-child wrapper tags unless the wrapper distinguishes a meaningful th
 
 ## Type Support
 
-`uigui/types/module.css.d.ts` constrains CSS Modules to a single exported `class` member:
+`lasertag/types/module.css.d.ts` constrains CSS Modules to a single exported `class` member:
 
 ```ts
 declare module "*.module.css" {
@@ -121,8 +121,8 @@ declare module "*.module.css" {
 }
 ```
 
-uigui ships JSX intrinsic element types for React, Preact, and Solid. Each allows arbitrary hyphenated custom elements in JSX:
+lasertag ships JSX intrinsic element types for React, Preact, and Solid. Each allows arbitrary hyphenated custom elements in JSX:
 
-- `uigui/react-jsx`
-- `uigui/preact-jsx`
-- `uigui/solid-jsx`
+- `lasertag/react-jsx`
+- `lasertag/preact-jsx`
+- `lasertag/solid-jsx`

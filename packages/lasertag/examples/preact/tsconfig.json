@@ -10,5 +10,5 @@
 		"target": "ES2024",
 		"types": []
 	},
-	"include": ["uigui.d.ts", "src/**/*.tsx"]
+	"include": ["lasertag.d.ts", "src/**/*.tsx"]
 }

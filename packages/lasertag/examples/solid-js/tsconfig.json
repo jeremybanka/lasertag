@@ -1,6 +1,7 @@
 {
 	"compilerOptions": {
-		"jsx": "react-jsx",
+		"jsx": "preserve",
+		"jsxImportSource": "solid-js",
 		"lib": ["DOM", "ES2024"],
 		"module": "NodeNext",
 		"moduleResolution": "NodeNext",
@@ -9,5 +10,5 @@
 		"target": "ES2024",
 		"types": []
 	},
-	"include": ["uigui.d.ts", "src/**/*.tsx"]
+	"include": ["lasertag.d.ts", "src/**/*.tsx"]
 }

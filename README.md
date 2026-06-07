@@ -1,5 +1,5 @@
-# uigui
+# lasertag
 
-workspace for the minimal-css project
+workspace for the lasertag CSS package
 
-package itself lives in [packages/uigui](packages/uigui)
+package itself lives in [packages/lasertag](packages/lasertag)

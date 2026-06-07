@@ -1,8 +1,8 @@
-# uigui
+# lasertag
 
 zero-runtime CSS structure for JSX components with CSS Modules.
 
-uigui is a small convention: each exported component owns one sibling
+lasertag is a small convention: each exported component owns one sibling
 `.module.css` file, that stylesheet exports one root `class`, and the rendered
 root tag names the component in kebab case.
 
@@ -26,22 +26,22 @@ app-header-bar.class {
 ## Install
 
 ```sh
-pnpm add -D uigui
+pnpm add -D lasertag
 ```
 
 Add the types your project needs:
 
 ```ts
-import "uigui/css-modules"
-import "uigui/react-jsx"
+import "lasertag/css-modules"
+import "lasertag/react-jsx"
 ```
 
-Use `uigui/preact-jsx` or `uigui/solid-jsx` instead for Preact or Solid.
+Use `lasertag/preact-jsx` or `lasertag/solid-jsx` instead for Preact or Solid.
 
 ## Includes
 
 - CSS Module typing for a single exported `class`
 - JSX intrinsic types for hyphenated custom elements
-- an optional ESLint plugin at `uigui/eslint-plugin`
-- a small global CSS starter at `uigui/templates/globals.css`
-- short guides in `uigui/docs`
+- an optional ESLint plugin at `lasertag/eslint-plugin`
+- a small global CSS starter at `lasertag/templates/globals.css`
+- short guides in `lasertag/docs`

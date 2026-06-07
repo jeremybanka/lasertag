@@ -1,10 +1,11 @@
 {
-	"name": "uigui",
+	"name": "lasertag",
 	"version": "0.1.0",
-	"description": "zero-runtime css framework for jsx with css modules",
+	"description": "zero-runtime structural css for jsx with css modules",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/jeremybanka/uigui.git"
+		"url": "git+https://github.com/jeremybanka/lasertag.git",
+		"directory": "packages/lasertag"
 	},
 	"files": [
 		"docs",

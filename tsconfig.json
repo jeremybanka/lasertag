@@ -17,5 +17,5 @@
 		"types": []
 	},
 	"include": ["**/*.ts", "*.d.ts"],
-	"exclude": ["packages/uigui/eslint/tests/HIGH-QUALITY-EXAMPLE.test.ts"]
+	"exclude": ["packages/lasertag/eslint/tests/HIGH-QUALITY-EXAMPLE.test.ts"]
 }
