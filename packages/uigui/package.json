@@ -8,6 +8,7 @@
 	},
 	"files": [
 		"docs",
+		"examples",
 		"types",
 		"AGENTS.md"
 	],
@@ -17,9 +18,9 @@
 		"./css-modules": {
 			"types": "./types/module.css.d.ts"
 		},
-    "./react-jsx": {
-      "types": "./types/react-jsx-intrinsic-elements.d.ts"
-    },
+		"./react-jsx": {
+			"types": "./types/react-jsx-intrinsic-elements.d.ts"
+		},
 		"./preact-jsx": {
 			"types": "./types/preact-jsx-intrinsic-elements.d.ts"
 		},
@@ -28,6 +29,7 @@
 		}
 	},
 	"scripts": {
+		"typecheck:examples": "tsc -p examples/react/tsconfig.json && tsc -p examples/preact/tsconfig.json",
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {},
@@ -44,9 +46,9 @@
 		"solid-js": "^1.9"
 	},
 	"peerDependenciesMeta": {
-    "@types/react": {
-      "optional": true
-    },
+		"@types/react": {
+			"optional": true
+		},
 		"preact": {
 			"optional": true
 		},

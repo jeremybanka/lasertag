@@ -1,5 +1,10 @@
 import type * as Preact from "preact"
 
+type CustomElementAttributes =
+	| Preact.HTMLAttributes<HTMLElement>
+	| Preact.SVGAttributes<SVGElement>
+	| Preact.MathMLAttributes<MathMLElement>
+
 // Allow arbitrary custom elements that follow the Custom Elements spec.
 //
 // In other words, this allows you to write `<my-element>` in your JSX.
@@ -12,10 +17,7 @@ import type * as Preact from "preact"
 declare module "preact" {
 	namespace JSX {
 		interface IntrinsicElements {
-			[tagname: `${string}-${string}` & {}]: Preact.DetailedHTMLProps<
-				Preact.HTMLAttributes<HTMLElement>,
-				HTMLElement
-			>
+			[tagname: `${string}-${string}` & {}]: CustomElementAttributes
 		}
 	}
 }

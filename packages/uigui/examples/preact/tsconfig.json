@@ -1,0 +1,14 @@
+{
+	"compilerOptions": {
+		"jsx": "react-jsx",
+		"jsxImportSource": "preact",
+		"lib": ["DOM", "ES2024"],
+		"module": "NodeNext",
+		"moduleResolution": "NodeNext",
+		"noEmit": true,
+		"strict": true,
+		"target": "ES2024",
+		"types": []
+	},
+	"include": ["uigui.d.ts", "src/**/*.tsx"]
+}
