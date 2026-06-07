@@ -1,9 +1,9 @@
-import styles from "./app.module.css"
+import css from "./AppRoot.module.css"
 
 export function App() {
 	return (
-		<div className={styles.class}>
+		<app-root className={css.class}>
 			<hello-world aria-label="React custom element" data-example="react" />
-		</div>
+		</app-root>
 	)
 }

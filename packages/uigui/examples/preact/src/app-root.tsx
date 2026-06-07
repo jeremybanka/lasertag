@@ -1,9 +1,9 @@
-import styles from "./app.module.css"
+import css from "./app-root.module.css"
 
 export function App() {
 	return (
-		<div class={styles.class}>
+		<app-root className={css.class}>
 			<hello-world aria-label="Preact custom element" data-example="preact" />
-		</div>
+		</app-root>
 	)
 }
