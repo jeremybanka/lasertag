@@ -29,7 +29,7 @@
 		}
 	},
 	"scripts": {
-		"typecheck:examples": "tsc -p examples/react/tsconfig.json && tsc -p examples/preact/tsconfig.json",
+		"typecheck:examples": "tsc -p examples/react/tsconfig.json && tsc -p examples/preact/tsconfig.json && tsc -p examples/solid-js/tsconfig.json",
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {},
