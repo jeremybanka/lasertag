@@ -3,3 +3,11 @@ packages:
 
 blockExoticSubdeps: true
 minimumReleaseAge: 1440
+
+peerDependencyRules:
+  allowAny:
+    - vite
+    - vitest
+  allowedVersions:
+    vite: '*'
+    vitest: '*'
