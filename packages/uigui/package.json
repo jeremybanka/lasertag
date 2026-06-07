@@ -26,15 +26,21 @@
 		},
 		"./solid-jsx": {
 			"types": "./types/solid-jsx-intrinsic-elements.d.ts"
+		},
+		"./eslint-plugin": {
+			"import": "./eslint/dist/plugin.js",
+			"types": "./eslint/dist/plugin.d.ts"
 		}
 	},
 	"scripts": {
 		"typecheck:examples": "tsc -p examples/react/tsconfig.json && tsc -p examples/preact/tsconfig.json && tsc -p examples/solid-js/tsconfig.json",
 		"typecheck": "tsc --noEmit"
 	},
-	"dependencies": {},
 	"devDependencies": {
+		"@eslint/core": "1.2.1",
+		"@types/estree": "1.0.9",
 		"@types/react": "19.2.17",
+		"eslint": "10.4.1",
 		"preact": "10.29.2",
 		"solid-js": "1.9.13",
 		"tsdown": "0.22.2",
@@ -42,6 +48,7 @@
 	},
 	"peerDependencies": {
 		"@types/react": "^19.2",
+    "eslint": "^10.4",
 		"preact": "^10.29",
 		"solid-js": "^1.9"
 	},
@@ -49,6 +56,9 @@
 		"@types/react": {
 			"optional": true
 		},
+    "eslint": {
+      "optional": true
+    },
 		"preact": {
 			"optional": true
 		},
