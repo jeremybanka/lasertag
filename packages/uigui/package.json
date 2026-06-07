@@ -1,0 +1,28 @@
+{
+	"name": "uigui",
+	"version": "0.1.0",
+	"description": "zero-runtime css framework for jsx with css modules",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/jeremybanka/uigui.git"
+	},
+	"files": [
+		"docs",
+		"types",
+		"AGENTS.md"
+	],
+	"type": "module",
+	"scripts": {
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {},
+	"devDependencies": {
+		"tsdown": "0.22.2",
+		"typescript": "6.0.3"
+	},
+	"engines": {
+		"node": "26.3.0",
+		"pnpm": "11.5.2"
+	},
+	"packageManager": "pnpm@11.5.2"
+}

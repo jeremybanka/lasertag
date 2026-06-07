@@ -1,0 +1,23 @@
+{
+	"name": "uigui-workspace",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"check": "vp check && vp test && pnpm --filter agents.yaml check",
+		"fmt": "vp fmt",
+		"fmt:check": "vp fmt --check",
+		"lint": "vp lint",
+		"staged": "vp staged",
+		"test": "vp test",
+		"typecheck": "pnpm --filter agents.yaml typecheck"
+	},
+	"devDependencies": {
+		"typescript": "6.0.3",
+		"vite-plus": "0.1.24"
+	},
+	"engines": {
+		"node": "26.3.0",
+		"pnpm": "11.5.2"
+	},
+	"packageManager": "pnpm@11.5.2"
+}

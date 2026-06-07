@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.mise/
+.pnpm-home/
+.pnpm-store/
+.xdg-data/
+.mise.local.toml
+.env
+*.log
