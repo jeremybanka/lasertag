@@ -1,6 +1,1 @@
 export * from "./rules/ban-div.ts"
-export * from "./rules/header-main-footer-as-group.ts"
-export * from "./rules/name-imported-css-module-as-css.ts"
-export * from "./rules/import-own-css-module-only.ts"
-export * from "./rules/export-own-component-only.ts"
-export * from "./rules/render-tag-with-own-name.ts"

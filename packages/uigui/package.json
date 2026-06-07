@@ -48,7 +48,7 @@
 	},
 	"peerDependencies": {
 		"@types/react": "^19.2",
-    "eslint": "^10.4",
+		"eslint": "^10.4",
 		"preact": "^10.29",
 		"solid-js": "^1.9"
 	},
@@ -56,9 +56,9 @@
 		"@types/react": {
 			"optional": true
 		},
-    "eslint": {
-      "optional": true
-    },
+		"eslint": {
+			"optional": true
+		},
 		"preact": {
 			"optional": true
 		},

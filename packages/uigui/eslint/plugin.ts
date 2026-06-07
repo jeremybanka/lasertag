@@ -6,7 +6,7 @@ export { Rules }
 
 const plugin: ESLint.Plugin = {
 	rules: {
-		
+		"ban-div": Rules.banDiv,
 	},
 } satisfies ESLint.Plugin
 
