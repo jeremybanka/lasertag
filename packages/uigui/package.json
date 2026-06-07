@@ -10,6 +10,7 @@
 		"docs",
 		"eslint/dist",
 		"examples",
+		"templates",
 		"types",
 		"AGENTS.md"
 	],

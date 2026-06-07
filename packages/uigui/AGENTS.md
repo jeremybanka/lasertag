@@ -11,4 +11,5 @@ zero-runtime css framework for jsx with css modules
 - Never use `<div>`. Use a semantic HTML element, form control, or descriptive custom tag instead.
 - Use `<header>`, `<main>`, and `<footer>` only as siblings under the same parent; `<header>`/`main`, `<main>`/`<footer>`, and `<header>`/`<footer>` are all valid pairings, but these tags should not appear alone or mixed with unrelated sibling elements.
 - Avoid extra single-child wrappers unless they distinguish an important element such as a form control, media element, or SVG.
-- Keep detailed examples and edge-case guidance in `./uigui-guide.md`.
+- Prefer a small `globals.css`, imported by the main entrypoint, for an uncontroversial reset, font imports, and semantic color variables. Keep component styling in CSS Modules.
+- Keep detailed examples and edge-case guidance in `./uigui-guide.md` and `./docs/globals-guide.md`.
