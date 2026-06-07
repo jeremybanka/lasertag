@@ -8,6 +8,7 @@
 	},
 	"files": [
 		"docs",
+		"eslint/dist",
 		"examples",
 		"types",
 		"AGENTS.md"
@@ -28,11 +29,12 @@
 			"types": "./types/solid-jsx-intrinsic-elements.d.ts"
 		},
 		"./eslint-plugin": {
-			"import": "./eslint/dist/plugin.js",
-			"types": "./eslint/dist/plugin.d.ts"
+			"import": "./eslint/dist/plugin.mjs",
+			"types": "./eslint/dist/plugin.d.mts"
 		}
 	},
 	"scripts": {
+		"build:eslint": "tsdown eslint/src/plugin.ts --out-dir eslint/dist --format esm --dts --clean",
 		"typecheck:examples": "tsc -p examples/react/tsconfig.json && tsc -p examples/preact/tsconfig.json && tsc -p examples/solid-js/tsconfig.json",
 		"typecheck": "tsc --noEmit"
 	},

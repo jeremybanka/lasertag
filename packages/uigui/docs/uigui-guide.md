@@ -1,6 +1,6 @@
-# Banka-Style CSS
+# uigui
 
-This app uses a small, structural CSS Modules convention: each exported React component owns one sibling `.module.css` file, and that stylesheet contains one root class named `.class`.
+uigui is a small, structural CSS Modules convention for JSX components: each exported component owns one sibling `.module.css` file, and that stylesheet contains one root class named `.class`.
 
 ## Component Modules
 
@@ -11,7 +11,7 @@ Checkbox.tsx
 Checkbox.module.css
 ```
 
-Import CSS modules as `css`, then apply only the root class. The root wrapper should be a hyphenated custom element matching the component name:
+Import CSS modules as `css`, then apply only the root class with your JSX runtime's class attribute, such as `className={css.class}` or `class={css.class}`. The root wrapper should be a hyphenated custom element matching the component name:
 
 ```tsx
 import css from "./AppHeaderBar.module.css"
@@ -36,14 +36,14 @@ app-header-bar.class {
 }
 ```
 
-Only make exceptions for interactive or form wrappers where the native element is the meaningful control:
+A component module should export the component it is named for, and should avoid exporting unrelated values. Component files should import only their own sibling CSS module, and should import it as `css`.
+
+Only make root tag exceptions when a native form or control element is the component's meaningful outer element, such as `button`, `label`, `input`, `select`, `textarea`, `fieldset`, or `form`:
 
 ```tsx
 import css from "./Checkbox.module.css"
 
-export const Checkbox = (
-	inputProps: React.InputHTMLAttributes<HTMLInputElement>,
-) => (
+export const Checkbox = (inputProps) => (
 	<label className={css.class}>
 		<input {...inputProps} type="checkbox" />
 		<span>Enabled</span>
@@ -100,7 +100,7 @@ Use a custom tag for the root of every exported component, named after that comp
 
 Use official semantic HTML when it fits inside that wrapper: `nav`, `ul`, `ol`, `li`, `article`, `blockquote`, `data`, `time`, `output`, `meter`, and `progress` all carry useful meaning.
 
-Use `header`, `main`, and `footer` only as siblings under the same parent. `header`/`main`, `main`/`footer`, and `header`/`footer` are all okay. Do not use any of those tags alone, and do not mix them with unrelated siblings; they gain meaning from their relationship under one parent.
+Use `header`, `main`, and `footer` only as siblings under the same parent. If any of those tags appears under a parent, that parent should contain at least two of those tags and no unrelated element children. `header`/`main`, `main`/`footer`, and `header`/`footer` are all okay; they gain meaning from their relationship under one parent.
 
 For interactions, prefer the browser's form controls: `input`, `textarea`, `button`, `label`, `select`, `option`, `fieldset`, and `legend`.
 
@@ -121,17 +121,8 @@ declare module "*.module.css" {
 }
 ```
 
-`uigui/types/jsx-intrinsic-elements.d.ts` allows arbitrary hyphenated custom elements in JSX:
+uigui ships JSX intrinsic element types for React, Preact, and Solid. Each allows arbitrary hyphenated custom elements in JSX:
 
-```ts
-declare module "react" {
-	namespace JSX {
-		interface IntrinsicElements {
-			[tagname: `${string}-${string}` & {}]: React.DetailedHTMLProps<
-				React.HTMLAttributes<HTMLElement>,
-				HTMLElement
-			>
-		}
-	}
-}
-```
+- `uigui/react-jsx`
+- `uigui/preact-jsx`
+- `uigui/solid-jsx`
