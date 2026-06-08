@@ -16,6 +16,5 @@
 		"target": "ES2024",
 		"types": []
 	},
-	"include": ["**/*.ts", "*.d.ts"],
-	"exclude": ["packages/lasertag/eslint/tests/HIGH-QUALITY-EXAMPLE.test.ts"]
+	"include": ["**/*.ts", "*.d.ts"]
 }
