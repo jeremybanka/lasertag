@@ -5,7 +5,9 @@ import type * as ESTree from "estree"
 const MESSAGE = `Import CSS modules with a default import named css.`
 
 function isCssModuleSource(source: ESTree.Literal): boolean {
-	return typeof source.value === `string` && source.value.endsWith(`.module.css`)
+	return (
+		typeof source.value === `string` && source.value.endsWith(`.module.css`)
+	)
 }
 
 export const nameImportedCssModuleAsCss: {

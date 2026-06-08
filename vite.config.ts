@@ -1,14 +1,6 @@
 import { defineConfig } from "vite-plus"
 
 export default defineConfig({
-	fmt: {
-		ignorePatterns: ["**/dist/**", "**/node_modules/**"],
-		semi: false,
-		singleQuote: false,
-		useTabs: true,
-		printWidth: 80,
-		sortPackageJson: true,
-	},
 	lint: {
 		ignorePatterns: ["**/dist/**", "**/node_modules/**"],
 		options: {
@@ -17,7 +9,7 @@ export default defineConfig({
 		},
 	},
 	staged: {
-		"*": "vp check --fix",
+		"*": ["dprint fmt", "vp check --no-fmt --fix"],
 	},
 	test: {
 		exclude: [
