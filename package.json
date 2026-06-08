@@ -3,12 +3,15 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
+		"change": "changeset",
 		"check": "dprint check && vp check --no-fmt",
 		"fmt": "dprint fmt",
 		"fmt:check": "dprint check",
 		"lint": "vp lint",
+		"release": "changeset publish",
 		"staged": "vp staged",
-		"test": "vp test"
+		"test": "vp test",
+		"workflows": "./scripts/update-workflows.node.ts"
 	},
 	"devDependencies": {
 		"@changesets/cli": "2.31.0",
