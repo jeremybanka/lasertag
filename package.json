@@ -9,7 +9,7 @@
 		"fmt": "dprint fmt",
 		"fmt:check": "dprint check",
 		"lint": "vp lint",
-		"release": "changeset publish",
+		"release": "pnpm build && changeset publish",
 		"staged": "vp staged",
 		"test": "vp run -r test",
 		"workflows": "./scripts/update-workflows.node.ts"
