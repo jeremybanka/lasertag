@@ -1,6 +1,9 @@
 packages:
   - packages/*
 
+allowBuilds:
+  dprint: true
+
 blockExoticSubdeps: true
 minimumReleaseAge: 1440
 
