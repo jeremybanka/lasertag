@@ -3,7 +3,7 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"build": "vp pack packages/lasertag/eslint/src/plugin.ts --out-dir packages/lasertag/eslint/dist --format esm --dts --clean",
+		"build": "vp pack",
 		"change": "changeset",
 		"check": "dprint check && vp check --no-fmt",
 		"fmt": "dprint fmt",

@@ -8,6 +8,13 @@ export default defineConfig({
 			typeCheck: true,
 		},
 	},
+	pack: {
+		clean: true,
+		dts: true,
+		entry: ["packages/lasertag/eslint/src/plugin.ts"],
+		format: "esm",
+		outDir: "packages/lasertag/eslint/dist",
+	},
 	staged: {
 		"*": ["dprint fmt", "vp check --no-fmt --fix"],
 	},
