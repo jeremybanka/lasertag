@@ -16,10 +16,6 @@ export default defineConfig({
 		outDir: "eslint/dist",
 	},
 	test: {
-		exclude: ["**/node_modules/**", "**/.git/**"],
-		include: [
-			"src/**/*.test.ts",
-			"eslint/tests/**/*.test.ts",
-		],
+		include: ["eslint/tests/**/*.test.ts"],
 	},
 })
