@@ -8,4 +8,11 @@ export default defineConfig({
 		format: "esm",
 		outDir: "eslint/dist",
 	},
+	test: {
+		exclude: ["**/node_modules/**", "**/.git/**"],
+		include: [
+			"src/**/*.test.ts",
+			"eslint/tests/**/*.test.ts",
+		],
+	},
 })

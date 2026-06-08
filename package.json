@@ -11,7 +11,7 @@
 		"lint": "vp lint",
 		"release": "changeset publish",
 		"staged": "vp staged",
-		"test": "vp test",
+		"test": "vp run -r test",
 		"workflows": "./scripts/update-workflows.node.ts"
 	},
 	"devDependencies": {

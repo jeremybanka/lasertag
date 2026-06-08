@@ -38,6 +38,7 @@
 	"scripts": {
 		"build": "vp pack",
 		"build:eslint": "vp pack",
+		"test": "vp test",
 		"typecheck:examples": "tsc -p examples/react/tsconfig.json && tsc -p examples/preact/tsconfig.json && tsc -p examples/solid-js/tsconfig.json",
 		"typecheck": "tsc --noEmit"
 	},

@@ -11,11 +11,4 @@ export default defineConfig({
 	staged: {
 		"*": ["dprint fmt", "vp check --no-fmt --fix"],
 	},
-	test: {
-		exclude: ["**/node_modules/**", "**/.git/**"],
-		include: [
-			"packages/*/src/**/*.test.ts",
-			"packages/*/eslint/tests/**/*.test.ts",
-		],
-	},
 })
