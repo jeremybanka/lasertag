@@ -1,0 +1,45 @@
+{
+	"$schema": "https://docs.renovatebot.com/renovate-schema.json",
+	"extends": ["config:recommended"],
+	"automerge": true,
+	"branchConcurrentLimit": 1,
+	"prHourlyLimit": 10,
+	"minimumReleaseAge": "1 day",
+	"customManagers": [
+		{
+			"customType": "regex",
+			"managerFilePatterns": ["/^\\.github\\/actions\\/setup\\/action\\.yml$/"],
+			"matchStrings": [
+				"uses: jdx\\/mise-action@\\S+(?:\\s+#.*)?\\s+      with:\\s+        version: (?<currentValue>\\S+)"
+			],
+			"depNameTemplate": "jdx/mise",
+			"datasourceTemplate": "github-releases",
+			"versioningTemplate": "semver-coerced"
+		}
+	],
+	"packageRules": [
+		{
+			"matchPackageNames": ["jdx/mise"],
+			"matchDatasources": ["github-releases"],
+			"ignoreUnstable": true
+		},
+		{
+			"groupName": "vite-plus",
+			"matchDepNames": ["vite", "vitest", "vite-plus", "viteplus"],
+			"matchPackageNames": [
+				"vite-plus",
+				"viteplus",
+				"@voidzero-dev/vite-plus-core",
+				"@voidzero-dev/vite-plus-test"
+			]
+		},
+		{
+			"matchManagers": ["github-actions"],
+			"dependencyDashboardApproval": true
+		},
+		{
+			"matchPackageNames": ["@typescript/*"],
+			"minimumReleaseAge": null
+		}
+	]
+}
