@@ -31,8 +31,8 @@ jobs:
         with:
           client-id: ${{ vars.RENOVATE_APP_CLIENT_ID }}
           private-key: ${{ secrets.RENOVATE_APP_PK_E8JQE9YE }}
-          owner: jeremybanka
-          repositories: lasertag
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
           permission-contents: write
           permission-pull-requests: write
           permission-issues: write
@@ -42,7 +42,7 @@ jobs:
         env:
           LOG_LEVEL: debug
           RENOVATE_ALLOW_PLUGINS: true
-          RENOVATE_REPOSITORIES: jeremybanka/lasertag
+          RENOVATE_REPOSITORIES: ${{ github.repository_owner }}/${{ github.event.repository.name }}
         with:
           configurationFile: renovate.json
           token: ${{ steps.app-token.outputs.token }}
