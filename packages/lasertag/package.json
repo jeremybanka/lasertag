@@ -9,7 +9,7 @@
 	},
 	"files": [
 		"docs",
-		"eslint/dist",
+		"eslint",
 		"examples",
 		"templates",
 		"types",
