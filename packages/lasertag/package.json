@@ -36,7 +36,7 @@
 		}
 	},
 	"scripts": {
-		"build:eslint": "tsdown eslint/src/plugin.ts --out-dir eslint/dist --format esm --dts --clean",
+		"build:eslint": "vp pack eslint/src/plugin.ts --out-dir eslint/dist --format esm --dts --clean",
 		"typecheck:examples": "tsc -p examples/react/tsconfig.json && tsc -p examples/preact/tsconfig.json && tsc -p examples/solid-js/tsconfig.json",
 		"typecheck": "tsc --noEmit"
 	},
@@ -48,7 +48,6 @@
 		"eslint": "10.4.1",
 		"preact": "10.29.2",
 		"solid-js": "1.9.13",
-		"tsdown": "0.22.2",
 		"typescript": "6.0.3",
 		"vitest": "npm:@voidzero-dev/vite-plus-test@0.1.24"
 	},
