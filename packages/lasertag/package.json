@@ -36,7 +36,8 @@
 		}
 	},
 	"scripts": {
-		"build:eslint": "vp run -w build",
+		"build": "vp pack",
+		"build:eslint": "vp pack",
 		"typecheck:examples": "tsc -p examples/react/tsconfig.json && tsc -p examples/preact/tsconfig.json && tsc -p examples/solid-js/tsconfig.json",
 		"typecheck": "tsc --noEmit"
 	},

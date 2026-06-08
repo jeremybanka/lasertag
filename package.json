@@ -3,7 +3,7 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"build": "vp pack",
+		"build": "vp run -r build",
 		"change": "changeset",
 		"check": "dprint check && vp check --no-fmt",
 		"fmt": "dprint fmt",
