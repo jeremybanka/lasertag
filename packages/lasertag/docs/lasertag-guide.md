@@ -31,8 +31,7 @@ The matching stylesheet should have a single top-level member:
 
 ```css
 app-header-bar.class {
-	> left-side {
-	}
+	> left-side {}
 }
 ```
 
@@ -53,10 +52,8 @@ export const Checkbox = (inputProps) => (
 
 ```css
 label.class {
-	> input {
-	}
-	> span {
-	}
+	> input {}
+	> span {}
 }
 ```
 
@@ -84,13 +81,11 @@ export const AppHeaderBar = () => (
 app-header-bar.class {
 	> left-side {
 		> app-logo {
-			> svg {
-			}
+			> svg {}
 		}
 	}
 
-	> right-side {
-	}
+	> right-side {}
 }
 ```
 

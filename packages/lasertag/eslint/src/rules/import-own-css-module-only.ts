@@ -8,9 +8,7 @@ const MESSAGE = `Import only the CSS module that belongs to this component file.
 function isCssModuleSource(
 	source: ESTree.Literal,
 ): source is ESTree.Literal & { value: string } {
-	return (
-		typeof source.value === `string` && source.value.endsWith(`.module.css`)
-	)
+	return typeof source.value === `string` && source.value.endsWith(`.module.css`)
 }
 
 function getExpectedCssModuleImport(filename: string): string {
@@ -46,9 +44,7 @@ export const importOwnCssModuleOnly: {
 			ImportDeclaration(node) {
 				if (!isCssModuleSource(node.source)) return
 
-				if (
-					node.source.value !== getExpectedCssModuleImport(context.filename)
-				) {
+				if (node.source.value !== getExpectedCssModuleImport(context.filename)) {
 					context.report({ node: node.source, message: MESSAGE })
 				}
 			},
