@@ -1,5 +1,11 @@
 # lasertag
 
+## 0.1.3
+
+### Patch Changes
+
+- bff3c8a: Add an ESLint rule that restricts CSS module import member access to `class`.
+
 ## 0.1.2
 
 ### Patch Changes
