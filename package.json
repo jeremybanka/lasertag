@@ -5,7 +5,7 @@
 	"scripts": {
 		"build": "vp run -r build",
 		"change": "changeset",
-		"check": "dprint check && vp check --no-fmt",
+		"check": "vp check --no-fmt",
 		"fmt": "dprint fmt",
 		"fmt:check": "dprint check",
 		"lint": "vp lint",
