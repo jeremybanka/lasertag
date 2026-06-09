@@ -6,6 +6,7 @@ export { Rules }
 
 const plugin: ESLint.Plugin = {
 	rules: {
+		"access-css-module-class-only": Rules.accessCssModuleClassOnly,
 		"ban-div": Rules.banDiv,
 		"export-own-component-only": Rules.exportOwnComponentOnly,
 		"header-main-footer-as-group": Rules.headerMainFooterAsGroup,
