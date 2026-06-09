@@ -12,4 +12,5 @@ zero-runtime structural css for jsx with css modules
 - Use `<header>`, `<main>`, and `<footer>` only as siblings under the same parent; `<header>`/`main`, `<main>`/`<footer>`, and `<header>`/`<footer>` are all valid pairings, but these tags should not appear alone or mixed with unrelated sibling elements.
 - Avoid extra single-child wrappers unless they distinguish an important element such as a form control, media element, or SVG.
 - Prefer a small `globals.css`, imported by the main entrypoint, for an uncontroversial reset, font imports, and semantic color variables. Keep component styling in CSS Modules.
+- We recommend using the ESLint plugin exported at `lasertag/eslint-plugin` to enforce these conventions; scope component ownership rules to JSX component files.
 - Keep detailed examples and edge-case guidance in `./docs/lasertag-guide.md` and `./docs/globals-guide.md`.
