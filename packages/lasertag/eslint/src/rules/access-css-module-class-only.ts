@@ -40,9 +40,16 @@ function isCssModuleImportAccess(
 
 function isAllowedCssModuleAccess(node: ESTree.MemberExpression): boolean {
 	return (
-		!node.computed &&
-		node.property.type === `Identifier` &&
-		node.property.name === `class`
+		(!node.computed &&
+			node.property.type === `Identifier` &&
+			node.property.name === `class`) ||
+		(node.computed &&
+			node.property.type === `Literal` &&
+			node.property.value === `class`) ||
+		(node.computed &&
+			node.property.type === `TemplateLiteral` &&
+			node.property.expressions.length === 0 &&
+			node.property.quasis[0]?.value.cooked === `class`)
 	)
 }
 

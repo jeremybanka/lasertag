@@ -14,6 +14,18 @@ ruleTester.run(`access-css-module-class-only`, accessCssModuleClassOnly, {
 			`,
 		},
 		{
+			name: `allow computed class access on css module import`,
+			code: `
+				import css from "./App.module.css"
+
+				const className = css["class"]
+			`,
+		},
+		{
+			name: `allow template literal computed class access on css module import`,
+			code: 'import css from "./App.module.css"\n\nconst className = css[`class`]',
+		},
+		{
 			name: `ignore non-css-module member access`,
 			code: `
 				const css = { className: "x" }
@@ -42,11 +54,11 @@ ruleTester.run(`access-css-module-class-only`, accessCssModuleClassOnly, {
 			errors: [{ message }],
 		},
 		{
-			name: `ban computed class access on css module import`,
+			name: `ban other computed access on css module import`,
 			code: `
 				import css from "./App.module.css"
 
-				const className = css["class"]
+				const className = css["className"]
 			`,
 			errors: [{ message }],
 		},
