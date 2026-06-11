@@ -3,7 +3,7 @@ import type { Rule } from "eslint"
 import type * as ESTree from "estree"
 import path from "node:path"
 
-const MESSAGE = `Export only the component that belongs to this file.`
+const MESSAGE = `A .tsx file should have at most one named export: a function returning JSX with the same name as the file.`
 
 type ExportNamedDeclaration = ESTree.ExportNamedDeclaration & {
 	exportKind?: `type` | `value`
@@ -17,25 +17,39 @@ function getExpectedExportName(filename: string): string {
 	return path.parse(filename).name
 }
 
-function getDeclarationName(
+function getDeclarationNameNodes(
 	declaration: ESTree.Declaration,
-): string | undefined {
+): ESTree.Identifier[] {
 	switch (declaration.type) {
 		case `FunctionDeclaration`:
 		case `ClassDeclaration`:
-			return declaration.id?.name
+			return declaration.id ? [declaration.id] : []
 		case `VariableDeclaration`:
-			if (declaration.declarations.length !== 1) return
-			return declaration.declarations[0]?.id.type === `Identifier`
-				? declaration.declarations[0].id.name
-				: undefined
+			return declaration.declarations.flatMap((declarator) =>
+				declarator.id.type === `Identifier` ? [declarator.id] : [],
+			)
 		default:
-			return
+			return []
 	}
 }
 
 function isTypeOnlyExport(node: ExportNamedDeclaration): boolean {
 	return node.exportKind === `type`
+}
+
+function getDefaultExportNameNode(
+	node: ESTree.ExportDefaultDeclaration,
+): ESTree.Identifier | undefined {
+	const { declaration } = node
+
+	if (
+		declaration.type === `FunctionDeclaration` ||
+		declaration.type === `ClassDeclaration`
+	) {
+		return declaration.id ?? undefined
+	}
+
+	return declaration.type === `Identifier` ? declaration : undefined
 }
 
 export const exportOwnComponentOnly: {
@@ -65,17 +79,29 @@ export const exportOwnComponentOnly: {
 
 		return {
 			ExportDefaultDeclaration(node) {
-				context.report({ node, message: MESSAGE })
+				context.report({
+					node: getDefaultExportNameNode(node) ?? node,
+					message: MESSAGE,
+				})
 			},
 
 			ExportNamedDeclaration(node: ExportNamedDeclaration) {
 				if (isTypeOnlyExport(node)) return
 
 				if (node.declaration) {
-					const declarationName = getDeclarationName(node.declaration)
+					const declarationNameNodes = getDeclarationNameNodes(node.declaration)
+					const namesToReport =
+						declarationNameNodes.length > 0 ? declarationNameNodes : [node]
 
-					if (declarationName !== expectedExportName) {
-						context.report({ node, message: MESSAGE })
+					for (const nameNode of namesToReport) {
+						if (
+							nameNode.type === `Identifier` &&
+							nameNode.name === expectedExportName
+						) {
+							continue
+						}
+
+						context.report({ node: nameNode, message: MESSAGE })
 					}
 
 					return
@@ -90,7 +116,7 @@ export const exportOwnComponentOnly: {
 							: specifier.exported.value
 
 					if (exportedName !== expectedExportName) {
-						context.report({ node: specifier, message: MESSAGE })
+						context.report({ node: specifier.exported, message: MESSAGE })
 					}
 				}
 			},

@@ -43,6 +43,17 @@ function getJSXElementName(node: JSSyntaxElement): string | undefined {
 	return isJSXIdentifier(name) ? name.name : undefined
 }
 
+function getJSXElementNameNode(
+	node: JSSyntaxElement | undefined,
+): JSSyntaxElement | undefined {
+	if (node?.type !== `JSXElement`) return
+
+	const element = node as JSXElement
+	const { name } = element.openingElement
+
+	return isJSXIdentifier(name) ? name : undefined
+}
+
 function isFunctionNode(node: JSSyntaxElement): boolean {
 	return (
 		node.type === `ArrowFunctionExpression` ||
@@ -164,7 +175,8 @@ function reportIfRootTagsDoNotMatch(
 
 		if (!isAllowedRootTag(componentName, rootTagName)) {
 			context.report({
-				node: rootNode ?? context.sourceCode.ast,
+				node:
+					getJSXElementNameNode(rootNode) ?? rootNode ?? context.sourceCode.ast,
 				message: MESSAGE,
 			})
 		}

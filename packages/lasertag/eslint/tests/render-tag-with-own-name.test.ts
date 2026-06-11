@@ -81,6 +81,19 @@ ruleTester.run(`render-tag-with-own-name`, renderTagWithOwnName, {
 			errors: [{ message }],
 		},
 		{
+			name: `report only the wrong root tag name`,
+			code: `export const ProjectList = () => <article data-kind="project"><span /></article>`,
+			errors: [
+				{
+					message,
+					line: 1,
+					column: 35,
+					endLine: 1,
+					endColumn: 42,
+				},
+			],
+		},
+		{
 			name: `ban semantic non-form root elements`,
 			code: `
 				export function ProjectList() {

@@ -76,6 +76,19 @@ ruleTester.run(`header-main-footer-as-group`, headerMainFooterAsGroup, {
 			errors: [{ message }],
 		},
 		{
+			name: `report only the offending group tag name`,
+			code: `const App = () => <app-shell><header data-kind="page"><span /></header></app-shell>`,
+			errors: [
+				{
+					message,
+					line: 1,
+					column: 31,
+					endLine: 1,
+					endColumn: 37,
+				},
+			],
+		},
+		{
 			name: `ban group mixed with unrelated element siblings`,
 			code: `
 				const App = () => (
