@@ -10,6 +10,24 @@ function isCssModuleSource(source: ESTree.Literal): boolean {
 	)
 }
 
+function getImportSpecifierNameNode(
+	node: ESTree.ImportDeclaration,
+): ESTree.Identifier | undefined {
+	const defaultSpecifier = node.specifiers.find(
+		(specifier) => specifier.type === `ImportDefaultSpecifier`,
+	)
+
+	if (defaultSpecifier && defaultSpecifier.local.name !== `css`) {
+		return defaultSpecifier.local
+	}
+
+	return node.specifiers.find(
+		(specifier) =>
+			specifier.type === `ImportSpecifier` ||
+			specifier.type === `ImportNamespaceSpecifier`,
+	)?.local
+}
+
 export const nameImportedCssModuleAsCss: {
 	meta: {
 		type: RuleType
@@ -43,7 +61,10 @@ export const nameImportedCssModuleAsCss: {
 					node.specifiers[0].local.name === `css`
 
 				if (!hasOnlyCssDefaultImport) {
-					context.report({ node, message: MESSAGE })
+					context.report({
+						node: getImportSpecifierNameNode(node) ?? node,
+						message: MESSAGE,
+					})
 				}
 			},
 		}

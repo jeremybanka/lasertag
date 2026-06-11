@@ -21,12 +21,33 @@ ruleTester.run(`name-imported-css-module-as-css`, nameImportedCssModuleAsCss, {
 		{
 			name: `ban another default import name`,
 			code: `import styles from "./App.module.css"`,
-			errors: [{ message }],
+			errors: [
+				{
+					message,
+					line: 1,
+					column: 8,
+					endLine: 1,
+					endColumn: 14,
+				},
+			],
 		},
 		{
 			name: `ban namespace css module imports`,
 			code: `import * as styles from "./App.module.css"`,
 			errors: [{ message }],
+		},
+		{
+			name: `report named css imports on the imported name`,
+			code: `import { css } from "./MyComponent.module.css"`,
+			errors: [
+				{
+					message,
+					line: 1,
+					column: 10,
+					endLine: 1,
+					endColumn: 13,
+				},
+			],
 		},
 		{
 			name: `ban side-effect css module imports`,
