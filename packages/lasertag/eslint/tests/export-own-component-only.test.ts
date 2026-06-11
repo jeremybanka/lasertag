@@ -1,7 +1,7 @@
 import { exportOwnComponentOnly } from "../src/rules/export-own-component-only.ts"
 import { ruleTester } from "./rule-tester.ts"
 
-const message = `Export only the component that belongs to this file.`
+const message = `A .tsx file should have at most one named export: a function returning JSX with the same name as the file.`
 
 ruleTester.run(`export-own-component-only`, exportOwnComponentOnly, {
 	valid: [
@@ -37,7 +37,15 @@ ruleTester.run(`export-own-component-only`, exportOwnComponentOnly, {
 			name: `ban differently named function component export`,
 			filename: `/project/src/AppHeaderBar.tsx`,
 			code: `export function AppNav() { return <app-nav /> }`,
-			errors: [{ message }],
+			errors: [
+				{
+					message,
+					line: 1,
+					column: 17,
+					endLine: 1,
+					endColumn: 23,
+				},
+			],
 		},
 		{
 			name: `ban helper value exports`,
@@ -51,18 +59,30 @@ ruleTester.run(`export-own-component-only`, exportOwnComponentOnly, {
 		{
 			name: `ban export lists that include other values`,
 			filename: `/project/src/ProjectList.tsx`,
-			code: `
-				const ProjectList = () => <project-list />
-				const formatCount = (count: number) => String(count)
-				export { ProjectList, formatCount }
-			`,
-			errors: [{ message }],
+			code: `const ProjectList = () => <project-list />; const formatCount = (count: number) => String(count); export { ProjectList, formatCount }`,
+			errors: [
+				{
+					message,
+					line: 1,
+					column: 121,
+					endLine: 1,
+					endColumn: 132,
+				},
+			],
 		},
 		{
 			name: `ban default exports`,
 			filename: `/project/src/ProjectList.tsx`,
 			code: `export default function ProjectList() { return <project-list /> }`,
-			errors: [{ message }],
+			errors: [
+				{
+					message,
+					line: 1,
+					column: 25,
+					endLine: 1,
+					endColumn: 36,
+				},
+			],
 		},
 	],
 })
