@@ -30,6 +30,13 @@ function getJSXElementName(node: JSSyntaxElement): string | undefined {
 	return isJSXIdentifier(name) ? name.name : undefined
 }
 
+function getJSXElementNameNode(node: JSSyntaxElement): JSSyntaxElement {
+	const element = node as JSXElement
+	const { name } = element.openingElement
+
+	return isJSXIdentifier(name) ? name : node
+}
+
 function isGroupTagName(name: string | undefined): boolean {
 	return name !== undefined && GROUP_TAGS.has(name)
 }
@@ -71,7 +78,10 @@ export const headerMainFooterAsGroup: {
 				const parent = element.parent as JSXElement | undefined
 
 				if (parent?.type !== `JSXElement`) {
-					context.report({ node, message: MESSAGE })
+					context.report({
+						node: getJSXElementNameNode(node),
+						message: MESSAGE,
+					})
 					return
 				}
 
@@ -86,7 +96,10 @@ export const headerMainFooterAsGroup: {
 				)
 
 				if (groupSiblingCount < 2 || hasUnrelatedElementSibling) {
-					context.report({ node, message: MESSAGE })
+					context.report({
+						node: getJSXElementNameNode(node),
+						message: MESSAGE,
+					})
 				}
 			},
 		}
