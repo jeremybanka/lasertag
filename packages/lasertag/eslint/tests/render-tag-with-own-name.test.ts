@@ -36,6 +36,41 @@ ruleTester.run(`render-tag-with-own-name`, renderTagWithOwnName, {
 			`,
 		},
 		{
+			name: `allow matching roots across nested control-flow returns`,
+			code: `
+				export function ProjectList({ mode, projects }) {
+					if (mode === "empty") {
+						return <project-list />
+					}
+
+					switch (mode) {
+						case "grid":
+							return <project-list />
+						default:
+							for (const project of projects) {
+								if (project.featured) {
+									return <project-list />
+								}
+							}
+					}
+
+					return <project-list />
+				}
+			`,
+		},
+		{
+			name: `ignore returns inside nested functions`,
+			code: `
+				export function ProjectList({ projects }) {
+					projects.map((project) => {
+						return <wrong-tag project={project} />
+					})
+
+					return <project-list />
+				}
+			`,
+		},
+		{
 			name: `ignore local components that are not exported`,
 			code: `const AppHeaderBar = () => <wrong-tag />`,
 		},
@@ -69,6 +104,48 @@ ruleTester.run(`render-tag-with-own-name`, renderTagWithOwnName, {
 			code: `
 				export function ProjectList() {
 					return <>No root tag</>
+				}
+			`,
+			errors: [{ message }],
+		},
+		{
+			name: `ban wrong roots returned from nested if statements`,
+			code: `
+				export function ProjectList({ isEmpty }) {
+					if (isEmpty) {
+						return <empty-state />
+					}
+
+					return <project-list />
+				}
+			`,
+			errors: [{ message }],
+		},
+		{
+			name: `ban wrong roots returned from switch cases`,
+			code: `
+				export function ProjectList({ mode }) {
+					switch (mode) {
+						case "grid":
+							return <project-grid />
+						default:
+							return <project-list />
+					}
+				}
+			`,
+			errors: [{ message }],
+		},
+		{
+			name: `ban wrong roots returned from loops`,
+			code: `
+				export function ProjectList({ projects }) {
+					for (const project of projects) {
+						if (project.featured) {
+							return <featured-projects />
+						}
+					}
+
+					return <project-list />
 				}
 			`,
 			errors: [{ message }],
