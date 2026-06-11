@@ -1,5 +1,16 @@
 # lasertag
 
+## 0.1.4
+
+### Patch Changes
+
+- 4db71e5: Tighten `render-tag-with-own-name` so exported components must return JSX whose outermost tag matches the component name, with no native form-control exception.
+- b151a73: Report `name-imported-css-module-as-css` diagnostics on the offending import specifier name when one is provided.
+- b151a73: Report `export-own-component-only` diagnostics on offending exported identifiers and clarify the rule message.
+- b151a73: Report `header-main-footer-as-group` diagnostics on the offending JSX tag name instead of the whole element.
+- b151a73: Report `render-tag-with-own-name` diagnostics on the mismatched JSX tag name instead of the whole returned element.
+- 4db71e5: Update `render-tag-with-own-name` to validate every return path inside exported components, including returns nested in `if`, `switch`, and loop control flow.
+
 ## 0.1.3
 
 ### Patch Changes
