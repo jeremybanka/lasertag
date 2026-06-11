@@ -2,16 +2,7 @@ import type { RuleType } from "@eslint/core"
 import type { JSSyntaxElement, Rule } from "eslint"
 import type * as ESTree from "estree"
 
-const FORM_CONTROL_ROOT_TAGS = new Set([
-	`button`,
-	`fieldset`,
-	`form`,
-	`input`,
-	`label`,
-	`select`,
-	`textarea`,
-])
-const MESSAGE = `Exported components should render a root tag matching their own name, unless a native form control is the meaningful wrapper.`
+const MESSAGE = `Exported components should return JSX with an outermost tag matching their own name.`
 
 type JSXIdentifier = JSSyntaxElement & {
 	type: `JSXIdentifier`
@@ -52,16 +43,89 @@ function getJSXElementName(node: JSSyntaxElement): string | undefined {
 	return isJSXIdentifier(name) ? name.name : undefined
 }
 
-function findReturnedNode(node: JSSyntaxElement): JSSyntaxElement | undefined {
-	if (node.type !== `BlockStatement`) return node
+function isFunctionNode(node: JSSyntaxElement): boolean {
+	return (
+		node.type === `ArrowFunctionExpression` ||
+		node.type === `FunctionDeclaration` ||
+		node.type === `FunctionExpression`
+	)
+}
+
+function getNodeChildren(node: JSSyntaxElement): JSSyntaxElement[] {
+	const children: JSSyntaxElement[] = []
+
+	for (const [key, value] of Object.entries(node)) {
+		if (key === `parent`) continue
+
+		if (Array.isArray(value)) {
+			children.push(
+				...value.filter(
+					(child): child is JSSyntaxElement =>
+						child !== null &&
+						typeof child === `object` &&
+						`type` in child &&
+						typeof child.type === `string`,
+				),
+			)
+			continue
+		}
+
+		if (
+			value !== null &&
+			typeof value === `object` &&
+			`type` in value &&
+			typeof value.type === `string`
+		) {
+			children.push(value as JSSyntaxElement)
+		}
+	}
+
+	return children
+}
+
+function collectReturnedNodes(
+	node: JSSyntaxElement,
+	returnedNodes: Array<JSSyntaxElement | undefined>,
+	visitedNodes: WeakSet<object>,
+) {
+	if (visitedNodes.has(node)) return
+
+	visitedNodes.add(node)
+
+	if (node.type === `ReturnStatement`) {
+		const returnStatement = node as ReturnStatement
+
+		returnedNodes.push(
+			(returnStatement.argument as JSSyntaxElement | null) ?? undefined,
+		)
+		return
+	}
+
+	if (isFunctionNode(node)) return
+
+	for (const child of getNodeChildren(node)) {
+		collectReturnedNodes(child, returnedNodes, visitedNodes)
+	}
+}
+
+function findReturnedNodes(
+	node: JSSyntaxElement,
+): Array<JSSyntaxElement | undefined> {
+	if (node.type !== `BlockStatement`) return [node]
 
 	const blockStatement = node as ESTree.BlockStatement
-	const returnStatement = blockStatement.body.find(
-		(statement): statement is ReturnStatement =>
-			statement.type === `ReturnStatement`,
-	)
+	const returnedNodes: Array<JSSyntaxElement | undefined> = []
+	const visitedNodes = new WeakSet<object>()
 
-	return (returnStatement?.argument as JSSyntaxElement | null) ?? undefined
+	for (const statement of blockStatement.body) {
+		collectReturnedNodes(
+			statement as JSSyntaxElement,
+			returnedNodes,
+			visitedNodes,
+		)
+	}
+
+	return returnedNodes
 }
 
 function getVariableComponentBody(
@@ -85,24 +149,25 @@ function getVariableComponentBody(
 }
 
 function isAllowedRootTag(componentName: string, tagName: string | undefined) {
-	return (
-		tagName === toKebabCase(componentName) ||
-		(tagName !== undefined && FORM_CONTROL_ROOT_TAGS.has(tagName))
-	)
+	return tagName === toKebabCase(componentName)
 }
 
-function reportIfRootTagDoesNotMatch(
+function reportIfRootTagsDoNotMatch(
 	context: Rule.RuleContext,
 	componentName: string,
-	rootNode: JSSyntaxElement | undefined,
+	rootNodes: Array<JSSyntaxElement | undefined>,
 ) {
-	const rootTagName = rootNode ? getJSXElementName(rootNode) : undefined
+	const nodesToCheck = rootNodes.length > 0 ? rootNodes : [undefined]
 
-	if (!isAllowedRootTag(componentName, rootTagName)) {
-		context.report({
-			node: rootNode ?? context.sourceCode.ast,
-			message: MESSAGE,
-		})
+	for (const rootNode of nodesToCheck) {
+		const rootTagName = rootNode ? getJSXElementName(rootNode) : undefined
+
+		if (!isAllowedRootTag(componentName, rootTagName)) {
+			context.report({
+				node: rootNode ?? context.sourceCode.ast,
+				message: MESSAGE,
+			})
+		}
 	}
 }
 
@@ -138,10 +203,10 @@ export const renderTagWithOwnName: {
 				if (declaration.type === `FunctionDeclaration`) {
 					if (!declaration.id) return
 
-					reportIfRootTagDoesNotMatch(
+					reportIfRootTagsDoNotMatch(
 						context,
 						declaration.id.name,
-						findReturnedNode(declaration.body as JSSyntaxElement),
+						findReturnedNodes(declaration.body as JSSyntaxElement),
 					)
 					return
 				}
@@ -151,10 +216,10 @@ export const renderTagWithOwnName: {
 
 					if (!component) return
 
-					reportIfRootTagDoesNotMatch(
+					reportIfRootTagsDoNotMatch(
 						context,
 						component.componentName,
-						findReturnedNode(component.body),
+						findReturnedNodes(component.body),
 					)
 				}
 			},
