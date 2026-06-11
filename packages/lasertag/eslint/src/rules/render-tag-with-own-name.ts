@@ -2,16 +2,7 @@ import type { RuleType } from "@eslint/core"
 import type { JSSyntaxElement, Rule } from "eslint"
 import type * as ESTree from "estree"
 
-const FORM_CONTROL_ROOT_TAGS = new Set([
-	`button`,
-	`fieldset`,
-	`form`,
-	`input`,
-	`label`,
-	`select`,
-	`textarea`,
-])
-const MESSAGE = `Exported components should render a root tag matching their own name, unless a native form control is the meaningful wrapper.`
+const MESSAGE = `Exported components should return JSX with an outermost tag matching their own name.`
 
 type JSXIdentifier = JSSyntaxElement & {
 	type: `JSXIdentifier`
@@ -158,10 +149,7 @@ function getVariableComponentBody(
 }
 
 function isAllowedRootTag(componentName: string, tagName: string | undefined) {
-	return (
-		tagName === toKebabCase(componentName) ||
-		(tagName !== undefined && FORM_CONTROL_ROOT_TAGS.has(tagName))
-	)
+	return tagName === toKebabCase(componentName)
 }
 
 function reportIfRootTagsDoNotMatch(

@@ -1,7 +1,7 @@
 import { renderTagWithOwnName } from "../src/rules/render-tag-with-own-name.ts"
 import { ruleTester } from "./rule-tester.ts"
 
-const message = `Exported components should render a root tag matching their own name, unless a native form control is the meaningful wrapper.`
+const message = `Exported components should return JSX with an outermost tag matching their own name.`
 
 ruleTester.run(`render-tag-with-own-name`, renderTagWithOwnName, {
 	valid: [
@@ -23,16 +23,6 @@ ruleTester.run(`render-tag-with-own-name`, renderTagWithOwnName, {
 				export const ProjectList = () => {
 					return <project-list />
 				}
-			`,
-		},
-		{
-			name: `allow form control root exceptions`,
-			code: `
-				export const Checkbox = () => (
-					<label>
-						<input type="checkbox" />
-					</label>
-				)
 			`,
 		},
 		{
@@ -104,6 +94,44 @@ ruleTester.run(`render-tag-with-own-name`, renderTagWithOwnName, {
 			code: `
 				export function ProjectList() {
 					return <>No root tag</>
+				}
+			`,
+			errors: [{ message }],
+		},
+		{
+			name: `ban form control root elements`,
+			code: `
+				export const Checkbox = () => (
+					<label>
+						<input type="checkbox" />
+					</label>
+				)
+			`,
+			errors: [{ message }],
+		},
+		{
+			name: `ban null returns`,
+			code: `
+				export function ProjectList() {
+					return null
+				}
+			`,
+			errors: [{ message }],
+		},
+		{
+			name: `ban non-jsx returns`,
+			code: `
+				export function ProjectList() {
+					return items.length
+				}
+			`,
+			errors: [{ message }],
+		},
+		{
+			name: `ban conditional expression returns`,
+			code: `
+				export function ProjectList({ isEmpty }) {
+					return isEmpty ? <project-list /> : <project-list />
 				}
 			`,
 			errors: [{ message }],
