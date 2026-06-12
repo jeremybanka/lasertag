@@ -1,7 +1,8 @@
 import { importOwnCssModuleOnly } from "../src/rules/import-own-css-module-only.ts"
 import { ruleTester } from "./rule-tester.ts"
 
-const message = `Import only the CSS module that belongs to this component file.`
+const message = (expectedImport: string) =>
+	`Expected CSS module import to be "${expectedImport}".`
 
 ruleTester.run(`import-own-css-module-only`, importOwnCssModuleOnly, {
 	valid: [
@@ -29,19 +30,19 @@ ruleTester.run(`import-own-css-module-only`, importOwnCssModuleOnly, {
 			name: `ban importing another component css module`,
 			filename: `/project/src/AppHeaderBar.tsx`,
 			code: `import css from "./AppNav.module.css"`,
-			errors: [{ message }],
+			errors: [{ message: message(`./AppHeaderBar.module.css`) }],
 		},
 		{
 			name: `ban importing css module from another directory`,
 			filename: `/project/src/AppHeaderBar.tsx`,
 			code: `import css from "../shared/AppHeaderBar.module.css"`,
-			errors: [{ message }],
+			errors: [{ message: message(`./AppHeaderBar.module.css`) }],
 		},
 		{
 			name: `ban importing own-looking css module with a non-relative specifier`,
 			filename: `/project/src/AppHeaderBar.tsx`,
 			code: `import css from "src/AppHeaderBar.module.css"`,
-			errors: [{ message }],
+			errors: [{ message: message(`./AppHeaderBar.module.css`) }],
 		},
 	],
 })

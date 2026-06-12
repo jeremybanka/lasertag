@@ -2,9 +2,11 @@ import type { RuleType } from "@eslint/core"
 import type { Rule } from "eslint"
 import type * as ESTree from "estree"
 
-const MESSAGE = `Import CSS modules with a default import named css.`
+const MESSAGE_ID = `nameImportedCssModuleAsCss`
 
-function isCssModuleSource(source: ESTree.Literal): boolean {
+function isCssModuleSource(
+	source: ESTree.Literal,
+): source is ESTree.Literal & { value: string } {
 	return (
 		typeof source.value === `string` && source.value.endsWith(`.module.css`)
 	)
@@ -36,6 +38,9 @@ export const nameImportedCssModuleAsCss: {
 			recommended: boolean
 			url: string
 		}
+		messages: {
+			nameImportedCssModuleAsCss: string
+		}
 		schema: never[]
 	}
 	create(context: Rule.RuleContext): Rule.RuleListener
@@ -46,6 +51,9 @@ export const nameImportedCssModuleAsCss: {
 			description: `Require CSS modules to be imported with a default import named css`,
 			recommended: true,
 			url: ``,
+		},
+		messages: {
+			nameImportedCssModuleAsCss: `Expected CSS module import to be \`import css from "{{source}}"\`.`,
 		},
 		schema: [],
 	},
@@ -63,7 +71,8 @@ export const nameImportedCssModuleAsCss: {
 				if (!hasOnlyCssDefaultImport) {
 					context.report({
 						node: getImportSpecifierNameNode(node) ?? node,
-						message: MESSAGE,
+						messageId: MESSAGE_ID,
+						data: { source: node.source.value },
 					})
 				}
 			},

@@ -3,7 +3,7 @@ import type { Rule } from "eslint"
 import type * as ESTree from "estree"
 import path from "node:path"
 
-const MESSAGE = `A .tsx file should have at most one named export: a function returning JSX with the same name as the file.`
+const MESSAGE_ID = `exportOwnComponentOnly`
 
 type ExportNamedDeclaration = ESTree.ExportNamedDeclaration & {
 	exportKind?: `type` | `value`
@@ -60,6 +60,9 @@ export const exportOwnComponentOnly: {
 			recommended: boolean
 			url: string
 		}
+		messages: {
+			exportOwnComponentOnly: string
+		}
 		schema: never[]
 	}
 	create(context: Rule.RuleContext): Rule.RuleListener
@@ -71,6 +74,9 @@ export const exportOwnComponentOnly: {
 			recommended: true,
 			url: ``,
 		},
+		messages: {
+			exportOwnComponentOnly: `Expected this .tsx file to export only the named component \`{{expectedExportName}}\`.`,
+		},
 		schema: [],
 	},
 
@@ -81,7 +87,8 @@ export const exportOwnComponentOnly: {
 			ExportDefaultDeclaration(node) {
 				context.report({
 					node: getDefaultExportNameNode(node) ?? node,
-					message: MESSAGE,
+					messageId: MESSAGE_ID,
+					data: { expectedExportName },
 				})
 			},
 
@@ -101,7 +108,11 @@ export const exportOwnComponentOnly: {
 							continue
 						}
 
-						context.report({ node: nameNode, message: MESSAGE })
+						context.report({
+							node: nameNode,
+							messageId: MESSAGE_ID,
+							data: { expectedExportName },
+						})
 					}
 
 					return
@@ -116,7 +127,11 @@ export const exportOwnComponentOnly: {
 							: specifier.exported.value
 
 					if (exportedName !== expectedExportName) {
-						context.report({ node: specifier.exported, message: MESSAGE })
+						context.report({
+							node: specifier.exported,
+							messageId: MESSAGE_ID,
+							data: { expectedExportName },
+						})
 					}
 				}
 			},

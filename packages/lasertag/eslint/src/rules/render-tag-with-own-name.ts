@@ -2,7 +2,7 @@ import type { RuleType } from "@eslint/core"
 import type { JSSyntaxElement, Rule } from "eslint"
 import type * as ESTree from "estree"
 
-const MESSAGE = `Exported components should return JSX with an outermost tag matching their own name.`
+const MESSAGE_ID = `renderTagWithOwnName`
 
 type JSXIdentifier = JSSyntaxElement & {
 	type: `JSXIdentifier`
@@ -172,12 +172,14 @@ function reportIfRootTagsDoNotMatch(
 
 	for (const rootNode of nodesToCheck) {
 		const rootTagName = rootNode ? getJSXElementName(rootNode) : undefined
+		const expectedTagName = toKebabCase(componentName)
 
 		if (!isAllowedRootTag(componentName, rootTagName)) {
 			context.report({
 				node:
 					getJSXElementNameNode(rootNode) ?? rootNode ?? context.sourceCode.ast,
-				message: MESSAGE,
+				messageId: MESSAGE_ID,
+				data: { componentName, expectedTagName },
 			})
 		}
 	}
@@ -191,6 +193,9 @@ export const renderTagWithOwnName: {
 			recommended: boolean
 			url: string
 		}
+		messages: {
+			renderTagWithOwnName: string
+		}
 		schema: never[]
 	}
 	create(context: Rule.RuleContext): Rule.RuleListener
@@ -201,6 +206,9 @@ export const renderTagWithOwnName: {
 			description: `Require exported components to render a root tag matching the component name`,
 			recommended: true,
 			url: ``,
+		},
+		messages: {
+			renderTagWithOwnName: `Expected exported component \`{{componentName}}\` to return JSX with outermost tag <{{expectedTagName}}>.`,
 		},
 		schema: [],
 	},
