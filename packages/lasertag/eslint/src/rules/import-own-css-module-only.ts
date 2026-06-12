@@ -3,7 +3,7 @@ import type { Rule } from "eslint"
 import type * as ESTree from "estree"
 import path from "node:path"
 
-const MESSAGE = `Import only the CSS module that belongs to this component file.`
+const MESSAGE_ID = `importOwnCssModule`
 
 function isCssModuleSource(
 	source: ESTree.Literal,
@@ -27,6 +27,9 @@ export const importOwnCssModuleOnly: {
 			recommended: boolean
 			url: string
 		}
+		messages: {
+			importOwnCssModule: string
+		}
 		schema: never[]
 	}
 	create(context: Rule.RuleContext): Rule.RuleListener
@@ -38,18 +41,25 @@ export const importOwnCssModuleOnly: {
 			recommended: true,
 			url: ``,
 		},
+		messages: {
+			importOwnCssModule: `Expected CSS module import to be "{{expectedImport}}".`,
+		},
 		schema: [],
 	},
 
 	create(context) {
+		const expectedImport = getExpectedCssModuleImport(context.filename)
+
 		return {
 			ImportDeclaration(node) {
 				if (!isCssModuleSource(node.source)) return
 
-				if (
-					node.source.value !== getExpectedCssModuleImport(context.filename)
-				) {
-					context.report({ node: node.source, message: MESSAGE })
+				if (node.source.value !== expectedImport) {
+					context.report({
+						node: node.source,
+						messageId: MESSAGE_ID,
+						data: { expectedImport },
+					})
 				}
 			},
 		}

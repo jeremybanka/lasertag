@@ -1,7 +1,8 @@
 import { renderTagWithOwnName } from "../src/rules/render-tag-with-own-name.ts"
 import { ruleTester } from "./rule-tester.ts"
 
-const message = `Exported components should return JSX with an outermost tag matching their own name.`
+const message = (componentName: string, expectedTagName: string) =>
+	`Expected exported component \`${componentName}\` to return JSX with outermost tag <${expectedTagName}>.`
 
 ruleTester.run(`render-tag-with-own-name`, renderTagWithOwnName, {
 	valid: [
@@ -73,19 +74,19 @@ ruleTester.run(`render-tag-with-own-name`, renderTagWithOwnName, {
 					return <header-bar />
 				}
 			`,
-			errors: [{ message }],
+			errors: [{ message: message(`AppHeaderBar`, `app-header-bar`) }],
 		},
 		{
 			name: `ban const component rendering the wrong custom tag`,
 			code: `export const ProjectList = () => <projects />`,
-			errors: [{ message }],
+			errors: [{ message: message(`ProjectList`, `project-list`) }],
 		},
 		{
 			name: `report only the wrong root tag name`,
 			code: `export const ProjectList = () => <article data-kind="project"><span /></article>`,
 			errors: [
 				{
-					message,
+					message: message(`ProjectList`, `project-list`),
 					line: 1,
 					column: 35,
 					endLine: 1,
@@ -100,7 +101,7 @@ ruleTester.run(`render-tag-with-own-name`, renderTagWithOwnName, {
 					return <section />
 				}
 			`,
-			errors: [{ message }],
+			errors: [{ message: message(`ProjectList`, `project-list`) }],
 		},
 		{
 			name: `ban fragments as the root`,
@@ -109,7 +110,7 @@ ruleTester.run(`render-tag-with-own-name`, renderTagWithOwnName, {
 					return <>No root tag</>
 				}
 			`,
-			errors: [{ message }],
+			errors: [{ message: message(`ProjectList`, `project-list`) }],
 		},
 		{
 			name: `ban form control root elements`,
@@ -120,7 +121,7 @@ ruleTester.run(`render-tag-with-own-name`, renderTagWithOwnName, {
 					</label>
 				)
 			`,
-			errors: [{ message }],
+			errors: [{ message: message(`Checkbox`, `checkbox`) }],
 		},
 		{
 			name: `ban null returns`,
@@ -129,7 +130,7 @@ ruleTester.run(`render-tag-with-own-name`, renderTagWithOwnName, {
 					return null
 				}
 			`,
-			errors: [{ message }],
+			errors: [{ message: message(`ProjectList`, `project-list`) }],
 		},
 		{
 			name: `ban non-jsx returns`,
@@ -138,7 +139,7 @@ ruleTester.run(`render-tag-with-own-name`, renderTagWithOwnName, {
 					return items.length
 				}
 			`,
-			errors: [{ message }],
+			errors: [{ message: message(`ProjectList`, `project-list`) }],
 		},
 		{
 			name: `ban conditional expression returns`,
@@ -147,7 +148,7 @@ ruleTester.run(`render-tag-with-own-name`, renderTagWithOwnName, {
 					return isEmpty ? <project-list /> : <project-list />
 				}
 			`,
-			errors: [{ message }],
+			errors: [{ message: message(`ProjectList`, `project-list`) }],
 		},
 		{
 			name: `ban wrong roots returned from nested if statements`,
@@ -160,7 +161,7 @@ ruleTester.run(`render-tag-with-own-name`, renderTagWithOwnName, {
 					return <project-list />
 				}
 			`,
-			errors: [{ message }],
+			errors: [{ message: message(`ProjectList`, `project-list`) }],
 		},
 		{
 			name: `ban wrong roots returned from switch cases`,
@@ -174,7 +175,7 @@ ruleTester.run(`render-tag-with-own-name`, renderTagWithOwnName, {
 					}
 				}
 			`,
-			errors: [{ message }],
+			errors: [{ message: message(`ProjectList`, `project-list`) }],
 		},
 		{
 			name: `ban wrong roots returned from loops`,
@@ -189,7 +190,7 @@ ruleTester.run(`render-tag-with-own-name`, renderTagWithOwnName, {
 					return <project-list />
 				}
 			`,
-			errors: [{ message }],
+			errors: [{ message: message(`ProjectList`, `project-list`) }],
 		},
 	],
 })
