@@ -1,5 +1,11 @@
 # lasertag
 
+## 0.1.5
+
+### Patch Changes
+
+- 2f79097: Improve ESLint rule diagnostics by including the specific expected CSS module import, CSS module binding, component export, or rendered root tag.
+
 ## 0.1.4
 
 ### Patch Changes
