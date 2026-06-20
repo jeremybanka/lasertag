@@ -2,9 +2,14 @@
 	"$schema": "https://docs.renovatebot.com/renovate-schema.json",
 	"extends": ["config:recommended"],
 	"automerge": true,
-	"branchConcurrentLimit": 1,
-	"prHourlyLimit": 10,
+	"branchConcurrentLimit": 9,
+	"internalChecksFilter": "strict",
 	"minimumReleaseAge": "1 day",
+	"prConcurrentLimit": 3,
+	"prHourlyLimit": 9,
+	"pruneBranchAfterAutomerge": true,
+	"pruneStaleBranches": true,
+	"statusCheckWhen": { "minimumReleaseAge": "never" },
 	"customManagers": [
 		{
 			"customType": "regex",
