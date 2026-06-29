@@ -1,5 +1,7 @@
-# lasertag
+<div align="left">
+  <img alt="lasertag logo" src="https://raw.githubusercontent.com/jeremybanka/lasertag/main/Lasertag.png" width="600" height="150">
+</div>
 
-workspace for the lasertag CSS package
+Workspace for the Lasertag CSS package.
 
-package itself lives in [packages/lasertag](packages/lasertag)
+The package itself lives in [packages/lasertag](packages/lasertag).
