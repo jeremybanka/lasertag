@@ -1,4 +1,4 @@
-# lasertag
+# Lasertag 👾
 
 zero-runtime CSS structure for JSX components with CSS Modules.
 
