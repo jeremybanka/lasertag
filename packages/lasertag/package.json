@@ -43,7 +43,7 @@
 		"@eslint/core": "1.2.1",
 		"@types/estree": "1.0.9",
 		"@types/react": "19.2.17",
-		"@typescript-eslint/parser": "8.62.0",
+		"@typescript-eslint/parser": "8.62.1",
 		"eslint": "10.6.0",
 		"preact": "10.29.3",
 		"solid-js": "1.9.13",
