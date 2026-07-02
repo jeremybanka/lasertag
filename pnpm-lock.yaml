@@ -66,8 +66,8 @@ importers:
         specifier: 10.29.3
         version: 10.29.3
       solid-js:
-        specifier: 1.9.13
-        version: 1.9.13
+        specifier: 1.9.14
+        version: 1.9.14
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -1721,8 +1721,8 @@ packages:
     resolution: {integrity: sha512-g9Q1haeby36OSStwb4ntCGGGaKsaVSjQ68fBxoQcutl5fS1vuY18H3wSt3jFyFtrkx+Kz0V1G85A4MyAdDMi2Q==}
     engines: {node: '>=8'}
 
-  solid-js@1.9.13:
-    resolution: {integrity: sha512-6hJeJMOcEX8ktqjpDoJZEmld3ijvcvWBDtiXBm7f4332SiFN66QeAQI1REQshvyUoISsSeJ4PHDauKYbwao9JQ==}
+  solid-js@1.9.14:
+    resolution: {integrity: sha512-sAEXC0Kk0S1EDg+8ysEWJDbYhA3RRoEjwuySUGlKIemeo0I5YZfOyumNjNs9Sv3y2nmhD+0rW66ag2HsMuQiGQ==}
 
   source-map-js@1.2.1:
     resolution: {integrity: sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==}
@@ -3323,7 +3323,7 @@ snapshots:
 
   slash@3.0.0: {}
 
-  solid-js@1.9.13:
+  solid-js@1.9.14:
     dependencies:
       csstype: 3.2.3
       seroval: 1.5.4
