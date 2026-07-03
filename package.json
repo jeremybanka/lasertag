@@ -26,7 +26,7 @@
 		"dprint-plugin-markup": "0.27.3",
 		"dprint-plugin-yaml": "0.6.0",
 		"typescript": "6.0.3",
-		"vite-plus": "0.2.1"
+		"vite-plus": "0.2.2"
 	},
 	"engines": {
 		"node": "26.4.0",
