@@ -11,11 +11,14 @@ export default defineConfig({
 			skipNodeModulesBundle: true,
 		},
 		dts: true,
-		entry: ["eslint/src/plugin.ts"],
+		entry: {
+			"eslint-plugin": "eslint/src/plugin.ts",
+			refractor: "refractor/src/index.ts",
+		},
 		format: "esm",
-		outDir: "eslint/dist",
+		outDir: "dist",
 	},
 	test: {
-		include: ["eslint/tests/**/*.test.ts"],
+		include: ["eslint/tests/**/*.test.ts", "refractor/tests/**/*.test.ts"],
 	},
 })

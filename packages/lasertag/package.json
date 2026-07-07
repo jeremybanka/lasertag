@@ -8,9 +8,11 @@
 		"directory": "packages/lasertag"
 	},
 	"files": [
+		"dist",
 		"docs",
 		"eslint",
 		"examples",
+		"refractor",
 		"templates",
 		"types",
 		"AGENTS.md"
@@ -31,8 +33,12 @@
 			"types": "./types/solid-jsx-intrinsic-elements.d.ts"
 		},
 		"./eslint-plugin": {
-			"import": "./eslint/dist/plugin.mjs",
-			"types": "./eslint/dist/plugin.d.mts"
+			"import": "./dist/eslint-plugin.mjs",
+			"types": "./dist/eslint-plugin.d.mts"
+		},
+		"./refractor": {
+			"import": "./dist/refractor.mjs",
+			"types": "./dist/refractor.d.mts"
 		}
 	},
 	"scripts": {
