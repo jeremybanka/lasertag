@@ -13,6 +13,7 @@
 		"docs",
 		"eslint",
 		"examples",
+		"lsp",
 		"refractor",
 		"templates",
 		"types",
@@ -40,10 +41,15 @@
 		"./refractor": {
 			"import": "./dist/refractor.mjs",
 			"types": "./dist/refractor.d.mts"
+		},
+		"./lsp": {
+			"import": "./dist/lsp.mjs",
+			"types": "./dist/lsp.d.mts"
 		}
 	},
 	"bin": {
-		"lasertag": "./dist/cli.mjs"
+		"lasertag": "./dist/cli.mjs",
+		"lasertag-lsp": "./dist/lsp.mjs"
 	},
 	"scripts": {
 		"build": "vp pack",
@@ -87,6 +93,8 @@
 	"packageManager": "pnpm@11.10.0",
 	"dependencies": {
 		"comline": "0.5.0",
+		"vscode-languageserver": "10.1.0",
+		"vscode-languageserver-textdocument": "1.0.12",
 		"zod": "4.4.3"
 	}
 }

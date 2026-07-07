@@ -14,6 +14,7 @@ export default defineConfig({
 		entry: {
 			cli: "cli/src/main.ts",
 			"eslint-plugin": "eslint/src/plugin.ts",
+			lsp: "lsp/src/server.ts",
 			refractor: "refractor/src/index.ts",
 		},
 		format: "esm",
@@ -23,6 +24,7 @@ export default defineConfig({
 		include: [
 			"cli/tests/**/*.test.ts",
 			"eslint/tests/**/*.test.ts",
+			"lsp/tests/**/*.test.ts",
 			"refractor/tests/**/*.test.ts",
 		],
 	},
