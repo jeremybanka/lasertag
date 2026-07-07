@@ -12,6 +12,7 @@ export default defineConfig({
 		},
 		dts: true,
 		entry: {
+			cli: "cli/src/main.ts",
 			"eslint-plugin": "eslint/src/plugin.ts",
 			refractor: "refractor/src/index.ts",
 		},
@@ -19,6 +20,10 @@ export default defineConfig({
 		outDir: "dist",
 	},
 	test: {
-		include: ["eslint/tests/**/*.test.ts", "refractor/tests/**/*.test.ts"],
+		include: [
+			"cli/tests/**/*.test.ts",
+			"eslint/tests/**/*.test.ts",
+			"refractor/tests/**/*.test.ts",
+		],
 	},
 })

@@ -8,6 +8,7 @@
 		"directory": "packages/lasertag"
 	},
 	"files": [
+		"cli",
 		"dist",
 		"docs",
 		"eslint",
@@ -40,6 +41,9 @@
 			"import": "./dist/refractor.mjs",
 			"types": "./dist/refractor.d.mts"
 		}
+	},
+	"bin": {
+		"lasertag": "./dist/cli.mjs"
 	},
 	"scripts": {
 		"build": "vp pack",
@@ -80,5 +84,9 @@
 		"node": "26.4.0",
 		"pnpm": "11.10.0"
 	},
-	"packageManager": "pnpm@11.10.0"
+	"packageManager": "pnpm@11.10.0",
+	"dependencies": {
+		"comline": "0.5.0",
+		"zod": "4.4.3"
+	}
 }

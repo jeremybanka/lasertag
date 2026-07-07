@@ -46,6 +46,13 @@ importers:
         version: 0.2.3(@types/node@25.9.2)(typescript@6.0.3)(vite@8.0.16(@types/node@25.9.2))
 
   packages/lasertag:
+    dependencies:
+      comline:
+        specifier: 0.5.0
+        version: 0.5.0(zod@4.4.3)
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
     devDependencies:
       '@eslint/core':
         specifier: 1.2.1
@@ -1118,6 +1125,17 @@ packages:
   chardet@2.1.1:
     resolution: {integrity: sha512-PsezH1rqdV9VvyNhxxOW32/d75r01NY7TQCmOqomRo15ZSOKbpTFVsfjghxo6JloQUCGnH4k1LGu0R4yCLlWQQ==}
 
+  comline@0.5.0:
+    resolution: {integrity: sha512-icuB44PASbBttcdIBIS/PqSA4PHJ1vDECnlGCo1Sig/03YGH9Z8MSqmNJ/YWrT8HTAqspbcg7kkxUmXxKv7SNw==}
+    peerDependencies:
+      arktype: ^2.1.28
+      zod: ^4.2.0
+    peerDependenciesMeta:
+      arktype:
+        optional: true
+      zod:
+        optional: true
+
   convert-source-map@2.0.0:
     resolution: {integrity: sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg==}
 
@@ -1773,6 +1791,9 @@ packages:
     resolution: {integrity: sha512-sf4i37nQ2LBx4m3wB74y+ubopq6W/dIzXg0FDGjsYnZHVa1Da8FH853wlL2gtUhg+xJXjfk3kUZS3BRoQeoQBQ==}
     engines: {node: '>=6'}
 
+  treetrunks@0.1.8:
+    resolution: {integrity: sha512-fD1vRlo9LqlSxjnKlyZvJ6U4hrOIwNUrSEl+3npElgpm7UvwwVqh6ncl8663IqhIxMy34BQILddW5vgz/NaGbA==}
+
   ts-api-utils@2.5.0:
     resolution: {integrity: sha512-OJ/ibxhPlqrMM0UiNHJ/0CKQkoKF243/AEmplt3qpRgkW8VG7IfOS41h7V8TjITqdByHzrjcS/2si+y4lIh8NA==}
     engines: {node: '>=18.12'}
@@ -1927,6 +1948,9 @@ packages:
   yocto-queue@0.1.0:
     resolution: {integrity: sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==}
     engines: {node: '>=10'}
+
+  zod@4.4.3:
+    resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
 
 snapshots:
 
@@ -2746,6 +2770,13 @@ snapshots:
 
   chardet@2.1.1: {}
 
+  comline@0.5.0(zod@4.4.3):
+    dependencies:
+      '@standard-schema/spec': 1.1.0
+      treetrunks: 0.1.8
+    optionalDependencies:
+      zod: 4.4.3
+
   convert-source-map@2.0.0: {}
 
   cross-spawn@7.0.6:
@@ -3363,6 +3394,8 @@ snapshots:
 
   totalist@3.0.1: {}
 
+  treetrunks@0.1.8: {}
+
   ts-api-utils@2.5.0(typescript@6.0.3):
     dependencies:
       typescript: 6.0.3
@@ -3496,3 +3529,5 @@ snapshots:
   ws@8.21.0: {}
 
   yocto-queue@0.1.0: {}
+
+  zod@4.4.3: {}
