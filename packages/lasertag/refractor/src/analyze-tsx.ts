@@ -16,6 +16,13 @@ export type AnalyzeTsxOptions = {
 	maxComponentDepth?: number
 }
 
+export type AnalyzeTsxRenderStoriesOptions = Omit<
+	AnalyzeTsxOptions,
+	"componentName"
+> & {
+	componentNames?: string[]
+}
+
 type ComponentDefinition = {
 	name: string
 	body: ts.ConciseBody
@@ -66,10 +73,61 @@ function isComponentName(name: string): boolean {
 	return /^[A-Z]/.test(name)
 }
 
+function containsJsx(node: ts.Node): boolean {
+	let foundJsx = false
+
+	function visit(child: ts.Node): void {
+		if (foundJsx) return
+
+		if (
+			ts.isJsxElement(child) ||
+			ts.isJsxSelfClosingElement(child) ||
+			ts.isJsxFragment(child)
+		) {
+			foundJsx = true
+			return
+		}
+
+		ts.forEachChild(child, visit)
+	}
+
+	visit(node)
+
+	return foundJsx
+}
+
 function isFunctionExpression(
 	node: ts.Expression,
 ): node is ts.ArrowFunction | ts.FunctionExpression {
 	return ts.isArrowFunction(node) || ts.isFunctionExpression(node)
+}
+
+function functionBodyFromExpression(
+	expression: ts.Expression,
+): ts.ConciseBody | undefined {
+	if (isFunctionExpression(expression)) {
+		return expression.body
+	}
+
+	if (
+		ts.isAsExpression(expression) ||
+		ts.isSatisfiesExpression(expression) ||
+		ts.isNonNullExpression(expression) ||
+		ts.isParenthesizedExpression(expression) ||
+		ts.isTypeAssertionExpression(expression)
+	) {
+		return functionBodyFromExpression(expression.expression)
+	}
+
+	if (ts.isCallExpression(expression)) {
+		for (const argument of expression.arguments) {
+			if (!ts.isExpression(argument)) continue
+
+			const body = functionBodyFromExpression(argument)
+
+			if (body) return body
+		}
+	}
 }
 
 function addVariableComponents(
@@ -82,13 +140,16 @@ function addVariableComponents(
 	for (const declaration of statement.declarationList.declarations) {
 		if (!ts.isIdentifier(declaration.name)) continue
 		if (!declaration.initializer) continue
-		if (!isFunctionExpression(declaration.initializer)) continue
+
+		const body = functionBodyFromExpression(declaration.initializer)
+
+		if (!body) continue
 
 		const name = declaration.name.text
 
 		index.components.set(name, {
 			name,
-			body: declaration.initializer.body,
+			body,
 			range: rangeOf(sourceFile, declaration),
 		})
 
@@ -225,6 +286,30 @@ function selectMainComponent(
 			message: `Found multiple exported components; pass componentName to choose one.`,
 		})
 	}
+}
+
+function selectComponentStories(
+	index: ComponentIndex,
+	options: AnalyzeTsxRenderStoriesOptions,
+): string[] {
+	const candidateNames =
+		options.componentNames ??
+		[...index.components]
+			.filter(
+				([componentName, definition]) =>
+					isComponentName(componentName) && containsJsx(definition.body),
+			)
+			.map(([componentName]) => componentName)
+	const names = candidateNames
+		.filter((componentName) => index.components.has(componentName))
+		.toSorted((leftName, rightName) => {
+			const left = index.components.get(leftName)
+			const right = index.components.get(rightName)
+
+			return (left?.range.start ?? 0) - (right?.range.start ?? 0)
+		})
+
+	return [...new Set(names)]
 }
 
 function collectReturnedExpressions(
@@ -583,6 +668,36 @@ function createSourceFile(options: AnalyzeTsxOptions): ts.SourceFile {
 	)
 }
 
+function createAnalyzeContext(
+	sourceFile: ts.SourceFile,
+	index: ComponentIndex,
+	warnings: RenderStoryWarning[],
+	options: Pick<AnalyzeTsxOptions, "maxComponentDepth">,
+): AnalyzeContext {
+	return {
+		sourceFile,
+		components: index.components,
+		warnings,
+		maxComponentDepth: options.maxComponentDepth ?? DEFAULT_MAX_COMPONENT_DEPTH,
+	}
+}
+
+function analyzeIndexedComponent(
+	sourceFile: ts.SourceFile,
+	index: ComponentIndex,
+	componentName: string,
+	options: Pick<AnalyzeTsxOptions, "maxComponentDepth">,
+): RenderStory {
+	const warnings: RenderStoryWarning[] = []
+	const context = createAnalyzeContext(sourceFile, index, warnings, options)
+
+	return {
+		componentName,
+		roots: analyzeComponent(context, componentName, []),
+		warnings,
+	}
+}
+
 export function analyzeTsxRenderStory(options: AnalyzeTsxOptions): RenderStory {
 	const sourceFile = createSourceFile(options)
 	const index = collectComponentIndex(sourceFile)
@@ -597,16 +712,22 @@ export function analyzeTsxRenderStory(options: AnalyzeTsxOptions): RenderStory {
 		}
 	}
 
-	const context: AnalyzeContext = {
-		sourceFile,
-		components: index.components,
-		warnings,
-		maxComponentDepth: options.maxComponentDepth ?? DEFAULT_MAX_COMPONENT_DEPTH,
-	}
+	const context = createAnalyzeContext(sourceFile, index, warnings, options)
 
 	return {
 		componentName,
 		roots: analyzeComponent(context, componentName, []),
 		warnings,
 	}
+}
+
+export function analyzeTsxRenderStories(
+	options: AnalyzeTsxRenderStoriesOptions,
+): RenderStory[] {
+	const sourceFile = createSourceFile(options)
+	const index = collectComponentIndex(sourceFile)
+
+	return selectComponentStories(index, options).map((componentName) =>
+		analyzeIndexedComponent(sourceFile, index, componentName, options),
+	)
 }

@@ -3,7 +3,10 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
 
-import { analyzeTsxRenderStory } from "../src/analyze-tsx.ts"
+import {
+	analyzeTsxRenderStories,
+	analyzeTsxRenderStory,
+} from "../src/analyze-tsx.ts"
 
 const fixturesRoot = fileURLToPath(new URL(`fixtures/golden`, import.meta.url))
 
@@ -50,4 +53,86 @@ describe(`golden render story fixtures`, () => {
 			).toEqual(expected)
 		})
 	}
+})
+
+describe(`broad render story extraction`, () => {
+	it(`extracts every component-style function it can find`, () => {
+		const sourceText = `
+			import * as React from "react"
+
+			function LocalOnly() {
+				return <local-only />
+			}
+
+			const Wrapped = React.forwardRef(function WrappedImpl(_props, ref) {
+				return (
+					<wrapped-root ref={ref}>
+						<button type="button" />
+					</wrapped-root>
+				)
+			})
+
+			function plainHelper() {
+				return <plain-helper />
+			}
+
+			function NotAComponent() {
+				return 1
+			}
+
+			export function Alpha() {
+				return (
+					<alpha-root>
+						<LocalOnly />
+					</alpha-root>
+				)
+			}
+
+			export const Beta = () => <beta-root />
+		`
+
+		expect(
+			stripSourceRanges(
+				analyzeTsxRenderStories({
+					filePath: `/project/src/ManyThings.tsx`,
+					sourceText,
+				}),
+			),
+		).toEqual([
+			{
+				componentName: `LocalOnly`,
+				roots: [{ kind: `element`, tagName: `local-only`, children: [] }],
+				warnings: [],
+			},
+			{
+				componentName: `Wrapped`,
+				roots: [
+					{
+						kind: `element`,
+						tagName: `wrapped-root`,
+						children: [{ kind: `element`, tagName: `button`, children: [] }],
+					},
+				],
+				warnings: [],
+			},
+			{
+				componentName: `Alpha`,
+				roots: [
+					{
+						kind: `element`,
+						tagName: `alpha-root`,
+						children: [
+							{ kind: `element`, tagName: `local-only`, children: [] },
+						],
+					},
+				],
+				warnings: [],
+			},
+			{
+				componentName: `Beta`,
+				roots: [{ kind: `element`, tagName: `beta-root`, children: [] }],
+				warnings: [],
+			},
+		])
+	})
 })

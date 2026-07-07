@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url"
 import { promisify } from "node:util"
 import ts from "typescript"
 
-import { analyzeTsxRenderStory } from "../packages/lasertag/refractor/src/analyze-tsx.ts"
+import { analyzeTsxRenderStories } from "../packages/lasertag/refractor/src/analyze-tsx.ts"
 import type {
 	OpaqueStoryNode,
 	RenderStory,
@@ -89,7 +89,7 @@ type FileOkReport = {
 	relativePath: string
 	durationMs: number
 	sourceBytes: number
-	componentName: string
+	componentNames: string[]
 	stats: StoryStats
 	warningCodes: string[]
 	opaqueReasons: CountEntry[]
@@ -119,6 +119,11 @@ type ProviderReport = {
 type CountEntry = {
 	name: string
 	count: number
+}
+
+type ElementPath = {
+	story: RenderStory
+	path: SelectorPath
 }
 
 type CorpusFailure = {
@@ -639,25 +644,28 @@ async function analyzeFile(
 	const startedAt = performance.now()
 
 	try {
-		const renderStory = analyzeTsxRenderStory({
+		const renderStories = analyzeTsxRenderStories({
 			filePath: file.filePath,
 			sourceText,
 		})
 		const durationMs = performance.now() - startedAt
-		const validationErrors = validateRenderStory(renderStory, sourceText.length)
-		const secondStory = analyzeTsxRenderStory({
+		const validationErrors = renderStories.flatMap((renderStory) =>
+			validateRenderStory(renderStory, sourceText.length).map(
+				(error) => `${renderStory.componentName}: ${error}`,
+			),
+		)
+		const secondStories = analyzeTsxRenderStories({
 			filePath: file.filePath,
 			sourceText,
 		})
 
-		if (JSON.stringify(renderStory) !== JSON.stringify(secondStory)) {
+		if (JSON.stringify(renderStories) !== JSON.stringify(secondStories)) {
 			validationErrors.push(`Render story extraction is not deterministic.`)
 		}
 
-		const storyFacts = collectStoryFacts(renderStory)
+		const storyFacts = collectStoriesFacts(renderStories)
 		const patterns = collectSourcePatterns(sourceText, file.filePath)
 		const synthetic = runSyntheticReachabilityChecks(
-			renderStory,
 			storyFacts.elementPaths,
 			options.syntheticSelectorsPerFile,
 		)
@@ -672,7 +680,9 @@ async function analyzeFile(
 		}
 
 		return {
-			componentName: renderStory.componentName,
+			componentNames: renderStories.map(
+				(renderStory) => renderStory.componentName,
+			),
 			durationMs,
 			opaqueReasons: countEntries(storyFacts.opaqueReasons),
 			patterns,
@@ -682,7 +692,9 @@ async function analyzeFile(
 			stats: storyFacts.stats,
 			status: `ok`,
 			synthetic,
-			warningCodes: renderStory.warnings.map((warning) => warning.code),
+			warningCodes: renderStories.flatMap((renderStory) =>
+				renderStory.warnings.map((warning) => warning.code),
+			),
 		}
 	} catch (error) {
 		return failedReport(
@@ -998,32 +1010,43 @@ function validateRange(
 	}
 }
 
-function collectStoryFacts(renderStory: RenderStory): {
-	elementPaths: SelectorPath[]
+function collectStoriesFacts(renderStories: RenderStory[]): {
+	elementPaths: ElementPath[]
 	opaqueReasons: Map<string, number>
 	stats: StoryStats
 } {
-	const elementPaths: SelectorPath[] = []
+	const elementPaths: ElementPath[] = []
 	const opaqueReasons = new Map<string, number>()
 	const stats: StoryStats = {
 		elementCount: 0,
 		maxDepth: 0,
 		opaqueCount: 0,
-		rootCount: renderStory.roots.length,
+		rootCount: sum(renderStories, (renderStory) => renderStory.roots.length),
 	}
 
-	for (const root of renderStory.roots) {
-		collectChildFacts(root, 1, [], elementPaths, opaqueReasons, stats)
+	for (const renderStory of renderStories) {
+		for (const root of renderStory.roots) {
+			collectChildFacts(
+				renderStory,
+				root,
+				1,
+				[],
+				elementPaths,
+				opaqueReasons,
+				stats,
+			)
+		}
 	}
 
 	return { elementPaths, opaqueReasons, stats }
 }
 
 function collectChildFacts(
+	renderStory: RenderStory,
 	child: StoryChild,
 	depth: number,
 	parentPath: SelectorPath,
-	elementPaths: SelectorPath[],
+	elementPaths: ElementPath[],
 	opaqueReasons: Map<string, number>,
 	stats: StoryStats,
 ): void {
@@ -1041,10 +1064,11 @@ function collectChildFacts(
 		tagName: child.tagName,
 	}
 	const currentPath = [...parentPath, pathSegment]
-	elementPaths.push(currentPath)
+	elementPaths.push({ path: currentPath, story: renderStory })
 
 	for (const nestedChild of child.children) {
 		collectChildFacts(
+			renderStory,
 			nestedChild,
 			depth + 1,
 			currentPath,
@@ -1056,8 +1080,7 @@ function collectChildFacts(
 }
 
 function runSyntheticReachabilityChecks(
-	renderStory: RenderStory,
-	elementPaths: SelectorPath[],
+	elementPaths: ElementPath[],
 	maxSelectors: number,
 ): SyntheticStats {
 	const selectedPaths = elementPaths.slice(0, maxSelectors)
@@ -1068,15 +1091,15 @@ function runSyntheticReachabilityChecks(
 		selectorsChecked: selectedPaths.length * 2,
 	}
 
-	for (const pathToElement of selectedPaths) {
-		if (canReachSelectorPath(renderStory, pathToElement) !== `reachable`) {
+	for (const { path: pathToElement, story } of selectedPaths) {
+		if (canReachSelectorPath(story, pathToElement) !== `reachable`) {
 			syntheticStats.positiveFailures += 1
 		}
 
 		const negativePath = createNegativePath(pathToElement)
 		if (!negativePath) continue
 
-		const negativeReachability = canReachSelectorPath(renderStory, negativePath)
+		const negativeReachability = canReachSelectorPath(story, negativePath)
 
 		if (negativeReachability === `reachable`) {
 			syntheticStats.negativeReachableFailures += 1
