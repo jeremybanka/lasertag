@@ -4,6 +4,12 @@ import type * as ESTree from "estree"
 
 const MESSAGE_ID = `renderTagWithOwnName`
 
+type RuleOptions = [
+	{
+		checkAllComponentFunctions?: boolean
+	}?,
+]
+
 type JSXIdentifier = JSSyntaxElement & {
 	type: `JSXIdentifier`
 	name: string
@@ -159,6 +165,27 @@ function getVariableComponentBody(
 	}
 }
 
+function getVariableDeclaratorComponentBody(
+	declarator: ESTree.VariableDeclarator,
+): { componentName: string; body: JSSyntaxElement } | undefined {
+	if (declarator.id.type !== `Identifier`) return
+	if (
+		declarator.init?.type !== `ArrowFunctionExpression` &&
+		declarator.init?.type !== `FunctionExpression`
+	) {
+		return
+	}
+
+	return {
+		componentName: declarator.id.name,
+		body: declarator.init.body as unknown as JSSyntaxElement,
+	}
+}
+
+function isPascalCase(name: string): boolean {
+	return /^[A-Z][A-Za-z0-9]*$/.test(name)
+}
+
 function isAllowedRootTag(componentName: string, tagName: string | undefined) {
 	return tagName === toKebabCase(componentName)
 }
@@ -196,24 +223,63 @@ export const renderTagWithOwnName: {
 		messages: {
 			renderTagWithOwnName: string
 		}
-		schema: never[]
+		schema: NonNullable<Rule.RuleMetaData["schema"]>
 	}
 	create(context: Rule.RuleContext): Rule.RuleListener
 } = {
 	meta: {
 		type: `problem`,
 		docs: {
-			description: `Require exported components to render a root tag matching the component name`,
+			description: `Require component functions to render a root tag matching the component name`,
 			recommended: true,
 			url: ``,
 		},
 		messages: {
-			renderTagWithOwnName: `Expected exported component \`{{componentName}}\` to return JSX with outermost tag <{{expectedTagName}}>.`,
+			renderTagWithOwnName: `Expected component function \`{{componentName}}\` to return JSX with outermost tag <{{expectedTagName}}>.`,
 		},
-		schema: [],
+		schema: [
+			{
+				type: `object`,
+				additionalProperties: false,
+				properties: {
+					checkAllComponentFunctions: {
+						type: `boolean`,
+					},
+				},
+			},
+		],
 	},
 
 	create(context) {
+		const [{ checkAllComponentFunctions = false } = {}] =
+			context.options as RuleOptions
+
+		const checkComponent = (componentName: string, body: JSSyntaxElement) => {
+			reportIfRootTagsDoNotMatch(
+				context,
+				componentName,
+				findReturnedNodes(body),
+			)
+		}
+
+		if (checkAllComponentFunctions) {
+			return {
+				FunctionDeclaration(node) {
+					if (!node.id || !isPascalCase(node.id.name)) return
+
+					checkComponent(node.id.name, node.body as unknown as JSSyntaxElement)
+				},
+
+				VariableDeclarator(node) {
+					const component = getVariableDeclaratorComponentBody(node)
+
+					if (!component || !isPascalCase(component.componentName)) return
+
+					checkComponent(component.componentName, component.body)
+				},
+			}
+		}
+
 		return {
 			ExportNamedDeclaration(node) {
 				const { declaration } = node
@@ -223,10 +289,9 @@ export const renderTagWithOwnName: {
 				if (declaration.type === `FunctionDeclaration`) {
 					if (!declaration.id) return
 
-					reportIfRootTagsDoNotMatch(
-						context,
+					checkComponent(
 						declaration.id.name,
-						findReturnedNodes(declaration.body as JSSyntaxElement),
+						declaration.body as JSSyntaxElement,
 					)
 					return
 				}
@@ -236,11 +301,7 @@ export const renderTagWithOwnName: {
 
 					if (!component) return
 
-					reportIfRootTagsDoNotMatch(
-						context,
-						component.componentName,
-						findReturnedNodes(component.body),
-					)
+					checkComponent(component.componentName, component.body)
 				}
 			},
 		}

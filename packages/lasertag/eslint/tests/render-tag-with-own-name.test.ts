@@ -2,7 +2,7 @@ import { renderTagWithOwnName } from "../src/rules/render-tag-with-own-name.ts"
 import { ruleTester } from "./rule-tester.ts"
 
 const message = (componentName: string, expectedTagName: string) =>
-	`Expected exported component \`${componentName}\` to return JSX with outermost tag <${expectedTagName}>.`
+	`Expected component function \`${componentName}\` to return JSX with outermost tag <${expectedTagName}>.`
 
 ruleTester.run(`render-tag-with-own-name`, renderTagWithOwnName, {
 	valid: [
@@ -65,6 +65,36 @@ ruleTester.run(`render-tag-with-own-name`, renderTagWithOwnName, {
 			name: `ignore local components that are not exported`,
 			code: `const AppHeaderBar = () => <wrong-tag />`,
 		},
+		{
+			name: `ignore local components when all component functions check is off`,
+			code: `const AppHeaderBar = () => <wrong-tag />`,
+			options: [{ checkAllComponentFunctions: false }],
+		},
+		{
+			name: `allow local function component with matching tag when all component functions check is on`,
+			code: `
+				function AppHeaderBar() {
+					return <app-header-bar />
+				}
+			`,
+			options: [{ checkAllComponentFunctions: true }],
+		},
+		{
+			name: `allow local arrow component with matching tag when all component functions check is on`,
+			code: `const ProjectList = () => <project-list />`,
+			options: [{ checkAllComponentFunctions: true }],
+		},
+		{
+			name: `ignore non-PascalCase functions when all component functions check is on`,
+			code: `
+				function formatProject() {
+					return <wrong-tag />
+				}
+
+				const renderProject = () => <wrong-tag />
+			`,
+			options: [{ checkAllComponentFunctions: true }],
+		},
 	],
 	invalid: [
 		{
@@ -79,6 +109,12 @@ ruleTester.run(`render-tag-with-own-name`, renderTagWithOwnName, {
 		{
 			name: `ban const component rendering the wrong custom tag`,
 			code: `export const ProjectList = () => <projects />`,
+			errors: [{ message: message(`ProjectList`, `project-list`) }],
+		},
+		{
+			name: `ban exported component rendering the wrong custom tag when all component functions check is on`,
+			code: `export const ProjectList = () => <projects />`,
+			options: [{ checkAllComponentFunctions: true }],
 			errors: [{ message: message(`ProjectList`, `project-list`) }],
 		},
 		{
@@ -191,6 +227,32 @@ ruleTester.run(`render-tag-with-own-name`, renderTagWithOwnName, {
 				}
 			`,
 			errors: [{ message: message(`ProjectList`, `project-list`) }],
+		},
+		{
+			name: `ban local function component rendering the wrong tag when all component functions check is on`,
+			code: `
+				function AppHeaderBar() {
+					return <header-bar />
+				}
+			`,
+			options: [{ checkAllComponentFunctions: true }],
+			errors: [{ message: message(`AppHeaderBar`, `app-header-bar`) }],
+		},
+		{
+			name: `ban local arrow component rendering the wrong tag when all component functions check is on`,
+			code: `const ProjectList = () => <projects />`,
+			options: [{ checkAllComponentFunctions: true }],
+			errors: [{ message: message(`ProjectList`, `project-list`) }],
+		},
+		{
+			name: `ban local function expression component rendering the wrong tag when all component functions check is on`,
+			code: `
+				const AppHeaderBar = function () {
+					return <header-bar />
+				}
+			`,
+			options: [{ checkAllComponentFunctions: true }],
+			errors: [{ message: message(`AppHeaderBar`, `app-header-bar`) }],
 		},
 	],
 })
