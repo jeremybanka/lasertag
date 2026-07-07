@@ -19,3 +19,13 @@ Preview the configured providers without network access:
 ```sh
 pnpm refractor:corpus --dry-run
 ```
+
+Run the corpus sweep and write JSON/Markdown reports:
+
+```sh
+pnpm refractor:corpus:test
+```
+
+The sweep fetches missing or stale providers by default. Use `--no-fetch` when
+you want the command to validate only the files that are already present in
+`providers/`.

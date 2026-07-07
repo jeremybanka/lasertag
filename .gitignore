@@ -8,3 +8,4 @@ dist/
 .env
 *.log
 packages/lasertag/refractor/corpus/providers/
+packages/lasertag/refractor/corpus/reports/

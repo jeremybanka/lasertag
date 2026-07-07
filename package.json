@@ -11,6 +11,7 @@
 		"lint": "vp lint",
 		"release": "pnpm build && changeset publish",
 		"refractor:corpus": "./scripts/fetch-refractor-corpus.node.ts",
+		"refractor:corpus:test": "./scripts/test-refractor-corpus.node.ts",
 		"staged": "vp staged",
 		"test": "vp run -r test",
 		"workflows": "./scripts/update-workflows.node.ts"

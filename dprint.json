@@ -25,6 +25,7 @@
 		"**/dist/**",
 		"**/drizzle/meta/**",
 		"**/refractor/corpus/providers/**",
+		"**/refractor/corpus/reports/**",
 		"**/heap.json",
 		"**/node_modules/**",
 		"**/projects/**"
