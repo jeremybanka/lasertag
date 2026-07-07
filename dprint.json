@@ -24,6 +24,7 @@
 		"**/coverage/**",
 		"**/dist/**",
 		"**/drizzle/meta/**",
+		"**/refractor/corpus/providers/**",
 		"**/heap.json",
 		"**/node_modules/**",
 		"**/projects/**"

@@ -1,0 +1,26 @@
+type Item = {
+	href?: string
+	label: string
+}
+
+type ItemListProps = {
+	items: Item[]
+	showEmpty: boolean
+}
+
+export const ItemList = ({ items, showEmpty }: ItemListProps) => (
+	<item-list>
+		{showEmpty && <empty-state />}
+		{items.map((item) =>
+			item.href ? (
+				<item-link>
+					<a href={item.href}>{item.label}</a>
+				</item-link>
+			) : (
+				<item-row>
+					<span>{item.label}</span>
+				</item-row>
+			)
+		)}
+	</item-list>
+)

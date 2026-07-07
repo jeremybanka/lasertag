@@ -7,3 +7,4 @@ dist/
 .mise.local.toml
 .env
 *.log
+packages/lasertag/refractor/corpus/providers/

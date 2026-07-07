@@ -1,0 +1,17 @@
+import { Fragment, type ReactNode } from "react"
+
+type FrameProps = {
+	children?: ReactNode
+	toolbar?: ReactNode
+}
+
+export function Frame({ children, toolbar }: FrameProps) {
+	return (
+		<Fragment>
+			<frame-root>
+				<header>{toolbar}</header>
+				<main>{children}</main>
+			</frame-root>
+		</Fragment>
+	)
+}

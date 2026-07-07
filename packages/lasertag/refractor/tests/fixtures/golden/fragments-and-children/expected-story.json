@@ -1,0 +1,32 @@
+{
+	"componentName": "Frame",
+	"roots": [
+		{
+			"kind": "element",
+			"tagName": "frame-root",
+			"children": [
+				{
+					"kind": "element",
+					"tagName": "header",
+					"children": [
+						{
+							"kind": "opaque",
+							"reason": "unsupported render expression"
+						}
+					]
+				},
+				{
+					"kind": "element",
+					"tagName": "main",
+					"children": [
+						{
+							"kind": "opaque",
+							"reason": "children prop render branch"
+						}
+					]
+				}
+			]
+		}
+	],
+	"warnings": []
+}

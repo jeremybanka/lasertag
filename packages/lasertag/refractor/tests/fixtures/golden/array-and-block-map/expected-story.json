@@ -1,0 +1,22 @@
+{
+	"componentName": "Grid",
+	"roots": [
+		{
+			"kind": "element",
+			"tagName": "grid-header",
+			"children": []
+		},
+		{
+			"kind": "element",
+			"tagName": "grid-row",
+			"children": [
+				{
+					"kind": "element",
+					"tagName": "grid-cell",
+					"children": []
+				}
+			]
+		}
+	],
+	"warnings": []
+}

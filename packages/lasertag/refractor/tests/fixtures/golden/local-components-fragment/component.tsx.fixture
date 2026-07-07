@@ -1,0 +1,24 @@
+function Badge() {
+	return (
+		<>
+			<badge-dot />
+			<badge-label />
+		</>
+	)
+}
+
+const Actions = () => (
+	<actions-row>
+		<button type="button">Buy</button>
+		<a href="/details">Details</a>
+	</actions-row>
+)
+
+export default function ProductCard() {
+	return (
+		<product-card>
+			<Badge />
+			<Actions />
+		</product-card>
+	)
+}

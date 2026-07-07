@@ -1,0 +1,38 @@
+{
+	"componentName": "ProductCard",
+	"roots": [
+		{
+			"kind": "element",
+			"tagName": "product-card",
+			"children": [
+				{
+					"kind": "element",
+					"tagName": "badge-dot",
+					"children": []
+				},
+				{
+					"kind": "element",
+					"tagName": "badge-label",
+					"children": []
+				},
+				{
+					"kind": "element",
+					"tagName": "actions-row",
+					"children": [
+						{
+							"kind": "element",
+							"tagName": "button",
+							"children": []
+						},
+						{
+							"kind": "element",
+							"tagName": "a",
+							"children": []
+						}
+					]
+				}
+			]
+		}
+	],
+	"warnings": []
+}

@@ -1,0 +1,24 @@
+{
+	"componentName": "Shell",
+	"roots": [
+		{
+			"kind": "element",
+			"tagName": "app-shell",
+			"children": [
+				{
+					"kind": "opaque",
+					"reason": "imported or external component"
+				},
+				{
+					"kind": "opaque",
+					"reason": "imported or external component"
+				},
+				{
+					"kind": "opaque",
+					"reason": "dynamic JSX component"
+				}
+			]
+		}
+	],
+	"warnings": []
+}

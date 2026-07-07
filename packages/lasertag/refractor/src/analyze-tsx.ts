@@ -337,12 +337,20 @@ function isIntrinsicJsxTag(tagName: string): boolean {
 	return /^[a-z]/.test(tagName) || tagName.includes(`-`)
 }
 
+function isFragmentJsxTag(tagName: string): boolean {
+	return tagName === `Fragment` || tagName === `React.Fragment`
+}
+
 function analyzeJsxElement(
 	context: AnalyzeContext,
 	node: ts.JsxElement,
 	stack: string[],
 ): StoryChild[] {
 	const tagName = getJsxTagText(context.sourceFile, node.openingElement.tagName)
+
+	if (isFragmentJsxTag(tagName)) {
+		return analyzeJsxChildren(context, node.children, stack)
+	}
 
 	if (!isIntrinsicJsxTag(tagName)) {
 		return analyzeComponentTag(context, tagName, node, stack)
@@ -364,6 +372,10 @@ function analyzeJsxSelfClosingElement(
 	stack: string[],
 ): StoryChild[] {
 	const tagName = getJsxTagText(context.sourceFile, node.tagName)
+
+	if (isFragmentJsxTag(tagName)) {
+		return []
+	}
 
 	if (!isIntrinsicJsxTag(tagName)) {
 		return analyzeComponentTag(context, tagName, node, stack)
@@ -424,6 +436,27 @@ function analyzeJsxChildren(
 
 		return [opaque(`unsupported JSX child`, context.sourceFile, child)]
 	})
+}
+
+function isChildrenExpression(expression: ts.Expression): boolean {
+	if (ts.isIdentifier(expression)) {
+		return expression.text === `children`
+	}
+
+	if (ts.isPropertyAccessExpression(expression)) {
+		return expression.name.text === `children`
+	}
+
+	if (!ts.isElementAccessExpression(expression)) {
+		return false
+	}
+
+	const argumentExpression = expression.argumentExpression
+
+	return (
+		ts.isStringLiteralLike(argumentExpression) &&
+		argumentExpression.text === `children`
+	)
 }
 
 function analyzeMapCall(
@@ -521,6 +554,12 @@ function analyzeExpression(
 
 	if (expression.kind === ts.SyntaxKind.NullKeyword) return []
 	if (expression.kind === ts.SyntaxKind.FalseKeyword) return []
+
+	if (isChildrenExpression(expression)) {
+		return [
+			opaque(`children prop render branch`, context.sourceFile, expression),
+		]
+	}
 
 	if (
 		ts.isIdentifier(expression) &&

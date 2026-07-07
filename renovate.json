@@ -20,6 +20,16 @@
 			"depNameTemplate": "jdx/mise",
 			"datasourceTemplate": "github-releases",
 			"versioningTemplate": "semver-coerced"
+		},
+		{
+			"customType": "regex",
+			"description": "Update release-pinned refractor render corpus providers",
+			"managerFilePatterns": [
+				"/^packages\\/lasertag\\/refractor\\/corpus\\/manifest\\.json$/"
+			],
+			"matchStrings": [
+				"\"version\"\\s*:\\s*\"(?<currentValue>[^\"]+)\"\\s*,\\s*\"renovate\"\\s*:\\s*\\{\\s*\"datasource\"\\s*:\\s*\"(?<datasource>[^\"]+)\"\\s*,\\s*\"packageName\"\\s*:\\s*\"(?<packageName>[^\"]+)\"\\s*,\\s*\"versioning\"\\s*:\\s*\"(?<versioning>[^\"]+)\"(?:\\s*,\\s*\"extractVersion\"\\s*:\\s*\"(?<extractVersion>[^\"]+)\")?\\s*\\}"
+			]
 		}
 	],
 	"packageRules": [
@@ -41,6 +51,15 @@
 		{
 			"matchManagers": ["github-actions"],
 			"dependencyDashboardApproval": true
+		},
+		{
+			"groupName": "refractor render corpus",
+			"matchPackageNames": [
+				"@radix-ui/react-dialog",
+				"@radix-ui/react-slot",
+				"mantinedev/mantine",
+				"shadcn-ui/ui"
+			]
 		},
 		{
 			"matchPackageNames": ["@typescript/*"],
