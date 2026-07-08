@@ -10,4 +10,5 @@ artifacts/
 *.log
 packages/lasertag/refractor/corpus/providers/
 packages/lasertag/refractor/corpus/reports/
+packages/lasertag/vscode/package.json
 packages/lasertag-vscode/server/
