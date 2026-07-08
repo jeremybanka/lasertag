@@ -1,5 +1,14 @@
 # lasertag
 
+## 0.2.0
+
+### Minor Changes
+
+- 81f2086: Add the Refractor library for extracting TSX render stories and finding unreachable CSS Module selectors.
+- 81f2086: Add the Lasertag LSP server for editor diagnostics powered by the shared Refractor library.
+- 81f2086: Add the `lasertag` CLI for validating CSS Modules, stubbing fix mode, and installing the bundled VSCode extension from npm.
+- 81f2086: Add the bundled Lasertag VSCode extension submodule with configurable LSP diagnostics for unreachable CSS Module selectors.
+
 ## 0.1.6
 
 ### Patch Changes
