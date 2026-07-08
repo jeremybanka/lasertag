@@ -684,3 +684,490 @@ describe(`module.css dead code assessment`, () => {
 		])
 	})
 })
+
+describe(`module.css pseudo selector reachability`, () => {
+	it(`allows ampersand pseudo-classes on the owning selector`, () => {
+		expect(
+			diagnosticSelectors(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<header />
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						&:hover {}
+						&:focus-visible {
+							> header {}
+						}
+					}
+				`,
+			),
+		).toEqual([])
+	})
+
+	it(`checks selectors nested underneath ampersand pseudo-classes`, () => {
+		expect(
+			diagnosticSelectors(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<header>
+									<h1 />
+								</header>
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						&:focus-visible {
+							> header {
+								> h1 {}
+								> nav {}
+							}
+						}
+					}
+				`,
+			),
+		).toEqual([`app-panel.class:focus-visible > header > nav`])
+	})
+
+	it(`allows ampersand pseudo-elements on the owning selector`, () => {
+		expect(
+			diagnosticSelectors(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return <app-panel className={css.class} />
+					}
+				`,
+				`
+					app-panel.class {
+						&::before {}
+						&::after {}
+					}
+				`,
+			),
+		).toEqual([])
+	})
+
+	it(`checks selectors nested underneath ampersand pseudo-elements`, () => {
+		expect(
+			diagnosticSelectors(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<header>
+									<h1 />
+								</header>
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						&::before {
+							> header {
+								> h1 {}
+								> button {}
+							}
+						}
+					}
+				`,
+			),
+		).toEqual([`app-panel.class::before > header > button`])
+	})
+})
+
+describe(`module.css selector refinement reachability`, () => {
+	it(`treats non-structural functional pseudo-classes as host refinements`, () => {
+		expect(
+			diagnosticSelectors(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<button type="button" />
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						> button:not(.disabled):nth-child(1) {}
+						> a:not(.disabled) {}
+					}
+				`,
+			),
+		).toEqual([`app-panel.class > a:not(.disabled)`])
+	})
+
+	it(`treats :is tag arguments as structural alternatives`, () => {
+		expect(
+			diagnosticSelectors(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<header>
+									<h1 />
+								</header>
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						> :is(header, footer) {
+							> h1 {}
+							> nav {}
+						}
+					}
+				`,
+			),
+		).toEqual([`app-panel.class > :is(header, footer) > nav`])
+	})
+
+	it(`treats :where tag arguments as structural alternatives`, () => {
+		expect(
+			diagnosticSelectors(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<header />
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						> :where(header, footer) {}
+						> :where(nav, aside) {}
+					}
+				`,
+			),
+		).toEqual([`app-panel.class > :where(nav, aside)`])
+	})
+
+	it(`treats attribute selectors as host refinements`, () => {
+		expect(
+			diagnosticSelectors(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<button type="button" data-icon=".external" />
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						> button[type="button"][data-icon=".external"] {}
+						> a[href] {}
+					}
+				`,
+			),
+		).toEqual([`app-panel.class > a[href]`])
+	})
+})
+
+describe(`module.css selector unknowns and escapes`, () => {
+	it(`skips selectors that cross a :global escape hatch`, () => {
+		expect(
+			diagnosticSelectors(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return <app-panel className={css.class} />
+					}
+				`,
+				`
+					app-panel.class {
+						:global(.radix-popover-content) {
+							> button {}
+						}
+					}
+				`,
+			),
+		).toEqual([])
+	})
+
+	it(`skips wildcard and tagless selectors`, () => {
+		expect(
+			diagnosticSelectors(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return <app-panel className={css.class} />
+					}
+				`,
+				`
+					app-panel.class {
+						> * {}
+						> [role="button"] {}
+					}
+				`,
+			),
+		).toEqual([])
+	})
+
+	it(`skips unsupported structural selectors`, () => {
+		expect(
+			diagnosticSelectors(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<header />
+								<footer />
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						> header + footer {}
+						> header ~ footer {}
+						> header:has(button) {}
+						svg|a {}
+					}
+				`,
+			),
+		).toEqual([])
+	})
+})
+
+describe(`module.css nesting and at-rule reachability`, () => {
+	it(`checks multiple root selector alternatives independently`, () => {
+		expect(
+			diagnosticSelectors(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<header />
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class,
+					other-panel.class {
+						> header {}
+					}
+				`,
+			),
+		).toEqual([`other-panel.class`, `other-panel.class > header`])
+	})
+
+	it(`checks nested rules inside modern at-rules`, () => {
+		expect(
+			diagnosticSelectors(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<header />
+							</app-panel>
+						)
+					}
+				`,
+				`
+					@supports (container-type: inline-size) {
+						app-panel.class {
+							@container (width > 20rem) {
+								@layer components {
+									> header {}
+									> footer {}
+								}
+							}
+						}
+					}
+				`,
+			),
+		).toEqual([`app-panel.class > footer`])
+	})
+
+	it(`reports nested self class selectors as impossible local classes`, () => {
+		expect(
+			diagnosticCodes(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<app-panel />
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						& & {}
+					}
+				`,
+			),
+		).toEqual([`impossible-local-class`])
+	})
+
+	it(`allows ampersand root alternatives inside :is`, () => {
+		expect(
+			diagnosticSelectors(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<header />
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						:is(&, other-panel.class) {
+							> header {}
+							> footer {}
+						}
+					}
+				`,
+			),
+		).toEqual([`:is(app-panel.class, other-panel.class) > footer`])
+	})
+})
+
+describe(`module.css opaque render story boundaries`, () => {
+	it(`does not report descendants that may come from imported components`, () => {
+		expect(
+			diagnosticSelectors(
+				`
+					import css from "./AppPanel.module.css"
+					import { UserMenu } from "./UserMenu.tsx"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<UserMenu />
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						> button {}
+						button {}
+					}
+				`,
+			),
+		).toEqual([])
+	})
+
+	it(`does not report descendants that may come from children`, () => {
+		expect(
+			diagnosticSelectors(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel({ children }: { children: React.ReactNode }) {
+						return (
+							<app-panel className={css.class}>
+								{children}
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						> button {}
+						button {}
+					}
+				`,
+			),
+		).toEqual([])
+	})
+
+	it(`does not report descendants that may come from render prop calls`, () => {
+		expect(
+			diagnosticSelectors(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel(
+						props: { footer?: () => React.ReactNode },
+					) {
+						return (
+							<app-panel className={css.class}>
+								{props.footer?.()}
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						> footer {}
+						footer button {}
+					}
+				`,
+			),
+		).toEqual([])
+	})
+
+	it(`does not report descendants that may come from portal calls`, () => {
+		expect(
+			diagnosticSelectors(
+				`
+					import { createPortal } from "react-dom"
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								{createPortal(<footer />, document.body)}
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						> footer {}
+						footer button {}
+					}
+				`,
+			),
+		).toEqual([])
+	})
+})

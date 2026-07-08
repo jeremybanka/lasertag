@@ -6,7 +6,7 @@ export type CssSelectorAnalysis = {
 	result:
 		| {
 				kind: `path`
-				path: SelectorPath
+				paths: SelectorPath[]
 		  }
 		| {
 				kind: `impossible-local-class`
@@ -33,6 +33,8 @@ type TokenizedSelectorPart = {
 	relation: `self` | `child` | `descendant`
 	compound: string
 }
+
+const MAX_SELECTOR_PATHS = 128
 
 function isWhitespace(character: string): boolean {
 	return /\s/.test(character)
@@ -397,6 +399,10 @@ function hasUnsupportedSelectorSyntax(selector: string): string | undefined {
 		if (character === `+` || character === `~`) {
 			return `sibling combinator`
 		}
+
+		if (character === `|`) {
+			return `namespace selector`
+		}
 	}
 
 	if (selector.includes(`:has(`)) return `:has()`
@@ -483,30 +489,67 @@ function readIdentifier(text: string, start: number): string {
 	return text.slice(start, end)
 }
 
-function stripBracketSections(text: string): string {
+function stripBalancedSections(
+	text: string,
+	options: { brackets?: boolean; parentheses?: boolean },
+): string {
 	let stripped = ``
 	let bracketDepth = 0
+	let parenDepth = 0
+	let quote: `"` | `'` | undefined
 
-	for (const character of text) {
-		if (character === `[`) {
+	for (let index = 0; index < text.length; index += 1) {
+		const character = text[index]
+		const previousCharacter = text[index - 1]
+
+		if (quote) {
+			if (character === quote && previousCharacter !== `\\`) {
+				quote = undefined
+			}
+
+			continue
+		}
+
+		if (character === `"` || character === `'`) {
+			quote = character
+			continue
+		}
+
+		if (options.brackets && character === `[`) {
 			bracketDepth += 1
 			continue
 		}
 
-		if (character === `]`) {
+		if (options.brackets && character === `]`) {
 			bracketDepth = Math.max(bracketDepth - 1, 0)
 			continue
 		}
 
-		if (bracketDepth === 0) stripped += character
+		if (options.parentheses && character === `(`) {
+			parenDepth += 1
+			continue
+		}
+
+		if (options.parentheses && character === `)`) {
+			parenDepth = Math.max(parenDepth - 1, 0)
+			continue
+		}
+
+		if (bracketDepth === 0 && parenDepth === 0 && character) {
+			stripped += character
+		}
 	}
 
 	return stripped
 }
 
+function stripNonStructuralSections(text: string): string {
+	return stripBalancedSections(text, { brackets: true, parentheses: true })
+}
+
 function getCompoundClasses(compound: string): string[] {
 	const classes: string[] = []
-	const stripped = stripBracketSections(compound)
+	const stripped = stripNonStructuralSections(compound)
 
 	for (let index = 0; index < stripped.length; index += 1) {
 		if (stripped[index] !== `.`) continue
@@ -523,7 +566,7 @@ function getCompoundClasses(compound: string): string[] {
 }
 
 function getCompoundTagName(compound: string): string | undefined {
-	const stripped = stripBracketSections(compound).trim()
+	const stripped = stripNonStructuralSections(compound).trim()
 
 	if (stripped.startsWith(`*`)) return
 
@@ -532,6 +575,242 @@ function getCompoundTagName(compound: string): string | undefined {
 	const tagName = readIdentifier(stripped, 0)
 
 	return tagName.length > 0 ? tagName : undefined
+}
+
+function findMatchingParen(text: string, openParenIndex: number): number {
+	let depth = 0
+	let bracketDepth = 0
+	let quote: `"` | `'` | undefined
+
+	for (let index = openParenIndex; index < text.length; index += 1) {
+		const character = text[index]
+		const previousCharacter = text[index - 1]
+
+		if (quote) {
+			if (character === quote && previousCharacter !== `\\`) {
+				quote = undefined
+			}
+
+			continue
+		}
+
+		if (character === `"` || character === `'`) {
+			quote = character
+			continue
+		}
+
+		if (character === `[`) {
+			bracketDepth += 1
+			continue
+		}
+
+		if (character === `]`) {
+			bracketDepth = Math.max(bracketDepth - 1, 0)
+			continue
+		}
+
+		if (bracketDepth > 0) continue
+
+		if (character === `(`) {
+			depth += 1
+			continue
+		}
+
+		if (character === `)`) {
+			depth -= 1
+
+			if (depth === 0) return index
+		}
+	}
+
+	return -1
+}
+
+function findFunctionalAlternativePseudo(compound: string):
+	| {
+			start: number
+			end: number
+			argumentsText: string
+	  }
+	| undefined {
+	let bracketDepth = 0
+	let parenDepth = 0
+	let quote: `"` | `'` | undefined
+
+	for (let index = 0; index < compound.length; index += 1) {
+		const character = compound[index]
+		const previousCharacter = compound[index - 1]
+
+		if (quote) {
+			if (character === quote && previousCharacter !== `\\`) {
+				quote = undefined
+			}
+
+			continue
+		}
+
+		if (character === `"` || character === `'`) {
+			quote = character
+			continue
+		}
+
+		if (character === `[`) {
+			bracketDepth += 1
+			continue
+		}
+
+		if (character === `]`) {
+			bracketDepth = Math.max(bracketDepth - 1, 0)
+			continue
+		}
+
+		if (bracketDepth > 0) continue
+
+		if (character === `(`) {
+			parenDepth += 1
+			continue
+		}
+
+		if (character === `)`) {
+			parenDepth = Math.max(parenDepth - 1, 0)
+			continue
+		}
+
+		if (parenDepth > 0) continue
+
+		for (const pseudoName of [`is`, `where`] as const) {
+			const prefix = `:${pseudoName}(`
+
+			if (!compound.startsWith(prefix, index)) continue
+
+			const openParenIndex = index + prefix.length - 1
+			const closeParenIndex = findMatchingParen(compound, openParenIndex)
+
+			if (closeParenIndex === -1) {
+				return
+			}
+
+			return {
+				start: index,
+				end: closeParenIndex + 1,
+				argumentsText: compound.slice(openParenIndex + 1, closeParenIndex),
+			}
+		}
+	}
+}
+
+function withoutLeadingTag(compound: string, tagName: string): string {
+	const trimmed = compound.trim()
+
+	return trimmed.slice(tagName.length)
+}
+
+function mergeCompoundAlternative(
+	prefix: string,
+	alternative: string,
+	suffix: string,
+): string | undefined {
+	const base = `${prefix}${suffix}`
+	const baseTagName = getCompoundTagName(base)
+	const alternativeTagName = getCompoundTagName(alternative)
+
+	if (!alternativeTagName) {
+		return `${prefix}${alternative}${suffix}`
+	}
+
+	const alternativeRest = withoutLeadingTag(alternative, alternativeTagName)
+
+	if (!baseTagName) {
+		return `${alternativeTagName}${prefix}${alternativeRest}${suffix}`
+	}
+
+	if (baseTagName !== alternativeTagName) {
+		return
+	}
+
+	return `${prefix}${alternativeRest}${suffix}`
+}
+
+function expandCompoundAlternatives(compound: string):
+	| {
+			kind: `compounds`
+			compounds: string[]
+	  }
+	| {
+			kind: `unknown`
+			reason: string
+	  } {
+	let compounds = [compound]
+
+	while (true) {
+		let expanded = false
+		const nextCompounds: string[] = []
+
+		for (const currentCompound of compounds) {
+			const pseudo = findFunctionalAlternativePseudo(currentCompound)
+
+			if (!pseudo) {
+				nextCompounds.push(currentCompound)
+				continue
+			}
+
+			expanded = true
+
+			const prefix = currentCompound.slice(0, pseudo.start)
+			const suffix = currentCompound.slice(pseudo.end)
+			const alternatives = splitSelectorList(pseudo.argumentsText, {
+				start: 0,
+				end: pseudo.argumentsText.length,
+			})
+
+			if (alternatives.length === 0) {
+				return { kind: `unknown`, reason: `empty functional pseudo-class` }
+			}
+
+			for (const alternative of alternatives) {
+				const parts = tokenizeSelector(alternative.text)
+
+				if (parts.length !== 1) {
+					return {
+						kind: `unknown`,
+						reason: `complex functional pseudo-class selector`,
+					}
+				}
+
+				const part = parts[0]
+
+				if (!part || part.relation !== `self`) {
+					return {
+						kind: `unknown`,
+						reason: `complex functional pseudo-class selector`,
+					}
+				}
+
+				const merged = mergeCompoundAlternative(prefix, part.compound, suffix)
+
+				if (!merged) {
+					return {
+						kind: `unknown`,
+						reason: `conflicting functional pseudo-class tag`,
+					}
+				}
+
+				nextCompounds.push(merged)
+			}
+		}
+
+		if (!expanded) {
+			return { kind: `compounds`, compounds }
+		}
+
+		const dedupedCompounds = [...new Set(nextCompounds)]
+
+		if (dedupedCompounds.length > MAX_SELECTOR_PATHS) {
+			return { kind: `unknown`, reason: `too many selector alternatives` }
+		}
+
+		compounds = dedupedCompounds
+	}
 }
 
 function parseSelectorPath(selector: string): CssSelectorAnalysis[`result`] {
@@ -551,27 +830,55 @@ function parseSelectorPath(selector: string): CssSelectorAnalysis[`result`] {
 		return { kind: `unknown`, reason: `empty selector` }
 	}
 
-	const path: SelectorPath = []
+	let paths: SelectorPath[] = [[]]
+	let impossibleClassName: string | undefined
 
 	for (const [index, part] of parts.entries()) {
-		const classes = getCompoundClasses(part.compound)
+		const expansion = expandCompoundAlternatives(part.compound)
 
-		for (const className of classes) {
-			if (!(index === 0 && className === `class`)) {
-				return { kind: `impossible-local-class`, className }
+		if (expansion.kind === `unknown`) return expansion
+
+		const segmentOptions: SelectorPath[number][] = []
+
+		for (const compound of expansion.compounds) {
+			const classes = getCompoundClasses(compound)
+			const invalidClassName = classes.find(
+				(className) => !(index === 0 && className === `class`),
+			)
+
+			if (invalidClassName) {
+				impossibleClassName ??= invalidClassName
+				continue
 			}
+
+			const tagName = getCompoundTagName(compound)
+
+			if (!tagName) {
+				return { kind: `unknown`, reason: `selector segment without tag` }
+			}
+
+			segmentOptions.push({
+				relation: index === 0 ? `self` : part.relation,
+				tagName,
+			})
 		}
 
-		const tagName = getCompoundTagName(part.compound)
-
-		if (!tagName) {
-			return { kind: `unknown`, reason: `selector segment without tag` }
+		if (segmentOptions.length === 0) {
+			return impossibleClassName
+				? { kind: `impossible-local-class`, className: impossibleClassName }
+				: { kind: `unknown`, reason: `selector segment without tag` }
 		}
 
-		path.push({ relation: index === 0 ? `self` : part.relation, tagName })
+		paths = paths.flatMap((path) =>
+			segmentOptions.map((segment) => [...path, segment]),
+		)
+
+		if (paths.length > MAX_SELECTOR_PATHS) {
+			return { kind: `unknown`, reason: `too many selector paths` }
+		}
 	}
 
-	return { kind: `path`, path }
+	return { kind: `path`, paths }
 }
 
 export function analyzeCssModuleSelectors(

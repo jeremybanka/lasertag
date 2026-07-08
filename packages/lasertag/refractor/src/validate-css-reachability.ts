@@ -51,7 +51,11 @@ export function validateCssReachability(
 			continue
 		}
 
-		if (canReachSelectorPath(renderStory, result.path) === `unreachable`) {
+		if (
+			result.paths.every(
+				(path) => canReachSelectorPath(renderStory, path) === `unreachable`,
+			)
+		) {
 			diagnostics.push({
 				code: `dead-selector`,
 				message: deadSelectorMessage(selectorAnalysis.selector),
