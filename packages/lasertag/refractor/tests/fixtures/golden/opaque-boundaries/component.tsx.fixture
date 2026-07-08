@@ -1,0 +1,19 @@
+import { Menu } from "./Menu.tsx"
+
+declare const Namespace: {
+	Tool: () => JSX.Element
+}
+
+type ShellProps = {
+	Widget: () => JSX.Element
+}
+
+export function Shell({ Widget }: ShellProps) {
+	return (
+		<app-shell>
+			<Menu />
+			<Widget />
+			<Namespace.Tool />
+		</app-shell>
+	)
+}

@@ -1,0 +1,54 @@
+{
+	"componentName": "ItemList",
+	"roots": [
+		{
+			"kind": "element",
+			"tagName": "item-list",
+			"children": [
+				{
+					"kind": "element",
+					"tagName": "empty-state",
+					"children": []
+				},
+				{
+					"kind": "element",
+					"tagName": "item-link",
+					"children": [
+						{
+							"kind": "element",
+							"tagName": "a",
+							"attributes": [
+								{
+									"name": "href"
+								}
+							],
+							"children": [
+								{
+									"kind": "opaque",
+									"reason": "unsupported render expression"
+								}
+							]
+						}
+					]
+				},
+				{
+					"kind": "element",
+					"tagName": "item-row",
+					"children": [
+						{
+							"kind": "element",
+							"tagName": "span",
+							"children": [
+								{
+									"kind": "opaque",
+									"reason": "unsupported render expression"
+								}
+							]
+						}
+					]
+				}
+			]
+		}
+	],
+	"warnings": []
+}

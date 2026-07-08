@@ -1,0 +1,34 @@
+{
+	"componentName": "StatusPanel",
+	"roots": [
+		{
+			"kind": "element",
+			"tagName": "status-panel",
+			"children": [
+				{
+					"kind": "element",
+					"tagName": "ready-state",
+					"children": [
+						{
+							"kind": "element",
+							"tagName": "button",
+							"attributes": [
+								{
+									"name": "type",
+									"value": "button"
+								}
+							],
+							"children": []
+						}
+					]
+				},
+				{
+					"kind": "element",
+					"tagName": "error-state",
+					"children": []
+				}
+			]
+		}
+	],
+	"warnings": []
+}

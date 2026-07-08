@@ -1,0 +1,19 @@
+type StatusPanelProps = {
+	state: "idle" | "ready" | "error"
+}
+
+export function StatusPanel({ state }: StatusPanelProps) {
+	if (state === "idle") return null
+
+	return (
+		<status-panel>
+			{state === "ready" ? (
+				<ready-state>
+					<button type="button">Continue</button>
+				</ready-state>
+			) : (
+				<error-state />
+			)}
+		</status-panel>
+	)
+}

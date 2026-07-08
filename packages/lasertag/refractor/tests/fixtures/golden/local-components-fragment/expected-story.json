@@ -1,0 +1,50 @@
+{
+	"componentName": "ProductCard",
+	"roots": [
+		{
+			"kind": "element",
+			"tagName": "product-card",
+			"children": [
+				{
+					"kind": "element",
+					"tagName": "badge-dot",
+					"children": []
+				},
+				{
+					"kind": "element",
+					"tagName": "badge-label",
+					"children": []
+				},
+				{
+					"kind": "element",
+					"tagName": "actions-row",
+					"children": [
+						{
+							"kind": "element",
+							"tagName": "button",
+							"attributes": [
+								{
+									"name": "type",
+									"value": "button"
+								}
+							],
+							"children": []
+						},
+						{
+							"kind": "element",
+							"tagName": "a",
+							"attributes": [
+								{
+									"name": "href",
+									"value": "/details"
+								}
+							],
+							"children": []
+						}
+					]
+				}
+			]
+		}
+	],
+	"warnings": []
+}

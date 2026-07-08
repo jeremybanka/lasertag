@@ -1,0 +1,19 @@
+type GridProps = {
+	rows: string[]
+}
+
+export function Grid({ rows }: GridProps) {
+	return [
+		<grid-header key="header" />,
+		rows.map((row) => {
+			if (!row) return null
+
+			return (
+				<grid-row key={row}>
+					<grid-cell />
+				</grid-row>
+			)
+		}),
+		false,
+	]
+}

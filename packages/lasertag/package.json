@@ -8,9 +8,13 @@
 		"directory": "packages/lasertag"
 	},
 	"files": [
+		"cli",
+		"dist",
 		"docs",
 		"eslint",
 		"examples",
+		"lsp",
+		"refractor",
 		"templates",
 		"types",
 		"AGENTS.md"
@@ -31,24 +35,49 @@
 			"types": "./types/solid-jsx-intrinsic-elements.d.ts"
 		},
 		"./eslint-plugin": {
-			"import": "./eslint/dist/plugin.mjs",
-			"types": "./eslint/dist/plugin.d.mts"
+			"import": "./dist/eslint-plugin.mjs",
+			"types": "./dist/eslint-plugin.d.mts"
+		},
+		"./refractor": {
+			"import": "./dist/refractor.mjs",
+			"types": "./dist/refractor.d.mts"
+		},
+		"./lsp": {
+			"import": "./dist/lsp.mjs",
+			"types": "./dist/lsp.d.mts"
 		}
 	},
+	"bin": {
+		"lasertag": "./dist/cli.mjs",
+		"lasertag-lsp": "./dist/lsp.mjs"
+	},
 	"scripts": {
-		"build": "vp pack",
+		"build": "vp pack && pnpm build:visx",
+		"build:visx": "node __scripts__/build-visx.node.ts",
 		"test": "vp test"
+	},
+	"dependencies": {
+		"atom.io": "0.49.6",
+		"comline": "0.5.0",
+		"takua": "0.2.2",
+		"tinyglobby": "0.2.17",
+		"vscode-languageserver": "10.1.0",
+		"vscode-languageserver-textdocument": "1.0.12",
+		"zod": "4.4.3"
 	},
 	"devDependencies": {
 		"@eslint/core": "1.2.1",
 		"@types/estree": "1.0.9",
+		"@types/node": "25.9.2",
 		"@types/react": "19.2.17",
 		"@typescript-eslint/parser": "8.63.0",
+		"@vscode/vsce": "3.9.2",
 		"eslint": "10.6.0",
 		"preact": "10.29.5",
 		"solid-js": "1.9.14",
 		"typescript": "6.0.3",
-		"vitest": "npm:@voidzero-dev/vite-plus-test@0.1.24"
+		"vitest": "npm:@voidzero-dev/vite-plus-test@0.1.24",
+		"vscode-languageclient": "10.1.0"
 	},
 	"peerDependencies": {
 		"@types/react": "^19.2",

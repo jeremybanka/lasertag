@@ -1,0 +1,131 @@
+{
+	"$schema": "./manifest.schema.json",
+	"providers": [
+		{
+			"name": "mantine",
+			"description": "Broad component-library TSX from @mantine/core.",
+			"version": "9.4.1",
+			"renovate": {
+				"datasource": "github-releases",
+				"packageName": "mantinedev/mantine",
+				"versioning": "semver"
+			},
+			"source": {
+				"kind": "github-archive",
+				"repository": "mantinedev/mantine",
+				"refTemplate": "{{version}}"
+			},
+			"license": "MIT",
+			"maxFiles": 80,
+			"include": [
+				{
+					"from": "packages/@mantine/core/src/components/**/*.tsx",
+					"coverage": [
+						"component-library",
+						"compound-components",
+						"conditional-rendering",
+						"mapping"
+					]
+				}
+			]
+		},
+		{
+			"name": "radix-dialog",
+			"description": "Radix dialog source recovered from npm sourcemaps.",
+			"version": "1.1.19",
+			"renovate": {
+				"datasource": "npm",
+				"packageName": "@radix-ui/react-dialog",
+				"versioning": "semver"
+			},
+			"source": {
+				"kind": "npm-sourcemaps",
+				"packageName": "@radix-ui/react-dialog"
+			},
+			"license": "MIT",
+			"maxFiles": 20,
+			"include": [
+				{
+					"from": "../src/**/*.tsx",
+					"coverage": [
+						"headless-components",
+						"portals",
+						"slots",
+						"state-branches"
+					]
+				}
+			]
+		},
+		{
+			"name": "radix-slot",
+			"description": "Radix slot source recovered from npm sourcemaps.",
+			"version": "1.3.0",
+			"renovate": {
+				"datasource": "npm",
+				"packageName": "@radix-ui/react-slot",
+				"versioning": "semver"
+			},
+			"source": {
+				"kind": "npm-sourcemaps",
+				"packageName": "@radix-ui/react-slot"
+			},
+			"license": "MIT",
+			"maxFiles": 20,
+			"include": [
+				{
+					"from": "../src/**/*.tsx",
+					"coverage": [
+						"children",
+						"clone-element",
+						"render-props",
+						"slots"
+					]
+				}
+			]
+		},
+		{
+			"name": "shadcn-ui",
+			"description": "App-like registry components from shadcn/ui releases.",
+			"version": "4.13.0",
+			"renovate": {
+				"datasource": "github-releases",
+				"packageName": "shadcn-ui/ui",
+				"versioning": "semver",
+				"extractVersion": "^shadcn@(?<version>.+)$"
+			},
+			"source": {
+				"kind": "github-archive",
+				"repository": "shadcn-ui/ui",
+				"refTemplate": "shadcn@{{version}}"
+			},
+			"license": "MIT",
+			"maxFiles": 120,
+			"include": [
+				{
+					"from": "apps/v4/registry/**/*.tsx",
+					"coverage": [
+						"app-components",
+						"children",
+						"composition",
+						"variants"
+					]
+				},
+				{
+					"from": "apps/www/registry/**/*.tsx",
+					"coverage": [
+						"app-components",
+						"mapping",
+						"templates"
+					]
+				},
+				{
+					"from": "packages/shadcn/src/**/*.tsx",
+					"coverage": [
+						"cli-rendering",
+						"templates"
+					]
+				}
+			]
+		}
+	]
+}

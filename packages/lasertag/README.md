@@ -38,6 +38,18 @@ import "lasertag/react-jsx"
 
 Use `lasertag/preact-jsx` or `lasertag/solid-jsx` instead for Preact or Solid.
 
+Install the VSCode extension from the same npm package:
+
+```sh
+pnpm lasertag --vscode-install
+```
+
+Pass an editor command when you want to target another VSCode-compatible binary:
+
+```sh
+pnpm lasertag --vscode-install=code-insiders
+```
+
 ## Includes
 
 - CSS Module typing for a single exported `class`

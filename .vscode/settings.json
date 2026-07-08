@@ -6,6 +6,7 @@
 	"dprint.verbose": true,
 	"editor.codeActionsOnSave": { "source.fixAll.oxc": "explicit" },
 	"js/ts.tsdk.path": "node_modules/typescript/lib",
+	"lasertag.lsp.path": "packages/lasertag/dist/lsp.mjs",
 	"coverage-gutters.coverageBaseDir": "**/coverage/",
 	"files.associations": {
 		"api-extractor.json": "jsonc",
