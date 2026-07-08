@@ -3,6 +3,7 @@
 	"editor.formatOnSave": true,
 	"editor.defaultFormatter": "dprint.dprint",
 	"dprint.path": "node_modules/.bin/dprint",
+	"lasertag.lsp.path": "packages/lasertag/dist/lsp.mjs",
 	"dprint.verbose": true,
 	"editor.codeActionsOnSave": { "source.fixAll.oxc": "explicit" },
 	"js/ts.tsdk.path": "node_modules/typescript/lib",

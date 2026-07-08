@@ -36,10 +36,15 @@
 		"configuration": {
 			"title": "lasertag",
 			"properties": {
+				"lasertag.lsp.path": {
+					"type": "string",
+					"default": "",
+					"description": "Optional path to a lasertag-lsp executable. Relative paths resolve from the workspace root. Leave empty to use the bundled server."
+				},
 				"lasertag.server.path": {
 					"type": "string",
 					"default": "",
-					"description": "Optional absolute path to a lasertag-lsp server module. Leave empty to use the bundled server."
+					"description": "Optional absolute path to a lasertag-lsp server module. Ignored when lasertag.lsp.path is set."
 				},
 				"lasertag.trace.server": {
 					"type": "string",

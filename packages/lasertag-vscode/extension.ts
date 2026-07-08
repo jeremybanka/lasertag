@@ -17,6 +17,11 @@ type VscodeModule = {
 		getConfiguration(section: string): {
 			get<T>(key: string, defaultValue: T): T
 		}
+		workspaceFolders?: Array<{
+			uri: {
+				fsPath: string
+			}
+		}>
 	}
 }
 
@@ -49,7 +54,44 @@ function getServerModulePath(context: ExtensionContext): string {
 	return context.asAbsolutePath(path.join("dist", "server", "server.mjs"))
 }
 
+function getWorkspaceRoot(): string | undefined {
+	return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
+}
+
+function getConfiguredLspPath(): string | undefined {
+	const configuredPath = vscode.workspace
+		.getConfiguration("lasertag")
+		.get("lsp.path", "")
+		.trim()
+
+	if (!configuredPath) return undefined
+	if (path.isAbsolute(configuredPath)) return configuredPath
+
+	const workspaceRoot = getWorkspaceRoot()
+
+	return workspaceRoot
+		? path.join(workspaceRoot, configuredPath)
+		: configuredPath
+}
+
 function createServerOptions(context: ExtensionContext) {
+	const command = getConfiguredLspPath()
+
+	if (command) {
+		const workspaceRoot = getWorkspaceRoot()
+		const executable = {
+			args: ["--stdio"],
+			command,
+			...(workspaceRoot ? { options: { cwd: workspaceRoot } } : {}),
+			transport: TransportKind.stdio,
+		}
+
+		return {
+			debug: executable,
+			run: executable,
+		}
+	}
+
 	const module = getServerModulePath(context)
 	const debugOptions = {
 		execArgv: ["--nolazy", "--inspect=6011"],
