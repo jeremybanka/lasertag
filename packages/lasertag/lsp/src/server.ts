@@ -35,6 +35,11 @@ export type LasertagLspServerOptions = LasertagLspStateEnvironment & {
 	debounceMs?: number
 }
 
+type WorkspaceFolderChangeEvent = {
+	added: Array<{ uri: string }>
+	removed: Array<{ uri: string }>
+}
+
 export function isCssModulePath(filePath: string): boolean {
 	return isCssModuleFilePath(filePath)
 }
@@ -68,6 +73,12 @@ function createDocumentInput(
 	}
 }
 
+export function clientSupportsWorkspaceFolderChangeEvents(
+	params?: InitializeParams,
+): boolean {
+	return params?.capabilities.workspace?.workspaceFolders === true
+}
+
 export function createRefractorDiagnostics(
 	document: TextDocument,
 	options: LasertagLspReadOptions = {},
@@ -88,14 +99,15 @@ export function createRefractorDiagnostics(
 }
 
 export function createInitializeResult(
-	_params?: InitializeParams,
+	params?: InitializeParams,
 ): InitializeResult {
 	return {
 		capabilities: {
 			textDocumentSync: TextDocumentSyncKind.Incremental,
 			workspace: {
 				workspaceFolders: {
-					changeNotifications: true,
+					changeNotifications:
+						clientSupportsWorkspaceFolderChangeEvents(params),
 					supported: true,
 				},
 			},
@@ -149,6 +161,7 @@ export function createLasertagLspServer(
 	const diagnosticSubscriptions = new Map<string, () => void>()
 	const diagnosticTimers = new Map<string, ReturnType<typeof setTimeout>>()
 	let clientSupportsDynamicWatchedFiles = false
+	let clientSupportsWorkspaceFolderChanges = false
 	let workspaceFolderPaths: string[] = []
 
 	function clearPendingDiagnostics(cssPath: string): void {
@@ -243,38 +256,79 @@ export function createLasertagLspServer(
 		if (isTsxPath(filePath)) scheduleAffectedCssForTsx(filePath)
 	}
 
+	function handleWorkspaceFoldersChanged(
+		event: WorkspaceFolderChangeEvent,
+	): void {
+		const removedPaths = new Set(
+			event.removed.flatMap((workspaceFolder) => {
+				const filePath = filePathFromUri(workspaceFolder.uri)
+
+				return filePath ? [filePath] : []
+			}),
+		)
+		const addedPaths = event.added.flatMap((workspaceFolder) => {
+			const filePath = filePathFromUri(workspaceFolder.uri)
+
+			return filePath ? [filePath] : []
+		})
+
+		workspaceFolderPaths = [
+			...workspaceFolderPaths.filter(
+				(workspaceFolderPath) => !removedPaths.has(workspaceFolderPath),
+			),
+			...addedPaths,
+		]
+		state.indexWorkspaceFolders(workspaceFolderPaths)
+	}
+
 	connection.onInitialize((params) => {
 		clientSupportsDynamicWatchedFiles =
 			params.capabilities.workspace?.didChangeWatchedFiles
 				?.dynamicRegistration === true
+		clientSupportsWorkspaceFolderChanges =
+			clientSupportsWorkspaceFolderChangeEvents(params)
 		workspaceFolderPaths = workspaceFolderPathsFromInitialize(params)
 		state.indexWorkspaceFolders(workspaceFolderPaths)
 
 		return createInitializeResult(params)
 	})
 	connection.onInitialized(() => {
-		if (!clientSupportsDynamicWatchedFiles) return
+		if (clientSupportsDynamicWatchedFiles) {
+			void connection.client
+				.register(DidChangeWatchedFilesNotification.type, {
+					watchers: [
+						{
+							globPattern: `**/*.module.css`,
+							kind: allWatchedFileChangeKinds(),
+						},
+						{
+							globPattern: `**/*.tsx`,
+							kind: allWatchedFileChangeKinds(),
+						},
+					],
+				})
+				.catch((error: unknown) => {
+					connection.console.warn(
+						`lasertag-lsp could not register file watchers: ${
+							error instanceof Error ? error.message : String(error)
+						}`,
+					)
+				})
+		}
 
-		void connection.client
-			.register(DidChangeWatchedFilesNotification.type, {
-				watchers: [
-					{
-						globPattern: `**/*.module.css`,
-						kind: allWatchedFileChangeKinds(),
-					},
-					{
-						globPattern: `**/*.tsx`,
-						kind: allWatchedFileChangeKinds(),
-					},
-				],
-			})
-			.catch((error: unknown) => {
-				connection.console.warn(
-					`lasertag-lsp could not register file watchers: ${
-						error instanceof Error ? error.message : String(error)
-					}`,
-				)
-			})
+		if (!clientSupportsWorkspaceFolderChanges) return
+
+		try {
+			connection.workspace.onDidChangeWorkspaceFolders(
+				handleWorkspaceFoldersChanged,
+			)
+		} catch (error: unknown) {
+			connection.console.warn(
+				`lasertag-lsp could not register workspace folder changes: ${
+					error instanceof Error ? error.message : String(error)
+				}`,
+			)
+		}
 	})
 	connection.onDidChangeWatchedFiles((event) => {
 		for (const change of event.changes) {
@@ -314,28 +368,6 @@ export function createLasertagLspServer(
 				}
 			}
 		}
-	})
-	connection.workspace.onDidChangeWorkspaceFolders((event) => {
-		const removedPaths = new Set(
-			event.removed.flatMap((workspaceFolder) => {
-				const filePath = filePathFromUri(workspaceFolder.uri)
-
-				return filePath ? [filePath] : []
-			}),
-		)
-		const addedPaths = event.added.flatMap((workspaceFolder) => {
-			const filePath = filePathFromUri(workspaceFolder.uri)
-
-			return filePath ? [filePath] : []
-		})
-
-		workspaceFolderPaths = [
-			...workspaceFolderPaths.filter(
-				(workspaceFolderPath) => !removedPaths.has(workspaceFolderPath),
-			),
-			...addedPaths,
-		]
-		state.indexWorkspaceFolders(workspaceFolderPaths)
 	})
 	documents.onDidOpen((event) => handleChangedDocument(event.document))
 	documents.onDidChangeContent((event) => handleChangedDocument(event.document))

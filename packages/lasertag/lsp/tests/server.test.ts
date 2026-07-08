@@ -1,7 +1,10 @@
 import { pathToFileURL } from "node:url"
 
 import { describe, expect, it } from "vitest"
-import { DiagnosticSeverity } from "vscode-languageserver/node"
+import {
+	DiagnosticSeverity,
+	type InitializeParams,
+} from "vscode-languageserver/node"
 import { TextDocument } from "vscode-languageserver-textdocument"
 
 import {
@@ -10,6 +13,7 @@ import {
 	type LspDocumentInput,
 } from "../src/state.ts"
 import {
+	clientSupportsWorkspaceFolderChangeEvents,
 	createInitializeResult,
 	createRefractorDiagnostics,
 	findSiblingTsxPath,
@@ -121,8 +125,16 @@ function createMemoryFileSystem(files: Record<string, string>) {
 }
 
 describe(`lasertag lsp`, () => {
-	it(`advertises incremental text document sync`, () => {
-		expect(createInitializeResult()).toMatchObject({
+	it(`advertises workspace folder notifications when the client supports them`, () => {
+		const params = {
+			capabilities: {
+				workspace: {
+					workspaceFolders: true,
+				},
+			},
+		} as InitializeParams
+
+		expect(createInitializeResult(params)).toMatchObject({
 			capabilities: {
 				textDocumentSync: 2,
 				workspace: {
@@ -136,6 +148,33 @@ describe(`lasertag lsp`, () => {
 				name: `lasertag-lsp`,
 			},
 		})
+	})
+
+	it(`does not ask for workspace folder notifications from unsupported clients`, () => {
+		expect(createInitializeResult()).toMatchObject({
+			capabilities: {
+				textDocumentSync: 2,
+				workspace: {
+					workspaceFolders: {
+						changeNotifications: false,
+						supported: true,
+					},
+				},
+			},
+			serverInfo: {
+				name: `lasertag-lsp`,
+			},
+		})
+		expect(clientSupportsWorkspaceFolderChangeEvents()).toBe(false)
+		expect(
+			clientSupportsWorkspaceFolderChangeEvents({
+				capabilities: {
+					workspace: {
+						workspaceFolders: false,
+					},
+				},
+			} as InitializeParams),
+		).toBe(false)
 	})
 
 	it(`finds a sibling tsx file for a css module`, () => {
