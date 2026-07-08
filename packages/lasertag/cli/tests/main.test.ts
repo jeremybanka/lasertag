@@ -213,7 +213,7 @@ describe(`lasertag cli`, () => {
 
 	it(`installs the bundled VSCode extension when --vscode-install is passed`, () => {
 		const fixture = createFixture({
-			"dist/vscode/Lasertag.vsix": `fake vsix`,
+			"dist/Lasertag.vsix": `fake vsix`,
 			"src/AppPanel.module.css": `
 				app-panel.class {
 					> footer {}
@@ -242,7 +242,7 @@ describe(`lasertag cli`, () => {
 					requests.push(request)
 					return { exitCode: 0 }
 				},
-				vsixPath: fixture.path(`dist/vscode/Lasertag.vsix`),
+				vsixPath: fixture.path(`dist/Lasertag.vsix`),
 			},
 		)
 
@@ -256,7 +256,7 @@ describe(`lasertag cli`, () => {
 			{
 				cwd: fixture.root,
 				editorCommand: `code-insiders`,
-				vsixPath: fixture.path(`dist/vscode/Lasertag.vsix`),
+				vsixPath: fixture.path(`dist/Lasertag.vsix`),
 			},
 		])
 		expect(logs).toEqual([
@@ -266,7 +266,7 @@ describe(`lasertag cli`, () => {
 
 	it(`defaults the VSCode extension installer to code`, () => {
 		const fixture = createFixture({
-			"dist/vscode/Lasertag.vsix": `fake vsix`,
+			"dist/Lasertag.vsix": `fake vsix`,
 		})
 		const { io, logs } = createTestIO()
 		const requests: Array<{
@@ -278,7 +278,7 @@ describe(`lasertag cli`, () => {
 				requests.push({ editorCommand: request.editorCommand })
 				return { exitCode: 0 }
 			},
-			vsixPath: fixture.path(`dist/vscode/Lasertag.vsix`),
+			vsixPath: fixture.path(`dist/Lasertag.vsix`),
 		})
 
 		expect(result.mode).toBe(`vscode-install`)
@@ -298,19 +298,19 @@ describe(`lasertag cli`, () => {
 				installed = true
 				return { exitCode: 0 }
 			},
-			vsixPath: fixture.path(`dist/vscode/Lasertag.vsix`),
+			vsixPath: fixture.path(`dist/Lasertag.vsix`),
 		})
 
 		expect(result.mode).toBe(`vscode-install`)
 		expect(result.exitCode).toBe(1)
 		expect(installed).toBe(false)
 		expect(errors[0]).toContain(`bundled extension not found`)
-		expect(errors[0]).toContain(fixture.path(`dist/vscode/Lasertag.vsix`))
+		expect(errors[0]).toContain(fixture.path(`dist/Lasertag.vsix`))
 	})
 
 	it(`reports VSCode extension installer failures`, () => {
 		const fixture = createFixture({
-			"dist/vscode/Lasertag.vsix": `fake vsix`,
+			"dist/Lasertag.vsix": `fake vsix`,
 		})
 		const { errors, io } = createTestIO()
 		const result = runLasertagCli([`lasertag`, `--vscode-install`], io, {
@@ -319,7 +319,7 @@ describe(`lasertag cli`, () => {
 				error: `code was not found on PATH.`,
 				exitCode: 1,
 			}),
-			vsixPath: fixture.path(`dist/vscode/Lasertag.vsix`),
+			vsixPath: fixture.path(`dist/Lasertag.vsix`),
 		})
 
 		expect(result.mode).toBe(`vscode-install`)

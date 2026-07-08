@@ -207,17 +207,10 @@ function defaultVscodeVsixPath(
 ): string {
 	const modulePath = fileURLToPath(import.meta.url)
 	const moduleDirectory = path.dirname(modulePath)
-	const bundledVsixPath = path.join(moduleDirectory, `vscode`, `Lasertag.vsix`)
+	const bundledVsixPath = path.join(moduleDirectory, `Lasertag.vsix`)
 	const candidates = [
 		bundledVsixPath,
-		path.resolve(
-			moduleDirectory,
-			`..`,
-			`..`,
-			`dist`,
-			`vscode`,
-			`Lasertag.vsix`,
-		),
+		path.resolve(moduleDirectory, `..`, `..`, `dist`, `Lasertag.vsix`),
 	]
 
 	return candidates.find(fileExists) ?? bundledVsixPath

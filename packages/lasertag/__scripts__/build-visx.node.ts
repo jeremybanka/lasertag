@@ -14,8 +14,8 @@ type LasertagPackageJson = {
 const scriptsRoot = path.dirname(fileURLToPath(import.meta.url))
 const packageRoot = path.resolve(scriptsRoot, "..")
 const vscodeRoot = path.resolve(packageRoot, "vscode")
-const vscodeDist = path.join(packageRoot, "dist", "vscode")
-const vsixPath = path.join(vscodeDist, "Lasertag.vsix")
+const packageDist = path.join(packageRoot, "dist")
+const vsixPath = path.join(packageDist, "Lasertag.vsix")
 const vscodePackageJsonPath = path.join(vscodeRoot, "package.json")
 const vsceBin = path.join(
 	packageRoot,
@@ -102,7 +102,7 @@ const vscodeManifest = {
 	},
 }
 
-await mkdir(vscodeDist, { recursive: true })
+await mkdir(packageDist, { recursive: true })
 await writeFile(
 	vscodePackageJsonPath,
 	`${JSON.stringify(vscodeManifest, null, "\t")}\n`,
