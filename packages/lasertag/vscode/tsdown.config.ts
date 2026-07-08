@@ -22,12 +22,12 @@ export default defineConfig([
 		},
 		dts: false,
 		entry: {
-			server: "../lasertag/lsp/src/server.ts",
+			server: "../lsp/src/server.ts",
 		},
 		format: "esm",
 		outDir: "dist/server",
 		platform: "node",
 		shims: true,
-		tsconfig: "../../tsconfig.json",
+		tsconfig: "../../../tsconfig.json",
 	},
 ])

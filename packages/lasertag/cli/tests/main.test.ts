@@ -211,6 +211,122 @@ describe(`lasertag cli`, () => {
 		expect(result.exitCode).toBe(0)
 	})
 
+	it(`installs the bundled VSCode extension when --vscode-install is passed`, () => {
+		const fixture = createFixture({
+			"dist/vscode/Lasertag.vsix": `fake vsix`,
+			"src/AppPanel.module.css": `
+				app-panel.class {
+					> footer {}
+				}
+			`,
+			"src/AppPanel.tsx": `
+				import css from "./AppPanel.module.css"
+
+				export function AppPanel() {
+					return <app-panel className={css.class} />
+				}
+			`,
+		})
+		const { io, logs } = createTestIO()
+		const requests: Array<{
+			cwd: string
+			editorCommand: string
+			vsixPath: string
+		}> = []
+		const result = runLasertagCli(
+			[`lasertag`, `--vscode-install`, `code-insiders`],
+			io,
+			{
+				cwd: fixture.root,
+				installVscodeExtension: (request) => {
+					requests.push(request)
+					return { exitCode: 0 }
+				},
+				vsixPath: fixture.path(`dist/vscode/Lasertag.vsix`),
+			},
+		)
+
+		expect(result.mode).toBe(`vscode-install`)
+		expect(result.options[`vscode-install`]).toBe(`code-insiders`)
+		expect(result.targets).toEqual([`**/*.module.css`])
+		expect(result.diagnostics).toEqual([])
+		expect(result.files).toEqual([])
+		expect(result.exitCode).toBe(0)
+		expect(requests).toEqual([
+			{
+				cwd: fixture.root,
+				editorCommand: `code-insiders`,
+				vsixPath: fixture.path(`dist/vscode/Lasertag.vsix`),
+			},
+		])
+		expect(logs).toEqual([
+			`lasertag vscode: installed Lasertag with code-insiders.`,
+		])
+	})
+
+	it(`defaults the VSCode extension installer to code`, () => {
+		const fixture = createFixture({
+			"dist/vscode/Lasertag.vsix": `fake vsix`,
+		})
+		const { io, logs } = createTestIO()
+		const requests: Array<{
+			editorCommand: string
+		}> = []
+		const result = runLasertagCli([`lasertag`, `--vscode-install`], io, {
+			cwd: fixture.root,
+			installVscodeExtension: (request) => {
+				requests.push({ editorCommand: request.editorCommand })
+				return { exitCode: 0 }
+			},
+			vsixPath: fixture.path(`dist/vscode/Lasertag.vsix`),
+		})
+
+		expect(result.mode).toBe(`vscode-install`)
+		expect(result.options[`vscode-install`]).toBe(``)
+		expect(result.exitCode).toBe(0)
+		expect(requests).toEqual([{ editorCommand: `code` }])
+		expect(logs).toEqual([`lasertag vscode: installed Lasertag with code.`])
+	})
+
+	it(`reports a missing bundled VSCode extension`, () => {
+		const fixture = createFixture({})
+		const { errors, io } = createTestIO()
+		let installed = false
+		const result = runLasertagCli([`lasertag`, `--vscode-install`], io, {
+			cwd: fixture.root,
+			installVscodeExtension: () => {
+				installed = true
+				return { exitCode: 0 }
+			},
+			vsixPath: fixture.path(`dist/vscode/Lasertag.vsix`),
+		})
+
+		expect(result.mode).toBe(`vscode-install`)
+		expect(result.exitCode).toBe(1)
+		expect(installed).toBe(false)
+		expect(errors[0]).toContain(`bundled extension not found`)
+		expect(errors[0]).toContain(fixture.path(`dist/vscode/Lasertag.vsix`))
+	})
+
+	it(`reports VSCode extension installer failures`, () => {
+		const fixture = createFixture({
+			"dist/vscode/Lasertag.vsix": `fake vsix`,
+		})
+		const { errors, io } = createTestIO()
+		const result = runLasertagCli([`lasertag`, `--vscode-install`], io, {
+			cwd: fixture.root,
+			installVscodeExtension: () => ({
+				error: `code was not found on PATH.`,
+				exitCode: 1,
+			}),
+			vsixPath: fixture.path(`dist/vscode/Lasertag.vsix`),
+		})
+
+		expect(result.mode).toBe(`vscode-install`)
+		expect(result.exitCode).toBe(1)
+		expect(errors).toEqual([`lasertag vscode: code was not found on PATH.`])
+	})
+
 	it(`prints help when --help is passed`, () => {
 		const { io, logs } = createTestIO()
 		const result = runLasertagCli([`lasertag`, `--help`], io)
@@ -219,5 +335,6 @@ describe(`lasertag cli`, () => {
 		expect(logs[0]).toContain(`USAGE`)
 		expect(logs[0]).toContain(`--fix`)
 		expect(logs[0]).toContain(`--format`)
+		expect(logs[0]).toContain(`--vscode-install`)
 	})
 })

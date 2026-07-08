@@ -53,18 +53,25 @@
 	},
 	"scripts": {
 		"build": "vp pack",
-		"test": "vp test"
+		"prepack": "pnpm run vscode:package",
+		"test": "vp test",
+		"vscode:check": "pnpm --dir vscode run check",
+		"vscode:package": "pnpm --dir vscode run package"
 	},
 	"devDependencies": {
 		"@eslint/core": "1.2.1",
 		"@types/estree": "1.0.9",
+		"@types/node": "25.9.2",
 		"@types/react": "19.2.17",
 		"@typescript-eslint/parser": "8.63.0",
+		"@vscode/vsce": "3.9.2",
 		"eslint": "10.6.0",
 		"preact": "10.29.5",
 		"solid-js": "1.9.14",
+		"tsdown": "0.22.3",
 		"typescript": "6.0.3",
-		"vitest": "npm:@voidzero-dev/vite-plus-test@0.1.24"
+		"vitest": "npm:@voidzero-dev/vite-plus-test@0.1.24",
+		"vscode-languageclient": "10.1.0"
 	},
 	"peerDependencies": {
 		"@types/react": "^19.2",

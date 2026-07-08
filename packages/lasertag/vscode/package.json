@@ -4,11 +4,12 @@
 	"description": "CSS Modules done right: dead selectors, caught from your component's real render story.",
 	"version": "0.1.1",
 	"publisher": "jeremybanka",
+	"private": true,
 	"type": "module",
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/jeremybanka/lasertag.git",
-		"directory": "packages/lasertag-vscode"
+		"directory": "packages/lasertag/vscode"
 	},
 	"license": "MIT",
 	"engines": {
@@ -64,19 +65,8 @@
 		"bundle": "pnpm run clean && pnpm run copy:icon && pnpm run build",
 		"check": "tsc --noEmit --ignoreConfig --target ES2024 --module NodeNext --moduleResolution NodeNext --allowImportingTsExtensions --erasableSyntaxOnly --skipLibCheck --strict --types node extension.ts scripts/package.ts tsdown.config.ts",
 		"clean": "node -e \"fs.rmSync('dist', { force: true, recursive: true })\"",
-		"copy:icon": "node -e \"fs.mkdirSync('dist', { recursive: true }); fs.copyFileSync('../../LasertagIcon.png', 'dist/LasertagIcon.png')\"",
+		"copy:icon": "node -e \"fs.mkdirSync('dist', { recursive: true }); fs.copyFileSync('../../../LasertagIcon.png', 'dist/LasertagIcon.png')\"",
 		"package": "node scripts/package.ts",
 		"vscode:prepublish": "pnpm run bundle"
-	},
-	"devDependencies": {
-		"@types/node": "25.9.2",
-		"@vscode/vsce": "3.9.2",
-		"atom.io": "0.49.6",
-		"tinyglobby": "0.2.17",
-		"tsdown": "0.22.3",
-		"typescript": "6.0.3",
-		"vscode-languageclient": "10.1.0",
-		"vscode-languageserver": "10.1.0",
-		"vscode-languageserver-textdocument": "1.0.12"
 	}
 }

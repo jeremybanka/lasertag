@@ -1,9 +1,17 @@
 #!/usr/bin/env node
 
+import { spawnSync } from "node:child_process"
 import { existsSync, readFileSync } from "node:fs"
 import path from "node:path"
+import { fileURLToPath } from "node:url"
 
-import { cli, help, options, parseBooleanOption } from "comline"
+import {
+	cli,
+	help,
+	options,
+	parseBooleanOption,
+	parseStringOption,
+} from "comline"
 import { globSync } from "tinyglobby"
 import { z } from "zod/v4"
 
@@ -26,12 +34,13 @@ const lasertagOptionsSchema = z.object({
 	fix: z.boolean().default(false),
 	format: z.enum(FORMAT_OPTIONS).default(`stylish`),
 	help: z.boolean().default(false),
+	"vscode-install": z.string().optional(),
 })
 
 type LasertagOptions = z.infer<typeof lasertagOptionsSchema>
 type LasertagOutputFormat = LasertagOptions[`format`]
 
-export type LasertagCliMode = `fix` | `help` | `validate`
+export type LasertagCliMode = `fix` | `help` | `validate` | `vscode-install`
 
 export type LasertagCliDiagnostic = CssReachabilityDiagnostic & {
 	cssPath: string
@@ -54,11 +63,26 @@ export type LasertagCliIO = {
 	log: (message: string, ...data: unknown[]) => void
 }
 
+export type LasertagVscodeInstallRequest = {
+	cwd: string
+	editorCommand: string
+	vsixPath: string
+}
+
+export type LasertagVscodeInstallResult = {
+	error?: string
+	exitCode: number
+}
+
 export type LasertagCliEnvironment = {
 	cwd?: string
 	fileExists?: (filePath: string) => boolean
 	glob?: typeof globSync
+	installVscodeExtension?: (
+		request: LasertagVscodeInstallRequest,
+	) => LasertagVscodeInstallResult
 	readFile?: (filePath: string) => string
+	vsixPath?: string
 }
 
 const lasertagCli = cli({
@@ -89,6 +113,12 @@ const lasertagCli = cli({
 					parse: parseBooleanOption,
 					required: false,
 				},
+				"vscode-install": {
+					description: `install the bundled Lasertag VSCode extension with an optional editor command`,
+					example: `--vscode-install=code-insiders`,
+					parse: parseStringOption,
+					required: false,
+				},
 			},
 		),
 	},
@@ -117,7 +147,7 @@ function findCliInvocationIndex(args: string[]): number {
 }
 
 function optionConsumesNextValue(arg: string): boolean {
-	return arg === `--format`
+	return arg === `--format` || arg === `--vscode-install`
 }
 
 function extractTargetPatterns(args: string[]): {
@@ -131,11 +161,12 @@ function extractTargetPatterns(args: string[]): {
 	let consumeNextOptionValue = false
 
 	for (const arg of args.slice(invocationIndex + 1)) {
-		if (consumeNextOptionValue) {
+		if (consumeNextOptionValue && !arg.startsWith(`-`)) {
 			cliArgs.push(arg)
 			consumeNextOptionValue = false
 			continue
 		}
+		consumeNextOptionValue = false
 
 		if (inExplicitPositionals) {
 			targets.push(arg)
@@ -169,6 +200,27 @@ function extractTargetPatterns(args: string[]): {
 
 function resolvePath(cwd: string, filePath: string): string {
 	return path.isAbsolute(filePath) ? filePath : path.resolve(cwd, filePath)
+}
+
+function defaultVscodeVsixPath(
+	fileExists: (filePath: string) => boolean = existsSync,
+): string {
+	const modulePath = fileURLToPath(import.meta.url)
+	const moduleDirectory = path.dirname(modulePath)
+	const bundledVsixPath = path.join(moduleDirectory, `vscode`, `Lasertag.vsix`)
+	const candidates = [
+		bundledVsixPath,
+		path.resolve(
+			moduleDirectory,
+			`..`,
+			`..`,
+			`dist`,
+			`vscode`,
+			`Lasertag.vsix`,
+		),
+	]
+
+	return candidates.find(fileExists) ?? bundledVsixPath
 }
 
 function discoverCssModuleFiles(
@@ -342,6 +394,87 @@ function runFixStub(
 	}
 }
 
+function installVscodeExtensionWithEditor(
+	request: LasertagVscodeInstallRequest,
+): LasertagVscodeInstallResult {
+	const child = spawnSync(
+		request.editorCommand,
+		[`--install-extension`, request.vsixPath, `--force`],
+		{
+			cwd: request.cwd,
+			stdio: `inherit`,
+		},
+	)
+
+	if (child.error) {
+		return {
+			error: child.error.message,
+			exitCode: 1,
+		}
+	}
+
+	if (child.signal) {
+		return {
+			error: `${request.editorCommand} exited from signal ${child.signal}.`,
+			exitCode: 1,
+		}
+	}
+
+	return {
+		exitCode: child.status ?? 1,
+	}
+}
+
+function runVscodeInstall(
+	targets: string[],
+	options: LasertagOptions,
+	io: LasertagCliIO,
+	environment: LasertagCliEnvironment,
+): LasertagCliResult {
+	const cwd = environment.cwd ?? process.cwd()
+	const fileExists = environment.fileExists ?? existsSync
+	const editorCommand = options[`vscode-install`] || `code`
+	const vsixPath = environment.vsixPath ?? defaultVscodeVsixPath(fileExists)
+
+	if (!fileExists(vsixPath)) {
+		io.error(
+			`lasertag vscode: bundled extension not found at ${vsixPath}. Run pnpm --filter lasertag vscode:package before installing from the workspace.`,
+		)
+
+		return {
+			diagnostics: [],
+			exitCode: 1,
+			files: [],
+			mode: `vscode-install`,
+			options,
+			targets,
+		}
+	}
+
+	const install =
+		environment.installVscodeExtension ?? installVscodeExtensionWithEditor
+	const result = install({ cwd, editorCommand, vsixPath })
+
+	if (result.error) {
+		io.error(`lasertag vscode: ${result.error}`)
+	} else if (result.exitCode !== 0) {
+		io.error(
+			`lasertag vscode: ${editorCommand} exited with code ${result.exitCode}.`,
+		)
+	} else {
+		io.log(`lasertag vscode: installed Lasertag with ${editorCommand}.`)
+	}
+
+	return {
+		diagnostics: [],
+		exitCode: result.exitCode,
+		files: [],
+		mode: `vscode-install`,
+		options,
+		targets,
+	}
+}
+
 export function runLasertagCli(
 	args: string[] = process.argv,
 	io: LasertagCliIO = console,
@@ -361,6 +494,10 @@ export function runLasertagCli(
 			options: opts,
 			targets,
 		}
+	}
+
+	if (opts[`vscode-install`] !== undefined) {
+		return runVscodeInstall(targets, opts, io, environment)
 	}
 
 	if (opts.fix) {

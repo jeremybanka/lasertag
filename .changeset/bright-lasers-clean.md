@@ -2,4 +2,4 @@
 "lasertag": minor
 ---
 
-Add Refractor CSS reachability analysis, CLI validation, and an LSP server for finding unreachable CSS Module selectors from TSX render stories.
+Add the Refractor library for extracting TSX render stories and finding unreachable CSS Module selectors.
