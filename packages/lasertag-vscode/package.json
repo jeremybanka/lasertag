@@ -1,0 +1,72 @@
+{
+	"name": "lasertag-vscode",
+	"displayName": "lasertag",
+	"description": "VSCode diagnostics for lasertag CSS module reachability.",
+	"version": "0.1.0",
+	"publisher": "lasertag",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/jeremybanka/lasertag.git",
+		"directory": "packages/lasertag-vscode"
+	},
+	"license": "MIT",
+	"engines": {
+		"vscode": "^1.100.0"
+	},
+	"categories": [
+		"Linters",
+		"Programming Languages"
+	],
+	"activationEvents": [
+		"onLanguage:css",
+		"onLanguage:typescriptreact",
+		"workspaceContains:**/*.module.css"
+	],
+	"extensionKind": [
+		"workspace"
+	],
+	"main": "./dist/extension.cjs",
+	"files": [
+		"dist",
+		"README.md"
+	],
+	"contributes": {
+		"configuration": {
+			"title": "lasertag",
+			"properties": {
+				"lasertag.server.path": {
+					"type": "string",
+					"default": "",
+					"description": "Optional absolute path to a lasertag-lsp server module. Leave empty to use the bundled server."
+				},
+				"lasertag.trace.server": {
+					"type": "string",
+					"enum": [
+						"off",
+						"messages",
+						"verbose"
+					],
+					"default": "off",
+					"description": "Trace communication between VSCode and the lasertag language server."
+				}
+			}
+		}
+	},
+	"scripts": {
+		"bundle": "node scripts/bundle.mjs",
+		"check": "node --check extension.js && node --check scripts/bundle.mjs && node --check scripts/package.mjs",
+		"package": "pnpm run bundle && node scripts/package.mjs",
+		"vscode:prepublish": "pnpm run bundle"
+	},
+	"dependencies": {},
+	"devDependencies": {
+		"@vscode/vsce": "3.9.2",
+		"atom.io": "0.49.6",
+		"rolldown": "1.0.3",
+		"tinyglobby": "0.2.17",
+		"typescript": "6.0.3",
+		"vscode-languageclient": "10.1.0",
+		"vscode-languageserver": "10.1.0",
+		"vscode-languageserver-textdocument": "1.0.12"
+	}
+}

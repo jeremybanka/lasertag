@@ -1,5 +1,6 @@
 node_modules/
 dist/
+artifacts/
 .mise/
 .pnpm-home/
 .pnpm-store/
@@ -9,3 +10,4 @@ dist/
 *.log
 packages/lasertag/refractor/corpus/providers/
 packages/lasertag/refractor/corpus/reports/
+packages/lasertag-vscode/server/

@@ -1,0 +1,7 @@
+# lasertag VSCode Extension
+
+This extension runs the bundled `lasertag-lsp` server and reports dead CSS module
+selectors in `.module.css` files.
+
+It syncs open CSS module and TSX documents to the server, and watches
+`**/*.module.css` plus `**/*.tsx` in the workspace.

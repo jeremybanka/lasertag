@@ -2,7 +2,9 @@ packages:
   - packages/*
 
 allowBuilds:
+  "@vscode/vsce-sign": false
   dprint: true
+  keytar: false
 
 blockExoticSubdeps: true
 minimumReleaseAge: 1440
