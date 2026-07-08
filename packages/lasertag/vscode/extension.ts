@@ -30,7 +30,17 @@ const vscode = require("vscode") as VscodeModule
 const { LanguageClient, TransportKind } =
 	require("vscode-languageclient/node") as typeof import("vscode-languageclient/node")
 
-let client: InstanceType<typeof LanguageClient> | undefined
+type InitializeParams = import("vscode-languageclient/node").InitializeParams
+
+class LasertagLanguageClient extends LanguageClient {
+	protected override fillInitializeParams(params: InitializeParams): void {
+		super.fillInitializeParams(params)
+		// VS Code Remote can report a client PID outside the server's namespace.
+		params.processId = null
+	}
+}
+
+let client: InstanceType<typeof LasertagLanguageClient> | undefined
 
 function traceFromSetting(trace: string): 0 | 1 | 3 {
 	switch (trace) {
@@ -155,7 +165,7 @@ function createClientOptions() {
 }
 
 export async function activate(context: ExtensionContext) {
-	client = new LanguageClient(
+	client = new LasertagLanguageClient(
 		"lasertag",
 		"lasertag",
 		createServerOptions(context),
