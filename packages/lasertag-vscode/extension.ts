@@ -1,11 +1,33 @@
-const path = require("node:path")
+declare const require: (id: string) => unknown
 
-const vscode = require("vscode")
-const { LanguageClient, TransportKind } = require("vscode-languageclient/node")
+type Disposable = {
+	dispose(): void
+}
 
-let client
+type ExtensionContext = {
+	asAbsolutePath(relativePath: string): string
+	subscriptions: {
+		push(disposable: Disposable): void
+	}
+}
 
-function traceFromSetting(trace) {
+type VscodeModule = {
+	workspace: {
+		createFileSystemWatcher(globPattern: string): unknown
+		getConfiguration(section: string): {
+			get<T>(key: string, defaultValue: T): T
+		}
+	}
+}
+
+const path = require("node:path") as typeof import("node:path")
+const vscode = require("vscode") as VscodeModule
+const { LanguageClient, TransportKind } =
+	require("vscode-languageclient/node") as typeof import("vscode-languageclient/node")
+
+let client: InstanceType<typeof LanguageClient> | undefined
+
+function traceFromSetting(trace: string): 0 | 1 | 3 {
 	switch (trace) {
 		case "messages":
 			return 1
@@ -16,7 +38,7 @@ function traceFromSetting(trace) {
 	}
 }
 
-function getServerModulePath(context) {
+function getServerModulePath(context: ExtensionContext): string {
 	const configuredPath = vscode.workspace
 		.getConfiguration("lasertag")
 		.get("server.path", "")
@@ -27,7 +49,7 @@ function getServerModulePath(context) {
 	return context.asAbsolutePath(path.join("dist", "server", "server.mjs"))
 }
 
-function createServerOptions(context) {
+function createServerOptions(context: ExtensionContext) {
 	const module = getServerModulePath(context)
 	const debugOptions = {
 		execArgv: ["--nolazy", "--inspect=6011"],
@@ -68,7 +90,7 @@ function createClientOptions() {
 	}
 }
 
-async function activate(context) {
+export async function activate(context: ExtensionContext) {
 	client = new LanguageClient(
 		"lasertag",
 		"lasertag",
@@ -90,13 +112,8 @@ async function activate(context) {
 	await client.start()
 }
 
-function deactivate() {
+export function deactivate() {
 	if (!client) return
 
 	return client.stop()
-}
-
-module.exports = {
-	activate,
-	deactivate,
 }

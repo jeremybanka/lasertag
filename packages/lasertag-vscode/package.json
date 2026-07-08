@@ -4,6 +4,7 @@
 	"description": "VSCode diagnostics for lasertag CSS module reachability.",
 	"version": "0.1.1",
 	"publisher": "lasertag",
+	"type": "module",
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/jeremybanka/lasertag.git",
@@ -54,15 +55,16 @@
 		}
 	},
 	"scripts": {
-		"build": "tsdown --config tsdown.config.mts",
+		"build": "tsdown --config tsdown.config.ts",
 		"bundle": "pnpm run clean && pnpm run copy:icon && pnpm run build",
-		"check": "node --check extension.js && node --check scripts/package.mjs && node --check tsdown.config.mts",
+		"check": "tsc --noEmit --ignoreConfig --target ES2024 --module NodeNext --moduleResolution NodeNext --allowImportingTsExtensions --erasableSyntaxOnly --skipLibCheck --strict --types node extension.ts scripts/package.ts tsdown.config.ts",
 		"clean": "node -e \"fs.rmSync('dist', { force: true, recursive: true })\"",
 		"copy:icon": "node -e \"fs.mkdirSync('dist', { recursive: true }); fs.copyFileSync('../../LasertagIcon.png', 'dist/LasertagIcon.png')\"",
-		"package": "node scripts/package.mjs",
+		"package": "node scripts/package.ts",
 		"vscode:prepublish": "pnpm run bundle"
 	},
 	"devDependencies": {
+		"@types/node": "25.9.2",
 		"@vscode/vsce": "3.9.2",
 		"atom.io": "0.49.6",
 		"tinyglobby": "0.2.17",

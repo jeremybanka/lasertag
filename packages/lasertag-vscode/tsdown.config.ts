@@ -9,7 +9,7 @@ export default defineConfig([
 		},
 		dts: false,
 		entry: {
-			extension: "extension.js",
+			extension: "extension.ts",
 		},
 		format: "cjs",
 		outDir: "dist",
