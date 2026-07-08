@@ -10,6 +10,8 @@ import {
 	Files,
 	type CodeAction,
 	type CodeActionParams,
+	type CompletionItem,
+	type CompletionParams,
 	type Diagnostic,
 	type InitializeParams,
 	type InitializeResult,
@@ -42,6 +44,7 @@ import {
 	LASERTAG_RESTART_SERVER_TITLE,
 	type OffsetRange,
 } from "./code-actions.ts"
+import { createCssModuleCompletionItems } from "./completions.ts"
 
 export type LasertagLspReadOptions = {
 	cssPath?: string
@@ -125,6 +128,9 @@ export function createInitializeResult(
 		capabilities: {
 			codeActionProvider: {
 				codeActionKinds: [CodeActionKind.QuickFix],
+			},
+			completionProvider: {
+				triggerCharacters: [`>`, `[`, `=`, `:`, `.`],
 			},
 			textDocumentSync: TextDocumentSyncKind.Incremental,
 			workspace: {
@@ -464,6 +470,26 @@ export function createLasertagLspServer(
 		return actions
 	}
 
+	function createCompletions(params: CompletionParams): CompletionItem[] {
+		const filePath = filePathFromUri(params.textDocument.uri)
+
+		if (!filePath || !isCssModulePath(filePath)) return []
+
+		const document = documents.get(params.textDocument.uri)
+
+		if (!document) return []
+
+		const renderStory = state.getRenderStory(filePath)
+
+		if (!renderStory) return []
+
+		return createCssModuleCompletionItems({
+			offset: document.offsetAt(params.position),
+			renderStory,
+			sourceText: document.getText(),
+		})
+	}
+
 	function handleChangedDocument(
 		document: TextDocument,
 		eventName: `changed` | `opened`,
@@ -585,6 +611,7 @@ export function createLasertagLspServer(
 		}
 	})
 	connection.onCodeAction(createCodeActions)
+	connection.onCompletion(createCompletions)
 	connection.onDidChangeWatchedFiles((event) => {
 		logger.info(`watchers`, `received file changes`, {
 			changeCount: event.changes.length,

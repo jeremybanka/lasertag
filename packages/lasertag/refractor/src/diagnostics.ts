@@ -5,10 +5,18 @@ export type SourceRange = {
 
 export type StoryChild = StoryNode | OpaqueStoryNode
 
+export type StoryAttribute = {
+	name: string
+	value?: string
+	range?: SourceRange
+	valueRange?: SourceRange
+}
+
 export type StoryNode = {
 	kind: `element`
 	tagName: string
 	children: StoryChild[]
+	attributes?: StoryAttribute[]
 	range?: SourceRange
 }
 

@@ -17,6 +17,11 @@
 						{
 							"kind": "element",
 							"tagName": "a",
+							"attributes": [
+								{
+									"name": "href"
+								}
+							],
 							"children": [
 								{
 									"kind": "opaque",

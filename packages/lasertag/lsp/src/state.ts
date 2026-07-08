@@ -669,6 +669,21 @@ export function createLasertagLspState(
 		getOpenDocumentPaths(): string[] {
 			return [...silo.getState(openDocumentPathsAtom)]
 		},
+		getRenderStory(cssPath: string): RenderStory | undefined {
+			const normalizedPath = normalizeFilePath(cssPath)
+
+			ensureCssDependencies(normalizedPath)
+
+			const tsxPath = silo.getState(siblingTsxPathSelectors, normalizedPath)
+
+			if (tsxPath === null) return
+
+			const renderStoryAnalysis = silo.getState(renderStorySelectors, tsxPath)
+
+			return renderStoryAnalysis.kind === `ready`
+				? renderStoryAnalysis.renderStory
+				: undefined
+		},
 		getWatchedTsxPaths(): string[] {
 			return [...silo.getState(watchedTsxPathsAtom)]
 		},

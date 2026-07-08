@@ -12,6 +12,12 @@
 						{
 							"kind": "element",
 							"tagName": "button",
+							"attributes": [
+								{
+									"name": "type",
+									"value": "button"
+								}
+							],
 							"children": []
 						}
 					]

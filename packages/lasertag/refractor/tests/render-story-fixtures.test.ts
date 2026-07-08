@@ -28,7 +28,7 @@ function stripSourceRanges(value: unknown): unknown {
 
 	return Object.fromEntries(
 		Object.entries(value)
-			.filter(([key]) => key !== `range`)
+			.filter(([key]) => key !== `range` && key !== `valueRange`)
 			.map(([key, nestedValue]) => [key, stripSourceRanges(nestedValue)]),
 	)
 }
@@ -110,7 +110,14 @@ describe(`broad render story extraction`, () => {
 					{
 						kind: `element`,
 						tagName: `wrapped-root`,
-						children: [{ kind: `element`, tagName: `button`, children: [] }],
+						children: [
+							{
+								kind: `element`,
+								tagName: `button`,
+								attributes: [{ name: `type`, value: `button` }],
+								children: [],
+							},
+						],
 					},
 				],
 				warnings: [],
@@ -134,5 +141,58 @@ describe(`broad render story extraction`, () => {
 				warnings: [],
 			},
 		])
+	})
+
+	it(`captures and normalizes JSX attributes`, () => {
+		const sourceText = `
+			export function AttributePanel() {
+				return (
+					<attribute-panel className="root" data-state="open">
+						<label htmlFor="name-input" />
+						<input id="name-input" aria-label={"Name"} disabled />
+					</attribute-panel>
+				)
+			}
+		`
+
+		expect(
+			stripSourceRanges(
+				analyzeTsxRenderStory({
+					filePath: `/project/src/AttributePanel.tsx`,
+					sourceText,
+				}),
+			),
+		).toEqual({
+			componentName: `AttributePanel`,
+			roots: [
+				{
+					kind: `element`,
+					tagName: `attribute-panel`,
+					attributes: [
+						{ name: `class`, value: `root` },
+						{ name: `data-state`, value: `open` },
+					],
+					children: [
+						{
+							kind: `element`,
+							tagName: `label`,
+							attributes: [{ name: `for`, value: `name-input` }],
+							children: [],
+						},
+						{
+							kind: `element`,
+							tagName: `input`,
+							attributes: [
+								{ name: `id`, value: `name-input` },
+								{ name: `aria-label`, value: `Name` },
+								{ name: `disabled` },
+							],
+							children: [],
+						},
+					],
+				},
+			],
+			warnings: [],
+		})
 	})
 })

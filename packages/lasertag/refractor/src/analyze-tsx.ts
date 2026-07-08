@@ -6,7 +6,9 @@ import type {
 	RenderStory,
 	RenderStoryWarning,
 	SourceRange,
+	StoryAttribute,
 	StoryChild,
+	StoryNode,
 } from "./diagnostics.ts"
 
 export type AnalyzeTsxOptions = {
@@ -418,6 +420,90 @@ function getJsxTagText(
 	return name.getText(sourceFile)
 }
 
+function normalizeJsxAttributeName(name: string): string {
+	switch (name) {
+		case `className`:
+			return `class`
+		case `htmlFor`:
+			return `for`
+		default:
+			return name
+	}
+}
+
+function stringLiteralAttributeValue(
+	sourceFile: ts.SourceFile,
+	initializer: ts.JsxAttribute[`initializer`],
+): Pick<StoryAttribute, `value` | `valueRange`> {
+	if (!initializer) return {}
+
+	if (ts.isStringLiteral(initializer)) {
+		return {
+			value: initializer.text,
+			valueRange: rangeOf(sourceFile, initializer),
+		}
+	}
+
+	if (
+		ts.isJsxExpression(initializer) &&
+		initializer.expression &&
+		ts.isStringLiteralLike(initializer.expression)
+	) {
+		return {
+			value: initializer.expression.text,
+			valueRange: rangeOf(sourceFile, initializer.expression),
+		}
+	}
+
+	return {}
+}
+
+function analyzeJsxAttributes(
+	context: AnalyzeContext,
+	attributes: ts.JsxAttributes,
+): StoryAttribute[] {
+	return attributes.properties.flatMap((attribute) => {
+		if (ts.isJsxSpreadAttribute(attribute)) return []
+
+		const name = normalizeJsxAttributeName(
+			attribute.name.getText(context.sourceFile),
+		)
+
+		if (name === `key` || name === `ref`) return []
+
+		return [
+			{
+				name,
+				range: rangeOf(context.sourceFile, attribute),
+				...stringLiteralAttributeValue(
+					context.sourceFile,
+					attribute.initializer,
+				),
+			},
+		]
+	})
+}
+
+function createStoryNode(
+	context: AnalyzeContext,
+	tagName: string,
+	children: StoryChild[],
+	range: SourceRange,
+	attributes: ts.JsxAttributes,
+): StoryNode {
+	const storyAttributes = analyzeJsxAttributes(context, attributes)
+	const baseNode: StoryNode = {
+		kind: `element`,
+		tagName,
+		children,
+		range,
+	}
+
+	return storyAttributes.length > 0
+		? { ...baseNode, attributes: storyAttributes }
+		: baseNode
+}
+
 function isIntrinsicJsxTag(tagName: string): boolean {
 	return /^[a-z]/.test(tagName) || tagName.includes(`-`)
 }
@@ -442,12 +528,13 @@ function analyzeJsxElement(
 	}
 
 	return [
-		{
-			kind: `element`,
+		createStoryNode(
+			context,
 			tagName,
-			children: analyzeJsxChildren(context, node.children, stack),
-			range: rangeOf(context.sourceFile, node.openingElement.tagName),
-		},
+			analyzeJsxChildren(context, node.children, stack),
+			rangeOf(context.sourceFile, node.openingElement.tagName),
+			node.openingElement.attributes,
+		),
 	]
 }
 
@@ -467,12 +554,13 @@ function analyzeJsxSelfClosingElement(
 	}
 
 	return [
-		{
-			kind: `element`,
+		createStoryNode(
+			context,
 			tagName,
-			children: [],
-			range: rangeOf(context.sourceFile, node.tagName),
-		},
+			[],
+			rangeOf(context.sourceFile, node.tagName),
+			node.attributes,
+		),
 	]
 }
 
