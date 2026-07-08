@@ -2,6 +2,7 @@ import { pathToFileURL } from "node:url"
 
 import { describe, expect, it } from "vitest"
 import {
+	CodeActionKind,
 	DiagnosticSeverity,
 	type InitializeParams,
 } from "vscode-languageserver/node"
@@ -19,10 +20,15 @@ import {
 } from "../src/logger.ts"
 import {
 	clientSupportsWorkspaceFolderChangeEvents,
+	createCleanUpDeadSelectorsCodeAction,
 	createInitializeResult,
 	createRefractorDiagnostics,
 	findSiblingTsxPath,
 } from "../src/server.ts"
+import {
+	LASERTAG_CLEAN_UP_DEAD_SELECTORS_KIND,
+	LASERTAG_CLEAN_UP_DEAD_SELECTORS_TITLE,
+} from "../src/code-actions.ts"
 
 const cssPath = `/project/src/AppPanel.module.css`
 const tsxPath = `/project/src/AppPanel.tsx`
@@ -201,6 +207,17 @@ describe(`lasertag lsp`, () => {
 		).toBe(false)
 	})
 
+	it(`advertises cleanup as both a quick fix and source action`, () => {
+		expect(
+			createInitializeResult().capabilities.codeActionProvider,
+		).toMatchObject({
+			codeActionKinds: [
+				CodeActionKind.QuickFix,
+				LASERTAG_CLEAN_UP_DEAD_SELECTORS_KIND,
+			],
+		})
+	})
+
 	it(`finds a sibling tsx file for a css module`, () => {
 		expect(
 			findSiblingTsxPath(
@@ -256,6 +273,23 @@ describe(`lasertag lsp`, () => {
 			},
 		])
 		expect(diagnostics[0]?.message).toContain(`does not match`)
+	})
+
+	it(`creates a no-op cleanup action when there are no dead selectors`, () => {
+		const document = TextDocument.create(
+			fileUri(cssPath),
+			`css`,
+			1,
+			createCssSource(`header`),
+		)
+		const action = createCleanUpDeadSelectorsCodeAction(document, [])
+
+		expect(action).toMatchObject({
+			diagnostics: [],
+			kind: CodeActionKind.QuickFix,
+			title: LASERTAG_CLEAN_UP_DEAD_SELECTORS_TITLE,
+		})
+		expect(action.edit?.changes?.[document.uri]).toEqual([])
 	})
 })
 

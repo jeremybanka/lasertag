@@ -1,7 +1,4 @@
 app-root.class {
 	display: grid;
 	gap: 0.5rem;
-	> hello-world {
-		display: float;
-	}
 }

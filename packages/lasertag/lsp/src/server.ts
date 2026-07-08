@@ -39,6 +39,7 @@ import {
 } from "./logger.ts"
 import {
 	createDeadSelectorCleanupRanges,
+	LASERTAG_CLEAN_UP_DEAD_SELECTORS_KIND,
 	LASERTAG_CLEAN_UP_DEAD_SELECTORS_TITLE,
 	LASERTAG_RESTART_SERVER_COMMAND,
 	LASERTAG_RESTART_SERVER_TITLE,
@@ -127,7 +128,10 @@ export function createInitializeResult(
 	return {
 		capabilities: {
 			codeActionProvider: {
-				codeActionKinds: [CodeActionKind.QuickFix],
+				codeActionKinds: [
+					CodeActionKind.QuickFix,
+					LASERTAG_CLEAN_UP_DEAD_SELECTORS_KIND,
+				],
 			},
 			completionProvider: {
 				triggerCharacters: [`>`, `[`, `=`, `:`, `.`],
@@ -290,6 +294,79 @@ function createDeleteTextEdit(
 	}
 }
 
+function codeActionKindMatches(
+	actionKind: string,
+	requestedKind: string,
+): boolean {
+	return (
+		actionKind === requestedKind || actionKind.startsWith(`${requestedKind}.`)
+	)
+}
+
+function shouldIncludeCodeActionKind(
+	actionKind: string,
+	requestedKinds: readonly string[] | undefined,
+): boolean {
+	return (
+		!requestedKinds ||
+		requestedKinds.length === 0 ||
+		requestedKinds.some((requestedKind) =>
+			codeActionKindMatches(actionKind, requestedKind),
+		)
+	)
+}
+
+function cleanUpDeadSelectorsKindForRequest(
+	requestedKinds: readonly string[] | undefined,
+): string | undefined {
+	if (!requestedKinds || requestedKinds.length === 0) {
+		return CodeActionKind.QuickFix
+	}
+
+	if (
+		shouldIncludeCodeActionKind(
+			LASERTAG_CLEAN_UP_DEAD_SELECTORS_KIND,
+			requestedKinds,
+		)
+	) {
+		return LASERTAG_CLEAN_UP_DEAD_SELECTORS_KIND
+	}
+
+	if (shouldIncludeCodeActionKind(CodeActionKind.QuickFix, requestedKinds)) {
+		return CodeActionKind.QuickFix
+	}
+}
+
+export function createCleanUpDeadSelectorsCodeAction(
+	document: TextDocument,
+	diagnostics: Diagnostic[],
+	kind: string = CodeActionKind.QuickFix,
+): CodeAction {
+	const deadSelectorDiagnostics = diagnostics.filter(
+		isLasertagDeadSelectorDiagnostic,
+	)
+	const sourceText = document.getText()
+	const cleanupRanges = createDeadSelectorCleanupRanges(
+		sourceText,
+		deadSelectorDiagnostics.map((diagnostic) =>
+			diagnosticToOffsetRange(document, diagnostic),
+		),
+	)
+
+	return {
+		diagnostics: deadSelectorDiagnostics,
+		edit: {
+			changes: {
+				[document.uri]: cleanupRanges.map((range) =>
+					createDeleteTextEdit(sourceText, range),
+				),
+			},
+		},
+		kind,
+		title: LASERTAG_CLEAN_UP_DEAD_SELECTORS_TITLE,
+	}
+}
+
 export function createLasertagLspServer(
 	options: LasertagLspServerOptions = {},
 ) {
@@ -411,48 +488,20 @@ export function createLasertagLspServer(
 		}
 	}
 
-	function createCleanUpDeadSelectorsCodeAction(
-		document: TextDocument,
-		diagnostics: Diagnostic[],
-	): CodeAction | undefined {
-		const deadSelectorDiagnostics = diagnostics.filter(
-			isLasertagDeadSelectorDiagnostic,
-		)
-
-		if (deadSelectorDiagnostics.length === 0) return
-
-		const sourceText = document.getText()
-		const cleanupRanges = createDeadSelectorCleanupRanges(
-			sourceText,
-			deadSelectorDiagnostics.map((diagnostic) =>
-				diagnosticToOffsetRange(document, diagnostic),
-			),
-		)
-
-		if (cleanupRanges.length === 0) return
-
-		return {
-			diagnostics: deadSelectorDiagnostics,
-			edit: {
-				changes: {
-					[document.uri]: cleanupRanges.map((range) =>
-						createDeleteTextEdit(sourceText, range),
-					),
-				},
-			},
-			kind: CodeActionKind.QuickFix,
-			title: LASERTAG_CLEAN_UP_DEAD_SELECTORS_TITLE,
-		}
-	}
-
 	function createCodeActions(params: CodeActionParams): CodeAction[] {
 		const filePath = filePathFromUri(params.textDocument.uri)
+		const requestedKinds = params.context.only
 
 		if (!filePath || (!isCssModulePath(filePath) && !isTsxPath(filePath))) {
 			return []
 		}
 
-		const actions = [createRestartCodeAction()]
+		const actions = shouldIncludeCodeActionKind(
+			CodeActionKind.QuickFix,
+			requestedKinds,
+		)
+			? [createRestartCodeAction()]
+			: []
 
 		if (!isCssModulePath(filePath)) return actions
 
@@ -460,12 +509,17 @@ export function createLasertagLspServer(
 
 		if (!document) return actions
 
-		const cleanUpAction = createCleanUpDeadSelectorsCodeAction(
-			document,
-			state.getDiagnostics(filePath),
-		)
+		const cleanUpActionKind = cleanUpDeadSelectorsKindForRequest(requestedKinds)
 
-		if (cleanUpAction) actions.unshift(cleanUpAction)
+		if (cleanUpActionKind) {
+			actions.unshift(
+				createCleanUpDeadSelectorsCodeAction(
+					document,
+					state.getDiagnostics(filePath),
+					cleanUpActionKind,
+				),
+			)
+		}
 
 		return actions
 	}

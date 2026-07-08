@@ -1,6 +1,8 @@
 export const LASERTAG_RESTART_SERVER_COMMAND = `lasertag.restartServer`
 export const LASERTAG_RESTART_SERVER_TITLE = `Lasertag: Restart Lasertag Server`
+export const LASERTAG_CLEAN_UP_DEAD_SELECTORS_COMMAND = `lasertag.cleanUpDeadSelectors`
 export const LASERTAG_CLEAN_UP_DEAD_SELECTORS_TITLE = `Lasertag: Clean up Dead Selectors`
+export const LASERTAG_CLEAN_UP_DEAD_SELECTORS_KIND = `source.fixAll.lasertag`
 
 export type OffsetRange = {
 	start: number
@@ -37,10 +39,46 @@ function trimRange(
 	}
 
 	while (
+		trimmedStart < trimmedEnd &&
+		sourceText.slice(trimmedStart, trimmedStart + 2) === `/*`
+	) {
+		const commentEnd = sourceText.indexOf(`*/`, trimmedStart + 2)
+
+		if (commentEnd === -1 || commentEnd + 2 > trimmedEnd) break
+
+		trimmedStart = commentEnd + 2
+
+		while (
+			trimmedStart < trimmedEnd &&
+			isWhitespace(sourceText[trimmedStart] ?? ``)
+		) {
+			trimmedStart += 1
+		}
+	}
+
+	while (
 		trimmedEnd > trimmedStart &&
 		isWhitespace(sourceText[trimmedEnd - 1] ?? ``)
 	) {
 		trimmedEnd -= 1
+	}
+
+	while (
+		trimmedEnd > trimmedStart &&
+		sourceText.slice(trimmedEnd - 2, trimmedEnd) === `*/`
+	) {
+		const commentStart = sourceText.lastIndexOf(`/*`, trimmedEnd - 3)
+
+		if (commentStart < trimmedStart) break
+
+		trimmedEnd = commentStart
+
+		while (
+			trimmedEnd > trimmedStart &&
+			isWhitespace(sourceText[trimmedEnd - 1] ?? ``)
+		) {
+			trimmedEnd -= 1
+		}
 	}
 
 	return { start: trimmedStart, end: trimmedEnd }
@@ -162,11 +200,65 @@ function findRulePreludeStart(
 	sourceText: string,
 	selectorStart: number,
 ): number {
-	const previousOpenBrace = sourceText.lastIndexOf(`{`, selectorStart - 1)
-	const previousCloseBrace = sourceText.lastIndexOf(`}`, selectorStart - 1)
-	const previousSemicolon = sourceText.lastIndexOf(`;`, selectorStart - 1)
+	let previousDelimiter = -1
+	let parenDepth = 0
+	let bracketDepth = 0
+	let quote: `"` | `'` | undefined
 
-	return Math.max(previousOpenBrace, previousCloseBrace, previousSemicolon) + 1
+	for (let index = 0; index < selectorStart; index += 1) {
+		const character = sourceText[index]
+		const previousCharacter = sourceText[index - 1]
+
+		if (quote) {
+			if (character === quote && previousCharacter !== `\\`) {
+				quote = undefined
+			}
+
+			continue
+		}
+
+		if (character === `"` || character === `'`) {
+			quote = character
+			continue
+		}
+
+		if (character === `/` && sourceText[index + 1] === `*`) {
+			const commentEnd = sourceText.indexOf(`*/`, index + 2)
+
+			if (commentEnd === -1 || commentEnd >= selectorStart) break
+
+			index = commentEnd + 1
+			continue
+		}
+
+		if (character === `(`) {
+			parenDepth += 1
+			continue
+		}
+
+		if (character === `)`) {
+			parenDepth = Math.max(parenDepth - 1, 0)
+			continue
+		}
+
+		if (character === `[`) {
+			bracketDepth += 1
+			continue
+		}
+
+		if (character === `]`) {
+			bracketDepth = Math.max(bracketDepth - 1, 0)
+			continue
+		}
+
+		if (parenDepth > 0 || bracketDepth > 0) continue
+
+		if (character === `{` || character === `}` || character === `;`) {
+			previousDelimiter = index
+		}
+	}
+
+	return previousDelimiter + 1
 }
 
 function splitSelectorItems(
@@ -194,6 +286,15 @@ function splitSelectorItems(
 
 		if (character === `"` || character === `'`) {
 			quote = character
+			continue
+		}
+
+		if (character === `/` && sourceText[index + 1] === `*`) {
+			const commentEnd = sourceText.indexOf(`*/`, index + 2)
+
+			if (commentEnd === -1 || commentEnd >= end) break
+
+			index = commentEnd + 1
 			continue
 		}
 
@@ -285,14 +386,35 @@ function createWholeRuleRemovalRange(
 		.every(isWhitespace)
 	const start = hasOnlyLineIndentation ? lineStart : context.preludeStart
 	let end = context.blockEnd + 1
+	const lineBreakEnd = lineBreakEndAt(sourceText, end)
 
-	if (sourceText.slice(end, end + 2) === `\r\n`) {
-		end += 2
-	} else if (sourceText[end] === `\n`) {
-		end += 1
+	if (lineBreakEnd !== undefined) {
+		const nextNonWhitespace = nextNonWhitespaceIndex(sourceText, lineBreakEnd)
+
+		if (
+			nextNonWhitespace < sourceText.length &&
+			sourceText[nextNonWhitespace] !== `}`
+		) {
+			end = lineBreakEnd
+		}
 	}
 
 	return { end, start }
+}
+
+function lineBreakEndAt(sourceText: string, index: number): number | undefined {
+	if (sourceText.slice(index, index + 2) === `\r\n`) return index + 2
+	if (sourceText[index] === `\n`) return index + 1
+}
+
+function nextNonWhitespaceIndex(sourceText: string, start: number): number {
+	let index = start
+
+	while (index < sourceText.length && isWhitespace(sourceText[index] ?? ``)) {
+		index += 1
+	}
+
+	return index
 }
 
 function createSelectorListItemRemovalRange(

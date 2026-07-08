@@ -4,6 +4,8 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 
 import {
+	LASERTAG_CLEAN_UP_DEAD_SELECTORS_COMMAND,
+	LASERTAG_CLEAN_UP_DEAD_SELECTORS_TITLE,
 	LASERTAG_RESTART_SERVER_COMMAND,
 	LASERTAG_RESTART_SERVER_TITLE,
 } from "../lsp/src/code-actions.ts"
@@ -81,6 +83,10 @@ const vscodeManifest = {
 	files: ["dist", "README.md"],
 	contributes: {
 		commands: [
+			{
+				command: LASERTAG_CLEAN_UP_DEAD_SELECTORS_COMMAND,
+				title: LASERTAG_CLEAN_UP_DEAD_SELECTORS_TITLE,
+			},
 			{
 				command: LASERTAG_RESTART_SERVER_COMMAND,
 				title: LASERTAG_RESTART_SERVER_TITLE,

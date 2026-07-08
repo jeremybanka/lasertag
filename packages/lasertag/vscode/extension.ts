@@ -1,4 +1,8 @@
-import { LASERTAG_RESTART_SERVER_COMMAND } from "../lsp/src/code-actions.ts"
+import {
+	LASERTAG_CLEAN_UP_DEAD_SELECTORS_COMMAND,
+	LASERTAG_CLEAN_UP_DEAD_SELECTORS_KIND,
+	LASERTAG_RESTART_SERVER_COMMAND,
+} from "../lsp/src/code-actions.ts"
 
 declare const require: (id: string) => unknown
 
@@ -9,12 +13,16 @@ type Disposable = {
 type ExtensionContext = {
 	asAbsolutePath(relativePath: string): string
 	subscriptions: {
-		push(disposable: Disposable): void
+		push(...disposables: Disposable[]): void
 	}
 }
 
 type VscodeModule = {
 	commands: {
+		executeCommand<T = unknown>(
+			command: string,
+			...args: unknown[]
+		): PromiseLike<T>
 		registerCommand(
 			command: string,
 			callback: (...args: unknown[]) => unknown,
@@ -178,6 +186,15 @@ export async function activate(context: ExtensionContext) {
 			LASERTAG_RESTART_SERVER_COMMAND,
 			async () => {
 				await client?.restart()
+			},
+		),
+		vscode.commands.registerCommand(
+			LASERTAG_CLEAN_UP_DEAD_SELECTORS_COMMAND,
+			async () => {
+				await vscode.commands.executeCommand("editor.action.codeAction", {
+					apply: "first",
+					kind: LASERTAG_CLEAN_UP_DEAD_SELECTORS_KIND,
+				})
 			},
 		),
 	)

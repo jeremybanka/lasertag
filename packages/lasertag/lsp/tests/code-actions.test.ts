@@ -105,4 +105,47 @@ describe(`lasertag lsp code actions`, () => {
 }
 `)
 	})
+
+	it(`preserves the parent closing line when removing the final nested rule`, () => {
+		const sourceText = `app-root.class {
+\t> p {
+\t\tdisplay: block;
+\t}
+}
+`
+		const ranges = createDeadSelectorCleanupRanges(sourceText, [
+			rangeFor(sourceText, `> p`),
+		])
+
+		expect(applyRanges(sourceText, ranges)).toBe(`app-root.class {
+
+}
+`)
+	})
+
+	it(`does not remove the end of a block comment before a dead selector`, () => {
+		const sourceText = `app-root.class {
+\tdisplay: grid;
+\tgap: 0.5rem;
+\t/* > hello-world {
+\t\tdisplay: float;
+\t} */
+\thi {
+\t}
+}
+`
+		const ranges = createDeadSelectorCleanupRanges(sourceText, [
+			rangeFor(sourceText, `hi`),
+		])
+
+		expect(applyRanges(sourceText, ranges)).toBe(`app-root.class {
+\tdisplay: grid;
+\tgap: 0.5rem;
+\t/* > hello-world {
+\t\tdisplay: float;
+\t} */
+
+}
+`)
+	})
 })
