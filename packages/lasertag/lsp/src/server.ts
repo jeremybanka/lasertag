@@ -4,19 +4,26 @@ import { existsSync, readFileSync } from "node:fs"
 
 import {
 	createConnection,
-	DiagnosticSeverity,
+	DidChangeWatchedFilesNotification,
+	FileChangeType,
 	Files,
 	type Diagnostic,
+	type InitializeParams,
 	type InitializeResult,
 	TextDocumentSyncKind,
 	TextDocuments,
+	WatchKind,
 } from "vscode-languageserver/node"
 import { TextDocument } from "vscode-languageserver-textdocument"
 
 import {
-	validateCssReachability,
-	type CssReachabilityDiagnostic,
-} from "../../refractor/src/index.ts"
+	createLasertagLspState,
+	findSiblingTsxPathFromConvention,
+	isCssModulePath as isCssModuleFilePath,
+	isTsxPath,
+	type LasertagLspStateEnvironment,
+	type LspDocumentInput,
+} from "./state.ts"
 
 export type LasertagLspReadOptions = {
 	cssPath?: string
@@ -24,20 +31,21 @@ export type LasertagLspReadOptions = {
 	readFile?: (filePath: string) => string
 }
 
+export type LasertagLspServerOptions = LasertagLspStateEnvironment & {
+	debounceMs?: number
+}
+
 export function isCssModulePath(filePath: string): boolean {
-	return filePath.endsWith(`.module.css`)
+	return isCssModuleFilePath(filePath)
 }
 
 export function findSiblingTsxPath(
 	cssPath: string,
 	fileExists: (filePath: string) => boolean = existsSync,
 ): string | undefined {
-	if (!isCssModulePath(cssPath)) return
+	const candidate = findSiblingTsxPathFromConvention(cssPath)
 
-	const stemPath = cssPath.slice(0, -`.module.css`.length)
-	const candidate = `${stemPath}.tsx`
-
-	return fileExists(candidate) ? candidate : undefined
+	return candidate && fileExists(candidate) ? candidate : undefined
 }
 
 function getDocumentFilePath(
@@ -47,22 +55,16 @@ function getDocumentFilePath(
 	return options.cssPath ?? Files.uriToFilePath(document.uri) ?? undefined
 }
 
-function toLspDiagnostic(
+function createDocumentInput(
 	document: TextDocument,
-	diagnostic: CssReachabilityDiagnostic,
-): Diagnostic {
-	const startOffset = diagnostic.range?.start ?? 0
-	const endOffset = diagnostic.range?.end ?? startOffset
-
+	filePath: string,
+): LspDocumentInput {
 	return {
-		code: diagnostic.code,
-		message: diagnostic.message,
-		range: {
-			start: document.positionAt(startOffset),
-			end: document.positionAt(endOffset),
-		},
-		severity: DiagnosticSeverity.Warning,
-		source: `lasertag`,
+		languageId: document.languageId,
+		path: filePath,
+		text: document.getText(),
+		uri: document.uri,
+		version: document.version,
 	}
 }
 
@@ -74,29 +76,29 @@ export function createRefractorDiagnostics(
 
 	if (!cssPath || !isCssModulePath(cssPath)) return []
 
-	const fileExists = options.fileExists ?? existsSync
-	const readFile =
-		options.readFile ?? ((filePath) => readFileSync(filePath, `utf-8`))
-	const tsxPath = findSiblingTsxPath(cssPath, fileExists)
-
-	if (!tsxPath) return []
-
-	const result = validateCssReachability({
-		cssPath,
-		cssSource: document.getText(),
-		tsxPath,
-		tsxSource: readFile(tsxPath),
+	const state = createLasertagLspState({
+		fileExists: options.fileExists ?? existsSync,
+		readFile:
+			options.readFile ?? ((filePath) => readFileSync(filePath, `utf-8`)),
 	})
 
-	return result.diagnostics.map((diagnostic) =>
-		toLspDiagnostic(document, diagnostic),
-	)
+	state.openDocument(createDocumentInput(document, cssPath))
+
+	return state.getDiagnostics(cssPath)
 }
 
-export function createInitializeResult(): InitializeResult {
+export function createInitializeResult(
+	_params?: InitializeParams,
+): InitializeResult {
 	return {
 		capabilities: {
 			textDocumentSync: TextDocumentSyncKind.Incremental,
+			workspace: {
+				workspaceFolders: {
+					changeNotifications: true,
+					supported: true,
+				},
+			},
 		},
 		serverInfo: {
 			name: `lasertag-lsp`,
@@ -104,25 +106,252 @@ export function createInitializeResult(): InitializeResult {
 	}
 }
 
-export function createLasertagLspServer() {
+function filePathFromUri(uri: string): string | undefined {
+	return Files.uriToFilePath(uri) ?? undefined
+}
+
+function filePathFromDocument(document: TextDocument): string | undefined {
+	return filePathFromUri(document.uri)
+}
+
+function workspaceFolderPathsFromInitialize(
+	params: InitializeParams,
+): string[] {
+	const workspaceFolderPaths =
+		params.workspaceFolders?.flatMap((workspaceFolder) => {
+			const filePath = filePathFromUri(workspaceFolder.uri)
+
+			return filePath ? [filePath] : []
+		}) ?? []
+
+	if (workspaceFolderPaths.length > 0) return workspaceFolderPaths
+
+	if (params.rootUri) {
+		const rootPath = filePathFromUri(params.rootUri)
+
+		if (rootPath) return [rootPath]
+	}
+
+	return []
+}
+
+function allWatchedFileChangeKinds(): number {
+	return WatchKind.Create | WatchKind.Change | WatchKind.Delete
+}
+
+export function createLasertagLspServer(
+	options: LasertagLspServerOptions = {},
+) {
 	const connection = createConnection()
 	const documents = new TextDocuments(TextDocument)
+	const state = createLasertagLspState(options)
+	const debounceMs = options.debounceMs ?? 75
+	const diagnosticSubscriptions = new Map<string, () => void>()
+	const diagnosticTimers = new Map<string, ReturnType<typeof setTimeout>>()
+	let clientSupportsDynamicWatchedFiles = false
+	let workspaceFolderPaths: string[] = []
 
-	function publishDiagnostics(document: TextDocument) {
+	function clearPendingDiagnostics(cssPath: string): void {
+		const timer = diagnosticTimers.get(cssPath)
+
+		if (timer) {
+			clearTimeout(timer)
+			diagnosticTimers.delete(cssPath)
+		}
+	}
+
+	function publishDiagnostics(cssPath: string): void {
+		if (!isCssModulePath(cssPath)) return
+
 		void connection.sendDiagnostics({
-			diagnostics: createRefractorDiagnostics(document),
-			uri: document.uri,
+			diagnostics: state.getDiagnostics(cssPath),
+			uri: state.getDocumentUri(cssPath),
 		})
 	}
 
-	connection.onInitialize(createInitializeResult)
-	documents.onDidOpen((event) => publishDiagnostics(event.document))
-	documents.onDidChangeContent((event) => publishDiagnostics(event.document))
-	documents.onDidClose((event) => {
+	function scheduleDiagnostics(cssPath: string): void {
+		if (!isCssModulePath(cssPath)) return
+
+		clearPendingDiagnostics(cssPath)
+
+		if (debounceMs <= 0) {
+			publishDiagnostics(cssPath)
+			return
+		}
+
+		diagnosticTimers.set(
+			cssPath,
+			setTimeout(() => {
+				diagnosticTimers.delete(cssPath)
+				publishDiagnostics(cssPath)
+			}, debounceMs),
+		)
+	}
+
+	function clearDiagnostics(
+		cssPath: string,
+		uri = state.getDocumentUri(cssPath),
+	): void {
+		clearPendingDiagnostics(cssPath)
 		void connection.sendDiagnostics({
 			diagnostics: [],
-			uri: event.document.uri,
+			uri,
 		})
+	}
+
+	function unsubscribeFromCssDiagnostics(cssPath: string): void {
+		const unsubscribe = diagnosticSubscriptions.get(cssPath)
+
+		if (!unsubscribe) return
+
+		unsubscribe()
+		diagnosticSubscriptions.delete(cssPath)
+	}
+
+	function subscribeToCssDiagnostics(cssPath: string): void {
+		if (!isCssModulePath(cssPath) || diagnosticSubscriptions.has(cssPath))
+			return
+
+		diagnosticSubscriptions.set(
+			cssPath,
+			state.subscribeToCssDiagnostics(cssPath, () =>
+				scheduleDiagnostics(cssPath),
+			),
+		)
+	}
+
+	function scheduleAffectedCssForTsx(tsxPath: string): void {
+		for (const cssPath of state.getAffectedCssPathsForTsx(tsxPath)) {
+			subscribeToCssDiagnostics(cssPath)
+			scheduleDiagnostics(cssPath)
+		}
+	}
+
+	function handleChangedDocument(document: TextDocument): void {
+		const filePath = filePathFromDocument(document)
+
+		if (!filePath) return
+
+		state.openDocument(createDocumentInput(document, filePath))
+
+		if (isCssModulePath(filePath)) {
+			subscribeToCssDiagnostics(filePath)
+			scheduleDiagnostics(filePath)
+			return
+		}
+
+		if (isTsxPath(filePath)) scheduleAffectedCssForTsx(filePath)
+	}
+
+	connection.onInitialize((params) => {
+		clientSupportsDynamicWatchedFiles =
+			params.capabilities.workspace?.didChangeWatchedFiles
+				?.dynamicRegistration === true
+		workspaceFolderPaths = workspaceFolderPathsFromInitialize(params)
+		state.indexWorkspaceFolders(workspaceFolderPaths)
+
+		return createInitializeResult(params)
+	})
+	connection.onInitialized(() => {
+		if (!clientSupportsDynamicWatchedFiles) return
+
+		void connection.client
+			.register(DidChangeWatchedFilesNotification.type, {
+				watchers: [
+					{
+						globPattern: `**/*.module.css`,
+						kind: allWatchedFileChangeKinds(),
+					},
+					{
+						globPattern: `**/*.tsx`,
+						kind: allWatchedFileChangeKinds(),
+					},
+				],
+			})
+			.catch((error: unknown) => {
+				connection.console.warn(
+					`lasertag-lsp could not register file watchers: ${
+						error instanceof Error ? error.message : String(error)
+					}`,
+				)
+			})
+	})
+	connection.onDidChangeWatchedFiles((event) => {
+		for (const change of event.changes) {
+			const filePath = filePathFromUri(change.uri)
+
+			if (!filePath) continue
+
+			const affectedCssBeforeChange = isTsxPath(filePath)
+				? state.getAffectedCssPathsForTsx(filePath)
+				: []
+
+			if (change.type === FileChangeType.Deleted) {
+				state.deleteFile(filePath)
+			} else {
+				state.refreshDiskFile(filePath)
+			}
+
+			if (isCssModulePath(filePath)) {
+				const isOpen = state.getOpenDocumentPaths().includes(filePath)
+
+				if (change.type === FileChangeType.Deleted && !isOpen) {
+					unsubscribeFromCssDiagnostics(filePath)
+					clearDiagnostics(filePath, change.uri)
+				} else {
+					subscribeToCssDiagnostics(filePath)
+					scheduleDiagnostics(filePath)
+				}
+			}
+
+			if (isTsxPath(filePath)) {
+				for (const cssPath of new Set([
+					...affectedCssBeforeChange,
+					...state.getAffectedCssPathsForTsx(filePath),
+				])) {
+					subscribeToCssDiagnostics(cssPath)
+					scheduleDiagnostics(cssPath)
+				}
+			}
+		}
+	})
+	connection.workspace.onDidChangeWorkspaceFolders((event) => {
+		const removedPaths = new Set(
+			event.removed.flatMap((workspaceFolder) => {
+				const filePath = filePathFromUri(workspaceFolder.uri)
+
+				return filePath ? [filePath] : []
+			}),
+		)
+		const addedPaths = event.added.flatMap((workspaceFolder) => {
+			const filePath = filePathFromUri(workspaceFolder.uri)
+
+			return filePath ? [filePath] : []
+		})
+
+		workspaceFolderPaths = [
+			...workspaceFolderPaths.filter(
+				(workspaceFolderPath) => !removedPaths.has(workspaceFolderPath),
+			),
+			...addedPaths,
+		]
+		state.indexWorkspaceFolders(workspaceFolderPaths)
+	})
+	documents.onDidOpen((event) => handleChangedDocument(event.document))
+	documents.onDidChangeContent((event) => handleChangedDocument(event.document))
+	documents.onDidClose((event) => {
+		const filePath = filePathFromDocument(event.document)
+
+		if (!filePath) return
+
+		state.closeDocument(filePath)
+
+		if (isCssModulePath(filePath)) {
+			unsubscribeFromCssDiagnostics(filePath)
+			clearDiagnostics(filePath, event.document.uri)
+		}
+
+		if (isTsxPath(filePath)) scheduleAffectedCssForTsx(filePath)
 	})
 	documents.listen(connection)
 
@@ -130,6 +359,7 @@ export function createLasertagLspServer() {
 		connection,
 		documents,
 		listen: () => connection.listen(),
+		state,
 	}
 }
 

@@ -1,18 +1,136 @@
+import { pathToFileURL } from "node:url"
+
 import { describe, expect, it } from "vitest"
 import { DiagnosticSeverity } from "vscode-languageserver/node"
 import { TextDocument } from "vscode-languageserver-textdocument"
 
+import {
+	createLasertagLspState,
+	type LasertagLspStateEnvironment,
+	type LspDocumentInput,
+} from "../src/state.ts"
 import {
 	createInitializeResult,
 	createRefractorDiagnostics,
 	findSiblingTsxPath,
 } from "../src/server.ts"
 
+const cssPath = `/project/src/AppPanel.module.css`
+const tsxPath = `/project/src/AppPanel.tsx`
+
+function fileUri(filePath: string): string {
+	return pathToFileURL(filePath).href
+}
+
+function createDocumentInput(
+	filePath: string,
+	text: string,
+	version = 1,
+	languageId = `css`,
+): LspDocumentInput {
+	return {
+		languageId,
+		path: filePath,
+		text,
+		uri: fileUri(filePath),
+		version,
+	}
+}
+
+function createCssSource(childTagName: string): string {
+	return `
+		app-panel.class {
+			> ${childTagName} {}
+		}
+	`
+}
+
+function createTsxSource(childTagName: string): string {
+	return `
+		import css from "./AppPanel.module.css"
+
+		export function AppPanel() {
+			return (
+				<app-panel className={css.class}>
+					<${childTagName} />
+				</app-panel>
+			)
+		}
+	`
+}
+
+function createMemoryFileSystem(files: Record<string, string>) {
+	const memory = new Map(Object.entries(files))
+	type TestGlobOptions = {
+		absolute?: boolean
+		cwd?: string
+		patterns?: readonly string[] | string
+	}
+	const glob = ((
+		patternsOrOptions: readonly string[] | string | TestGlobOptions,
+		options?: TestGlobOptions,
+	) => {
+		const isOptionsCall =
+			typeof patternsOrOptions === `object` &&
+			!Array.isArray(patternsOrOptions) &&
+			`patterns` in patternsOrOptions
+		const globOptions = isOptionsCall ? patternsOrOptions : options
+		const patterns = isOptionsCall
+			? patternsOrOptions.patterns
+			: patternsOrOptions
+		const patternList = Array.isArray(patterns) ? patterns : [patterns]
+		const cwd =
+			typeof globOptions?.cwd === `string` ? globOptions.cwd : `/project`
+		const absolute = globOptions?.absolute === true
+
+		return [...memory.keys()]
+			.filter((filePath) => filePath.startsWith(cwd))
+			.filter((filePath) =>
+				patternList.some((pattern) => {
+					if (pattern === `**/*.module.css`) {
+						return filePath.endsWith(`.module.css`)
+					}
+
+					if (pattern === `**/*.tsx`) return filePath.endsWith(`.tsx`)
+
+					return false
+				}),
+			)
+			.map((filePath) => (absolute ? filePath : filePath.slice(cwd.length + 1)))
+	}) as NonNullable<LasertagLspStateEnvironment[`glob`]>
+	const environment: LasertagLspStateEnvironment = {
+		fileExists: (filePath) => memory.has(filePath),
+		glob,
+		readFile: (filePath) => {
+			const sourceText = memory.get(filePath)
+
+			if (sourceText === undefined) {
+				throw new Error(`Missing test file: ${filePath}`)
+			}
+
+			return sourceText
+		},
+	}
+
+	return {
+		deleteFile: (filePath: string) => memory.delete(filePath),
+		environment,
+		writeFile: (filePath: string, sourceText: string) =>
+			memory.set(filePath, sourceText),
+	}
+}
+
 describe(`lasertag lsp`, () => {
 	it(`advertises incremental text document sync`, () => {
 		expect(createInitializeResult()).toMatchObject({
 			capabilities: {
 				textDocumentSync: 2,
+				workspace: {
+					workspaceFolders: {
+						changeNotifications: true,
+						supported: true,
+					},
+				},
 			},
 			serverInfo: {
 				name: `lasertag-lsp`,
@@ -75,5 +193,125 @@ describe(`lasertag lsp`, () => {
 			},
 		])
 		expect(diagnostics[0]?.message).toContain(`does not match`)
+	})
+})
+
+describe(`lasertag lsp state`, () => {
+	it(`validates open CSS against the sibling TSX file on disk`, () => {
+		const fileSystem = createMemoryFileSystem({
+			[tsxPath]: createTsxSource(`header`),
+		})
+		const state = createLasertagLspState(fileSystem.environment)
+
+		state.openDocument(createDocumentInput(cssPath, createCssSource(`footer`)))
+
+		expect(state.getDiagnostics(cssPath)).toMatchObject([
+			{
+				code: `dead-selector`,
+				severity: DiagnosticSeverity.Warning,
+				source: `lasertag`,
+			},
+		])
+	})
+
+	it(`updates diagnostics when an open CSS module changes`, () => {
+		const fileSystem = createMemoryFileSystem({
+			[tsxPath]: createTsxSource(`header`),
+		})
+		const state = createLasertagLspState(fileSystem.environment)
+
+		state.openDocument(createDocumentInput(cssPath, createCssSource(`footer`)))
+		expect(state.getDiagnostics(cssPath)).toHaveLength(1)
+
+		state.openDocument(
+			createDocumentInput(cssPath, createCssSource(`header`), 2),
+		)
+
+		expect(state.getDiagnostics(cssPath)).toEqual([])
+	})
+
+	it(`updates diagnostics when an open TSX render story changes`, () => {
+		const fileSystem = createMemoryFileSystem({
+			[tsxPath]: createTsxSource(`header`),
+		})
+		const state = createLasertagLspState(fileSystem.environment)
+
+		state.openDocument(createDocumentInput(cssPath, createCssSource(`footer`)))
+		expect(state.getDiagnostics(cssPath)).toHaveLength(1)
+
+		state.openDocument(
+			createDocumentInput(
+				tsxPath,
+				createTsxSource(`footer`),
+				1,
+				`typescriptreact`,
+			),
+		)
+
+		expect(state.getDiagnostics(cssPath)).toEqual([])
+	})
+
+	it(`emits subscribed diagnostics when a disk TSX file refreshes`, () => {
+		const fileSystem = createMemoryFileSystem({
+			[tsxPath]: createTsxSource(`header`),
+		})
+		const state = createLasertagLspState(fileSystem.environment)
+		const emissions: DiagnosticSeverity[][] = []
+
+		state.openDocument(createDocumentInput(cssPath, createCssSource(`footer`)))
+		const unsubscribe = state.subscribeToCssDiagnostics(
+			cssPath,
+			(diagnostics) => {
+				emissions.push(
+					diagnostics.map(
+						(diagnostic) =>
+							diagnostic.severity ?? DiagnosticSeverity.Information,
+					),
+				)
+			},
+		)
+
+		expect(emissions.at(-1)).toEqual([DiagnosticSeverity.Warning])
+
+		fileSystem.writeFile(tsxPath, createTsxSource(`footer`))
+		state.refreshDiskFile(tsxPath)
+
+		expect(emissions.at(-1)).toEqual([])
+
+		unsubscribe()
+	})
+
+	it(`falls back to disk CSS on close and clears deleted disk files`, () => {
+		const fileSystem = createMemoryFileSystem({
+			[cssPath]: createCssSource(`footer`),
+			[tsxPath]: createTsxSource(`header`),
+		})
+		const state = createLasertagLspState(fileSystem.environment)
+
+		state.openDocument(createDocumentInput(cssPath, createCssSource(`header`)))
+		expect(state.getDiagnostics(cssPath)).toEqual([])
+
+		state.closeDocument(cssPath)
+		expect(state.getDiagnostics(cssPath)).toHaveLength(1)
+
+		fileSystem.deleteFile(cssPath)
+		state.deleteFile(cssPath)
+
+		expect(state.getDiagnostics(cssPath)).toEqual([])
+	})
+
+	it(`indexes workspace CSS modules and TSX files for affected-path lookups`, () => {
+		const fileSystem = createMemoryFileSystem({
+			[cssPath]: createCssSource(`footer`),
+			[tsxPath]: createTsxSource(`header`),
+			"/project/src/not-a-module.css": `body { margin: 0; }`,
+		})
+		const state = createLasertagLspState(fileSystem.environment)
+
+		state.indexWorkspaceFolders([`/project`])
+
+		expect(state.getKnownCssModulePaths()).toEqual([cssPath])
+		expect(state.getWatchedTsxPaths()).toEqual([tsxPath])
+		expect(state.getAffectedCssPathsForTsx(tsxPath)).toEqual([cssPath])
 	})
 })

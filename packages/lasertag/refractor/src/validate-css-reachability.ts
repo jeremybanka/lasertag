@@ -1,4 +1,5 @@
 import { analyzeCssModuleSelectors } from "./analyze-css-module.ts"
+import type { CssSelectorAnalysis } from "./analyze-css-module.ts"
 import { analyzeTsxRenderStory } from "./analyze-tsx.ts"
 import type { CssReachabilityDiagnostic, RenderStory } from "./diagnostics.ts"
 import { canReachSelectorPath } from "./reachability.ts"
@@ -16,6 +17,11 @@ export type ValidateCssReachabilityResult = {
 	diagnostics: CssReachabilityDiagnostic[]
 }
 
+export type CreateCssReachabilityDiagnosticsOptions = {
+	renderStory: RenderStory
+	selectorAnalyses: CssSelectorAnalysis[]
+}
+
 function deadSelectorMessage(selector: string): string {
 	return `Selector "${selector}" does not match any supported render story path.`
 }
@@ -24,16 +30,10 @@ function impossibleLocalClassMessage(className: string): string {
 	return `Local class ".${className}" is unreachable; lasertag CSS modules expose only "css.class".`
 }
 
-export function validateCssReachability(
-	options: ValidateCssReachabilityOptions,
-): ValidateCssReachabilityResult {
-	const tsxOptions = {
-		sourceText: options.tsxSource,
-		...(options.tsxPath ? { filePath: options.tsxPath } : {}),
-		...(options.componentName ? { componentName: options.componentName } : {}),
-	}
-	const renderStory = analyzeTsxRenderStory(tsxOptions)
-	const selectorAnalyses = analyzeCssModuleSelectors(options.cssSource)
+export function createCssReachabilityDiagnostics({
+	renderStory,
+	selectorAnalyses,
+}: CreateCssReachabilityDiagnosticsOptions): CssReachabilityDiagnostic[] {
 	const diagnostics: CssReachabilityDiagnostic[] = []
 
 	for (const selectorAnalysis of selectorAnalyses) {
@@ -64,6 +64,24 @@ export function validateCssReachability(
 			})
 		}
 	}
+
+	return diagnostics
+}
+
+export function validateCssReachability(
+	options: ValidateCssReachabilityOptions,
+): ValidateCssReachabilityResult {
+	const tsxOptions = {
+		sourceText: options.tsxSource,
+		...(options.tsxPath ? { filePath: options.tsxPath } : {}),
+		...(options.componentName ? { componentName: options.componentName } : {}),
+	}
+	const renderStory = analyzeTsxRenderStory(tsxOptions)
+	const selectorAnalyses = analyzeCssModuleSelectors(options.cssSource)
+	const diagnostics = createCssReachabilityDiagnostics({
+		renderStory,
+		selectorAnalyses,
+	})
 
 	return { renderStory, diagnostics }
 }

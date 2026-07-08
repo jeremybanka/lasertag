@@ -1,6 +1,7 @@
 # LSP State Engine Plan
 
-Status: planning
+Status: atom.io-backed diagnostics implemented; editor-extension docs, client
+configuration, and code actions are future surfaces.
 
 The current `lasertag-lsp` server is a proof of life: it validates an open
 `.module.css` document against its sibling `.tsx` file, then publishes refractor
@@ -12,20 +13,23 @@ This plan is based on the installed `atom.io` agent docs under
 
 ## Remaining LSP Checklist
 
-- [ ] Build a small atom.io-powered LSP state module.
-- [ ] Track workspace folders and workspace-level config.
-- [ ] Track open CSS and TSX documents by URI/path/version.
-- [ ] Treat open document text as fresher than disk text.
-- [ ] Add file watching for closed sibling `.tsx` files.
-- [ ] Recompute CSS diagnostics when the CSS module changes.
-- [ ] Recompute CSS diagnostics when its sibling TSX changes.
-- [ ] Publish diagnostics from subscriptions to derived diagnostic state.
-- [ ] Debounce high-frequency document changes before publishing diagnostics.
-- [ ] Add cancellation or stale-result protection for slow analysis.
-- [ ] Cache parsed TSX render stories and CSS selector analysis through derived state.
-- [ ] Clear diagnostics for closed or deleted CSS module documents.
-- [ ] Dispose atom-family members for closed/deleted files.
-- [ ] Add tests with isolated atom.io stores.
+- [x] Build a small atom.io-powered LSP state module.
+- [x] Track workspace folders.
+- [ ] Track workspace-level config.
+- [x] Track open CSS and TSX documents by URI/path/version.
+- [x] Treat open document text as fresher than disk text.
+- [x] Add file watching for closed sibling `.tsx` files.
+- [x] Recompute CSS diagnostics when the CSS module changes.
+- [x] Recompute CSS diagnostics when its sibling TSX changes.
+- [x] Publish diagnostics from subscriptions to derived diagnostic state.
+- [x] Debounce high-frequency document changes before publishing diagnostics.
+- [x] Add stale-result protection by publishing only the latest derived state after
+      the debounce window.
+- [x] Cache parsed TSX render stories and CSS selector analysis through derived state.
+- [x] Clear diagnostics for closed or deleted CSS module documents.
+- [ ] Dispose atom-family members for closed/deleted files after subscription
+      lifetimes are tightened.
+- [x] Add tests with isolated atom.io stores.
 - [ ] Add editor-extension wiring documentation.
 - [ ] Add code actions after `--fix` has a real edit engine.
 
@@ -56,17 +60,14 @@ Features to defer:
 
 These are facts with their own origin. They should be atoms or atom families.
 
-| State                       | Kind                                    | Origin                             |
-| --------------------------- | --------------------------------------- | ---------------------------------- |
-| `workspaceFolderPathsAtom`  | `atom<string[]>`                        | LSP initialize/workspace changes   |
-| `lspConfigAtom`             | `atom<LspConfig>`                       | defaults plus future client config |
-| `openDocumentPathsAtom`     | `atom<string[]>`                        | LSP document open/close events     |
-| `openDocumentTextAtoms`     | `atomFamily<string, string>`            | LSP document open/change events    |
-| `openDocumentVersionAtoms`  | `atomFamily<number, string>`            | LSP document open/change events    |
-| `openDocumentUriAtoms`      | `atomFamily<string, string>`            | LSP document open events           |
-| `diskFileSnapshotAtoms`     | `atomFamily<FileSnapshotMaybe, string>` | file reads/watchers                |
-| `watchedCssModulePathsAtom` | `atom<string[]>`                        | workspace scan/watchers            |
-| `watchedTsxPathsAtom`       | `atom<string[]>`                        | workspace scan/watchers            |
+| State                       | Kind                                    | Origin                           |
+| --------------------------- | --------------------------------------- | -------------------------------- |
+| `workspaceFolderPathsAtom`  | `atom<string[]>`                        | LSP initialize/workspace changes |
+| `openDocumentPathsAtom`     | `atom<string[]>`                        | LSP document open/close events   |
+| `openDocumentAtoms`         | `atomFamily<OpenDocument, string>`      | LSP document open/change events  |
+| `diskFileSnapshotAtoms`     | `atomFamily<FileSnapshotMaybe, string>` | file reads/watchers              |
+| `watchedCssModulePathsAtom` | `atom<string[]>`                        | workspace scan/watchers          |
+| `watchedTsxPathsAtom`       | `atom<string[]>`                        | workspace scan/watchers          |
 
 `string` family keys should be canonical absolute file paths. URI conversion
 belongs at the LSP boundary.
@@ -75,38 +76,36 @@ belongs at the LSP boundary.
 
 These values should be selectors or selector families.
 
-| View                                 | Kind                                              | Depends on                                 |
-| ------------------------------------ | ------------------------------------------------- | ------------------------------------------ |
-| `documentTextSelectors`              | `selectorFamily<TextMaybe, string>`               | open text first, then disk snapshot        |
-| `isCssModulePathSelectors`           | `selectorFamily<boolean, string>`                 | file path                                  |
-| `siblingTsxPathSelectors`            | `selectorFamily<PathMaybe, string>`               | CSS path plus file existence state         |
-| `cssModuleValidationInputSelectors`  | `selectorFamily<ValidationInputMaybe, string>`    | CSS text, sibling TSX path, TSX text       |
-| `renderStorySelectors`               | `selectorFamily<RenderStoryMaybe, string>`        | TSX text                                   |
-| `cssSelectorAnalysisSelectors`       | `selectorFamily<CssSelectorAnalysis[], string>`   | CSS text                                   |
-| `cssReachabilityResultSelectors`     | `selectorFamily<ReachabilityResultMaybe, string>` | validation input                           |
-| `lspDiagnosticSelectors`             | `selectorFamily<Diagnostic[], string>`            | reachability result plus CSS document text |
-| `affectedCssPathsByTsxPathSelectors` | `selectorFamily<string[], string>`                | watched CSS paths plus sibling relation    |
+| View                                 | Kind                                            | Depends on                              |
+| ------------------------------------ | ----------------------------------------------- | --------------------------------------- |
+| `fileSnapshotSelectors`              | `selectorFamily<FileSnapshot, string>`          | open document first, then disk snapshot |
+| `fileTextSelectors`                  | `selectorFamily<TextMaybe, string>`             | file snapshot                           |
+| `documentUriSelectors`               | `selectorFamily<string, string>`                | open document URI or file URL           |
+| `siblingTsxPathSelectors`            | `selectorFamily<PathMaybe, string>`             | CSS path plus file existence state      |
+| `renderStorySelectors`               | `selectorFamily<RenderStoryMaybe, string>`      | TSX text                                |
+| `cssSelectorAnalysisSelectors`       | `selectorFamily<CssSelectorAnalysis[], string>` | CSS text                                |
+| `refractorDiagnosticSelectors`       | `selectorFamily<Diagnostic[], string>`          | render story plus CSS selector analysis |
+| `lspDiagnosticSelectors`             | `selectorFamily<Diagnostic[], string>`          | refractor diagnostics plus CSS text     |
+| `affectedCssPathsByTsxPathSelectors` | `selectorFamily<string[], string>`              | watched CSS paths plus sibling relation |
 
-The first implementation can keep `validateCssReachability` as the combined
-derived operation. Splitting render-story extraction and selector analysis into
-separate selectors is a performance follow-up once we want finer invalidation.
+The implementation splits render-story extraction and selector analysis into
+separate selectors. Refractor exposes `createCssReachabilityDiagnostics` so the
+LSP can combine those cached views without reparsing both sides on every change.
 
 ## Transactions
 
 Transactions should be the only way LSP event handlers mutate state.
 
-| Transaction             | Purpose                                                       |
-| ----------------------- | ------------------------------------------------------------- |
-| `initializeWorkspaceTX` | set workspace roots and initial config                        |
-| `openDocumentTX`        | register a URI/path/version/text as open                      |
-| `changeDocumentTX`      | update open text and version                                  |
-| `closeDocumentTX`       | remove open text/version and optionally hydrate disk snapshot |
-| `deleteDocumentTX`      | remove indexes, dispose family state, clear diagnostics       |
-| `refreshDiskFileTX`     | update a file snapshot from watcher or explicit read          |
-| `rescanWorkspaceTX`     | update CSS/TSX indexes from a glob scan                       |
+| Transaction                      | Purpose                                                   |
+| -------------------------------- | --------------------------------------------------------- |
+| `indexWorkspaceFilesTransaction` | set workspace roots and CSS/TSX indexes                   |
+| `upsertOpenDocumentTransaction`  | register or update a URI/path/version/text as open        |
+| `closeDocumentTransaction`       | remove open document state before hydrating disk fallback |
+| `refreshDiskFileTransaction`     | update a file snapshot from watcher or explicit read      |
 
-The close/delete transactions should update the index atom and dispose related
-family members in the same operation.
+Delete events currently flow through `refreshDiskFileTransaction` with a missing
+snapshot. Family-member disposal is intentionally deferred until subscription
+lifetimes are stricter.
 
 ## Publication Flow
 
@@ -137,14 +136,15 @@ For each open or watched TSX path:
    invalidates through its sibling TSX dependency.
 3. The CSS diagnostic subscriptions publish the refreshed diagnostics.
 
-## Initial Slice
+## Implemented Slice
 
-1. Add `lsp/src/state.ts` with atom.io atoms, selectors, and transactions.
-2. Keep `server.ts` small: convert LSP events into transactions and subscribe to
+1. Added `lsp/src/state.ts` with atom.io atoms, selectors, and transactions.
+2. Kept `server.ts` small: convert LSP events into transactions and subscribe to
    diagnostic selectors.
-3. Keep disk reads sync for now, matching the current server.
-4. Add tests for CSS edits, TSX edits, close clearing, and sibling lookup.
-5. Use a `Silo` or snapshot-based reset so state tests do not share the implicit
+3. Kept disk reads sync for now, matching the current server.
+4. Added tests for CSS edits, TSX edits, close/delete behavior, subscriptions,
+   workspace indexing, and sibling lookup.
+5. Used `Silo` so state tests do not share the implicit
    store.
 
 The target outcome is not more diagnostics than today. The target is a server
