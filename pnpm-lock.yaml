@@ -47,6 +47,9 @@ importers:
 
   packages/lasertag:
     dependencies:
+      atom.io:
+        specifier: 0.49.6
+        version: 0.49.6(@typescript-eslint/parser@8.62.1(eslint@10.6.0)(typescript@6.0.3))(eslint@10.6.0)(solid-js@1.9.14)
       comline:
         specifier: 0.5.0
         version: 0.5.0(zod@4.4.3)
@@ -1110,6 +1113,44 @@ packages:
   assertion-error@2.0.1:
     resolution: {integrity: sha512-Izi8RQcffqCeNVgFigKli1ssklIbpHnCYc6AknXGYoB6grJqyeby7jv12JUQgmTAnIDnbck1uxksT4dzN3PWBA==}
     engines: {node: '>=12'}
+
+  atom.io@0.49.6:
+    resolution: {integrity: sha512-P4CzokrAcK7/lnDcNSObeOTTaQcLGb7Q9rriEAAoTMNlELIMk1j3WcczA64wjtJijuBSi6hIWZ9j9fbAZWhFNA==}
+    peerDependencies:
+      '@floating-ui/react': '>=0.25.0'
+      '@floating-ui/react-dom': '>=2.0.0'
+      '@testing-library/react': '>=14.0.0'
+      '@typescript-eslint/parser': '>=8.0.0'
+      eslint: '>=9.0.0'
+      happy-dom: '>=17.4.4'
+      motion: '>=11.0.0'
+      react: ^18.0.0 || ^19.0.0
+      socket.io: '>=4.0.0'
+      socket.io-client: '>=4.0.0'
+      solid-js: ^1.9.0
+    peerDependenciesMeta:
+      '@floating-ui/react':
+        optional: true
+      '@floating-ui/react-dom':
+        optional: true
+      '@testing-library/react':
+        optional: true
+      '@typescript-eslint/parser':
+        optional: true
+      eslint:
+        optional: true
+      happy-dom:
+        optional: true
+      motion:
+        optional: true
+      react:
+        optional: true
+      socket.io:
+        optional: true
+      socket.io-client:
+        optional: true
+      solid-js:
+        optional: true
 
   balanced-match@4.0.4:
     resolution: {integrity: sha512-BLrgEcRTwX2o6gGxGOCNyMvGSp35YofuYzw9h1IMTRmKqttAZZVU67bdb9Pr2vUHA8+j3i2tJfjO6C6+4myGTA==}
@@ -2777,6 +2818,12 @@ snapshots:
   array-union@2.1.0: {}
 
   assertion-error@2.0.1: {}
+
+  atom.io@0.49.6(@typescript-eslint/parser@8.62.1(eslint@10.6.0)(typescript@6.0.3))(eslint@10.6.0)(solid-js@1.9.14):
+    optionalDependencies:
+      '@typescript-eslint/parser': 8.62.1(eslint@10.6.0)(typescript@6.0.3)
+      eslint: 10.6.0
+      solid-js: 1.9.14
 
   balanced-match@4.0.4: {}
 
