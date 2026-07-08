@@ -24,7 +24,7 @@ function getServerModulePath(context) {
 
 	if (configuredPath) return configuredPath
 
-	return context.asAbsolutePath(path.join("dist", "server", "lsp.mjs"))
+	return context.asAbsolutePath(path.join("dist", "server", "server.mjs"))
 }
 
 function createServerOptions(context) {
