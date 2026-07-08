@@ -88,7 +88,7 @@ const vscodeManifest = {
 					type: "string",
 					default: "",
 					description:
-						"Optional absolute path to a lasertag-lsp server module. Ignored when lasertag.lsp.path is set.",
+						"Optional path to a lasertag-lsp server module. Ignored when lasertag.lsp.path is set.",
 				},
 				"lasertag.trace.server": {
 					type: "string",

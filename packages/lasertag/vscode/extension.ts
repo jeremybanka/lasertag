@@ -81,6 +81,8 @@ function getConfiguredLogLevel(): string {
 function createServerEnvironment() {
 	return {
 		...process.env,
+		ELECTRON_NO_ASAR: "1",
+		ELECTRON_RUN_AS_NODE: "1",
 		LASERTAG_LSP_LOG_LEVEL: getConfiguredLogLevel(),
 	}
 }
@@ -91,7 +93,7 @@ function createServerOptions(context: ExtensionContext) {
 	if (command) {
 		const workspaceRoot = getWorkspaceRoot()
 		const executable = {
-			args: ["--stdio"],
+			args: [],
 			command,
 			options: {
 				env: createServerEnvironment(),
@@ -107,23 +109,24 @@ function createServerOptions(context: ExtensionContext) {
 	}
 
 	const module = getServerModulePath(context)
-	const debugOptions = {
+	const workspaceRoot = getWorkspaceRoot()
+	const options = {
 		env: createServerEnvironment(),
-		execArgv: ["--nolazy", "--inspect=6011"],
+		...(workspaceRoot ? { cwd: workspaceRoot } : {}),
 	}
 
 	return {
 		debug: {
-			module,
-			options: debugOptions,
-			transport: TransportKind.ipc,
+			args: ["--nolazy", "--inspect=6011", module],
+			command: process.execPath,
+			options,
+			transport: TransportKind.stdio,
 		},
 		run: {
-			module,
-			options: {
-				env: createServerEnvironment(),
-			},
-			transport: TransportKind.ipc,
+			args: [module],
+			command: process.execPath,
+			options,
+			transport: TransportKind.stdio,
 		},
 	}
 }

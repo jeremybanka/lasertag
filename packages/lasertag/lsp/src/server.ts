@@ -183,7 +183,36 @@ function writeServerEventToStderr(message: string): void {
 	}
 }
 
+let processCrashLoggingRegistered = false
+
 function registerProcessCrashLogging(logger: LasertagLspLogger): void {
+	if (processCrashLoggingRegistered) return
+
+	processCrashLoggingRegistered = true
+	const originalExit = process.exit.bind(process)
+
+	process.exit = ((code?: number | string | null): never => {
+		const exitCode =
+			code === null || code === undefined
+				? (process.exitCode ?? 0)
+				: Number(code)
+
+		if (exitCode !== 0) {
+			const stack =
+				new Error(`process.exit(${String(code)})`).stack ??
+				`process.exit(${String(code)})`
+
+			logger.error(`server`, `process exit requested`, { code, stack })
+			writeServerEventToStderr(`process.exit(${String(code)})\n${stack}`)
+		}
+
+		return originalExit(code)
+	}) as typeof process.exit
+
+	process.on(`disconnect`, () => {
+		logger.warn(`server`, `process ipc channel disconnected`)
+		writeServerEventToStderr(`process ipc channel disconnected`)
+	})
 	process.on(`uncaughtExceptionMonitor`, (error, origin) => {
 		const stack = stackFromError(error)
 
