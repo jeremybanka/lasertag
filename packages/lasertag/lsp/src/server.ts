@@ -193,7 +193,6 @@ export function createLasertagLspServer(
 			connection.console,
 			options.logLevel ?? logLevelFromEnvironment(),
 		)
-	const diagnosticSubscriptions = new Map<string, () => void>()
 	const diagnosticTimers = new Map<string, ReturnType<typeof setTimeout>>()
 	let clientSupportsDynamicWatchedFiles = false
 	let clientSupportsWorkspaceFolderChanges = false
@@ -270,29 +269,6 @@ export function createLasertagLspServer(
 		logger.info(`diagnostics`, `cleared`, { cssPath, uri })
 	}
 
-	function unsubscribeFromCssDiagnostics(cssPath: string): void {
-		const unsubscribe = diagnosticSubscriptions.get(cssPath)
-
-		if (!unsubscribe) return
-
-		unsubscribe()
-		diagnosticSubscriptions.delete(cssPath)
-		logger.debug(`diagnostics`, `unsubscribed`, { cssPath })
-	}
-
-	function subscribeToCssDiagnostics(cssPath: string): void {
-		if (!isCssModulePath(cssPath) || diagnosticSubscriptions.has(cssPath))
-			return
-
-		logger.debug(`diagnostics`, `subscribing`, { cssPath })
-		diagnosticSubscriptions.set(
-			cssPath,
-			state.subscribeToCssDiagnostics(cssPath, () =>
-				scheduleDiagnostics(cssPath),
-			),
-		)
-	}
-
 	function scheduleAffectedCssForTsx(tsxPath: string): void {
 		const affectedCssPaths = state.getAffectedCssPathsForTsx(tsxPath)
 
@@ -302,7 +278,6 @@ export function createLasertagLspServer(
 		})
 
 		for (const cssPath of affectedCssPaths) {
-			subscribeToCssDiagnostics(cssPath)
 			scheduleDiagnostics(cssPath)
 		}
 	}
@@ -323,7 +298,6 @@ export function createLasertagLspServer(
 		state.openDocument(createDocumentInput(document, filePath))
 
 		if (isCssModulePath(filePath)) {
-			subscribeToCssDiagnostics(filePath)
 			scheduleDiagnostics(filePath)
 			return
 		}
@@ -456,10 +430,8 @@ export function createLasertagLspServer(
 				const isOpen = state.getOpenDocumentPaths().includes(filePath)
 
 				if (change.type === FileChangeType.Deleted && !isOpen) {
-					unsubscribeFromCssDiagnostics(filePath)
 					clearDiagnostics(filePath, change.uri)
 				} else {
-					subscribeToCssDiagnostics(filePath)
 					scheduleDiagnostics(filePath)
 				}
 			}
@@ -476,7 +448,6 @@ export function createLasertagLspServer(
 				})
 
 				for (const cssPath of affectedCssPaths) {
-					subscribeToCssDiagnostics(cssPath)
 					scheduleDiagnostics(cssPath)
 				}
 			}
@@ -501,7 +472,6 @@ export function createLasertagLspServer(
 		state.closeDocument(filePath)
 
 		if (isCssModulePath(filePath)) {
-			unsubscribeFromCssDiagnostics(filePath)
 			clearDiagnostics(filePath, event.document.uri)
 		}
 
