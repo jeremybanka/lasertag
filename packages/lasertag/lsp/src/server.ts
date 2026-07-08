@@ -163,6 +163,35 @@ function messageFromError(error: unknown): string {
 	return error instanceof Error ? error.message : String(error)
 }
 
+function stackFromError(error: unknown): string {
+	if (error instanceof Error) return error.stack ?? error.message
+
+	if (typeof error === `string`) return error
+
+	try {
+		return JSON.stringify(error)
+	} catch {
+		return String(error)
+	}
+}
+
+function writeServerEventToStderr(message: string): void {
+	try {
+		process.stderr.write(`[lasertag-lsp] ${message}\n`)
+	} catch {
+		// This path is only for process-lifecycle breadcrumbs.
+	}
+}
+
+function registerProcessCrashLogging(logger: LasertagLspLogger): void {
+	process.on(`uncaughtExceptionMonitor`, (error, origin) => {
+		const stack = stackFromError(error)
+
+		logger.error(`server`, `uncaught exception`, { origin, stack })
+		writeServerEventToStderr(`uncaught exception (${origin})\n${stack}`)
+	})
+}
+
 function durationMs(start: number): number {
 	return Number((performance.now() - start).toFixed(2))
 }
@@ -197,6 +226,14 @@ export function createLasertagLspServer(
 	let clientSupportsDynamicWatchedFiles = false
 	let clientSupportsWorkspaceFolderChanges = false
 	let workspaceFolderPaths: string[] = []
+
+	connection.onShutdown(() => {
+		logger.info(`server`, `shutdown requested`)
+	})
+	connection.onExit(() => {
+		logger.warn(`server`, `exit notification received`)
+		writeServerEventToStderr(`exit notification received`)
+	})
 
 	function logWorkspaceIndex(event: string, startedAt: number): void {
 		logger.info(`workspace`, event, {
@@ -483,10 +520,14 @@ export function createLasertagLspServer(
 		connection,
 		documents,
 		listen: () => connection.listen(),
+		logger,
 		state,
 	}
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-	createLasertagLspServer().listen()
+	const server = createLasertagLspServer()
+
+	registerProcessCrashLogging(server.logger)
+	server.listen()
 }
