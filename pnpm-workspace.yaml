@@ -8,6 +8,8 @@ allowBuilds:
 
 blockExoticSubdeps: true
 minimumReleaseAge: 1440
+minimumReleaseAgeExclude:
+  - takua@0.2.2
 verifyDepsBeforeRun: error
 
 peerDependencyRules:
