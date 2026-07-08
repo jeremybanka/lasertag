@@ -2,7 +2,7 @@
 	"name": "lasertag-vscode",
 	"displayName": "lasertag",
 	"description": "VSCode diagnostics for lasertag CSS module reachability.",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"publisher": "lasertag",
 	"repository": {
 		"type": "git",

@@ -1,4 +1,4 @@
-import { mkdir } from "node:fs/promises"
+import { mkdir, readFile } from "node:fs/promises"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { spawn } from "node:child_process"
@@ -7,7 +7,13 @@ const scriptRoot = path.dirname(fileURLToPath(import.meta.url))
 const extensionRoot = path.resolve(scriptRoot, "..")
 const workspaceRoot = path.resolve(extensionRoot, "..", "..")
 const artifactsRoot = path.join(workspaceRoot, "artifacts")
-const vsixPath = path.join(artifactsRoot, "lasertag-vscode-0.1.0.vsix")
+const packageJson = JSON.parse(
+	await readFile(path.join(extensionRoot, "package.json"), "utf-8"),
+)
+const vsixPath = path.join(
+	artifactsRoot,
+	`lasertag-vscode-${packageJson.version}.vsix`,
+)
 
 await mkdir(artifactsRoot, { recursive: true })
 
