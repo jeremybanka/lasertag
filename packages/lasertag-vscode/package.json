@@ -25,6 +25,7 @@
 	"extensionKind": [
 		"workspace"
 	],
+	"icon": "dist/LasertagIcon.png",
 	"main": "./dist/extension.cjs",
 	"files": [
 		"dist",

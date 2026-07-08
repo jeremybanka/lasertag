@@ -1,4 +1,4 @@
-import { chmod, mkdir, rm } from "node:fs/promises"
+import { chmod, copyFile, mkdir, rm } from "node:fs/promises"
 import { spawn } from "node:child_process"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
@@ -24,6 +24,10 @@ async function run(command, args) {
 
 await rm(distRoot, { force: true, recursive: true })
 await mkdir(path.join(distRoot, "server"), { recursive: true })
+await copyFile(
+	path.join(workspaceRoot, "LasertagIcon.png"),
+	path.join(distRoot, "LasertagIcon.png"),
+)
 
 await run("rolldown", [
 	"extension.js",
