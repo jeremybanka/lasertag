@@ -51,7 +51,7 @@ function getServerModulePath(context: ExtensionContext): string {
 
 	if (configuredPath) return configuredPath
 
-	return context.asAbsolutePath(path.join("dist", "server", "server.mjs"))
+	return context.asAbsolutePath(path.join("dist", "server.mjs"))
 }
 
 function getWorkspaceRoot(): string | undefined {

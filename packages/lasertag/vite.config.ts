@@ -40,7 +40,7 @@ export default defineConfig({
 			dts: false,
 			entry: { server: "lsp/src/server.ts" },
 			format: "esm",
-			outDir: "vscode/dist/server",
+			outDir: "vscode/dist",
 			platform: "node",
 			shims: true,
 		},
