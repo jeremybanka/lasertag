@@ -24,6 +24,12 @@ import {
 	type LasertagLspStateEnvironment,
 	type LspDocumentInput,
 } from "./state.ts"
+import {
+	createLasertagLspLogger,
+	logLevelFromEnvironment,
+	type LasertagLspLogger,
+	type LasertagLspLogLevel,
+} from "./logger.ts"
 
 export type LasertagLspReadOptions = {
 	cssPath?: string
@@ -33,6 +39,8 @@ export type LasertagLspReadOptions = {
 
 export type LasertagLspServerOptions = LasertagLspStateEnvironment & {
 	debounceMs?: number
+	logger?: LasertagLspLogger
+	logLevel?: LasertagLspLogLevel
 }
 
 type WorkspaceFolderChangeEvent = {
@@ -151,6 +159,27 @@ function allWatchedFileChangeKinds(): number {
 	return WatchKind.Create | WatchKind.Change | WatchKind.Delete
 }
 
+function messageFromError(error: unknown): string {
+	return error instanceof Error ? error.message : String(error)
+}
+
+function durationMs(start: number): number {
+	return Number((performance.now() - start).toFixed(2))
+}
+
+function watchedFileChangeTypeName(type: FileChangeType): string {
+	switch (type) {
+		case FileChangeType.Changed:
+			return `changed`
+		case FileChangeType.Created:
+			return `created`
+		case FileChangeType.Deleted:
+			return `deleted`
+		default:
+			return `unknown`
+	}
+}
+
 export function createLasertagLspServer(
 	options: LasertagLspServerOptions = {},
 ) {
@@ -158,11 +187,26 @@ export function createLasertagLspServer(
 	const documents = new TextDocuments(TextDocument)
 	const state = createLasertagLspState(options)
 	const debounceMs = options.debounceMs ?? 75
+	const logger =
+		options.logger ??
+		createLasertagLspLogger(
+			connection.console,
+			options.logLevel ?? logLevelFromEnvironment(),
+		)
 	const diagnosticSubscriptions = new Map<string, () => void>()
 	const diagnosticTimers = new Map<string, ReturnType<typeof setTimeout>>()
 	let clientSupportsDynamicWatchedFiles = false
 	let clientSupportsWorkspaceFolderChanges = false
 	let workspaceFolderPaths: string[] = []
+
+	function logWorkspaceIndex(event: string, startedAt: number): void {
+		logger.info(`workspace`, event, {
+			cssModuleCount: state.getKnownCssModulePaths().length,
+			durationMs: durationMs(startedAt),
+			tsxCount: state.getWatchedTsxPaths().length,
+			workspaceFolderCount: workspaceFolderPaths.length,
+		})
+	}
 
 	function clearPendingDiagnostics(cssPath: string): void {
 		const timer = diagnosticTimers.get(cssPath)
@@ -170,15 +214,26 @@ export function createLasertagLspServer(
 		if (timer) {
 			clearTimeout(timer)
 			diagnosticTimers.delete(cssPath)
+			logger.debug(`diagnostics`, `cleared pending timer`, { cssPath })
 		}
 	}
 
 	function publishDiagnostics(cssPath: string): void {
 		if (!isCssModulePath(cssPath)) return
 
+		const startedAt = performance.now()
+		const diagnostics = state.getDiagnostics(cssPath)
+		const uri = state.getDocumentUri(cssPath)
+
 		void connection.sendDiagnostics({
-			diagnostics: state.getDiagnostics(cssPath),
-			uri: state.getDocumentUri(cssPath),
+			diagnostics,
+			uri,
+		})
+		logger.info(`diagnostics`, `published`, {
+			cssPath,
+			diagnosticCount: diagnostics.length,
+			durationMs: durationMs(startedAt),
+			uri,
 		})
 	}
 
@@ -188,10 +243,12 @@ export function createLasertagLspServer(
 		clearPendingDiagnostics(cssPath)
 
 		if (debounceMs <= 0) {
+			logger.debug(`diagnostics`, `publishing immediately`, { cssPath })
 			publishDiagnostics(cssPath)
 			return
 		}
 
+		logger.debug(`diagnostics`, `scheduled`, { cssPath, debounceMs })
 		diagnosticTimers.set(
 			cssPath,
 			setTimeout(() => {
@@ -210,6 +267,7 @@ export function createLasertagLspServer(
 			diagnostics: [],
 			uri,
 		})
+		logger.info(`diagnostics`, `cleared`, { cssPath, uri })
 	}
 
 	function unsubscribeFromCssDiagnostics(cssPath: string): void {
@@ -219,12 +277,14 @@ export function createLasertagLspServer(
 
 		unsubscribe()
 		diagnosticSubscriptions.delete(cssPath)
+		logger.debug(`diagnostics`, `unsubscribed`, { cssPath })
 	}
 
 	function subscribeToCssDiagnostics(cssPath: string): void {
 		if (!isCssModulePath(cssPath) || diagnosticSubscriptions.has(cssPath))
 			return
 
+		logger.debug(`diagnostics`, `subscribing`, { cssPath })
 		diagnosticSubscriptions.set(
 			cssPath,
 			state.subscribeToCssDiagnostics(cssPath, () =>
@@ -234,17 +294,32 @@ export function createLasertagLspServer(
 	}
 
 	function scheduleAffectedCssForTsx(tsxPath: string): void {
-		for (const cssPath of state.getAffectedCssPathsForTsx(tsxPath)) {
+		const affectedCssPaths = state.getAffectedCssPathsForTsx(tsxPath)
+
+		logger.info(`tsx`, `scheduling affected css`, {
+			affectedCssCount: affectedCssPaths.length,
+			tsxPath,
+		})
+
+		for (const cssPath of affectedCssPaths) {
 			subscribeToCssDiagnostics(cssPath)
 			scheduleDiagnostics(cssPath)
 		}
 	}
 
-	function handleChangedDocument(document: TextDocument): void {
+	function handleChangedDocument(
+		document: TextDocument,
+		eventName: `changed` | `opened`,
+	): void {
 		const filePath = filePathFromDocument(document)
 
 		if (!filePath) return
 
+		logger.debug(`document`, eventName, {
+			filePath,
+			languageId: document.languageId,
+			version: document.version,
+		})
 		state.openDocument(createDocumentInput(document, filePath))
 
 		if (isCssModulePath(filePath)) {
@@ -271,6 +346,7 @@ export function createLasertagLspServer(
 
 			return filePath ? [filePath] : []
 		})
+		const startedAt = performance.now()
 
 		workspaceFolderPaths = [
 			...workspaceFolderPaths.filter(
@@ -279,9 +355,12 @@ export function createLasertagLspServer(
 			...addedPaths,
 		]
 		state.indexWorkspaceFolders(workspaceFolderPaths)
+		logWorkspaceIndex(`folders changed`, startedAt)
 	}
 
 	connection.onInitialize((params) => {
+		const startedAt = performance.now()
+
 		clientSupportsDynamicWatchedFiles =
 			params.capabilities.workspace?.didChangeWatchedFiles
 				?.dynamicRegistration === true
@@ -289,11 +368,23 @@ export function createLasertagLspServer(
 			clientSupportsWorkspaceFolderChangeEvents(params)
 		workspaceFolderPaths = workspaceFolderPathsFromInitialize(params)
 		state.indexWorkspaceFolders(workspaceFolderPaths)
+		logger.info(`server`, `initialized`, {
+			clientSupportsDynamicWatchedFiles,
+			clientSupportsWorkspaceFolderChanges,
+			debounceMs,
+			logLevel: logger.getLevel(),
+			rootUri: params.rootUri,
+			workspaceFolderCount: workspaceFolderPaths.length,
+		})
+		logWorkspaceIndex(`indexed`, startedAt)
 
 		return createInitializeResult(params)
 	})
 	connection.onInitialized(() => {
 		if (clientSupportsDynamicWatchedFiles) {
+			logger.info(`watchers`, `registering dynamic file watchers`, {
+				globPatterns: [`**/*.module.css`, `**/*.tsx`],
+			})
 			void connection.client
 				.register(DidChangeWatchedFilesNotification.type, {
 					watchers: [
@@ -307,30 +398,41 @@ export function createLasertagLspServer(
 						},
 					],
 				})
-				.catch((error: unknown) => {
-					connection.console.warn(
-						`lasertag-lsp could not register file watchers: ${
-							error instanceof Error ? error.message : String(error)
-						}`,
-					)
+				.then(() => {
+					logger.info(`watchers`, `registered dynamic file watchers`, {
+						globPatterns: [`**/*.module.css`, `**/*.tsx`],
+					})
 				})
+				.catch((error: unknown) => {
+					logger.warn(`watchers`, `could not register file watchers`, {
+						error: messageFromError(error),
+					})
+				})
+		} else {
+			logger.info(`watchers`, `using client-synchronized file events`)
 		}
 
-		if (!clientSupportsWorkspaceFolderChanges) return
+		if (!clientSupportsWorkspaceFolderChanges) {
+			logger.info(`workspace`, `client does not send folder changes`)
+			return
+		}
 
 		try {
 			connection.workspace.onDidChangeWorkspaceFolders(
 				handleWorkspaceFoldersChanged,
 			)
+			logger.info(`workspace`, `registered folder change listener`)
 		} catch (error: unknown) {
-			connection.console.warn(
-				`lasertag-lsp could not register workspace folder changes: ${
-					error instanceof Error ? error.message : String(error)
-				}`,
-			)
+			logger.warn(`workspace`, `could not register workspace folder changes`, {
+				error: messageFromError(error),
+			})
 		}
 	})
 	connection.onDidChangeWatchedFiles((event) => {
+		logger.info(`watchers`, `received file changes`, {
+			changeCount: event.changes.length,
+		})
+
 		for (const change of event.changes) {
 			const filePath = filePathFromUri(change.uri)
 
@@ -345,6 +447,10 @@ export function createLasertagLspServer(
 			} else {
 				state.refreshDiskFile(filePath)
 			}
+			logger.debug(`watchers`, `processed file change`, {
+				changeType: watchedFileChangeTypeName(change.type),
+				filePath,
+			})
 
 			if (isCssModulePath(filePath)) {
 				const isOpen = state.getOpenDocumentPaths().includes(filePath)
@@ -359,23 +465,39 @@ export function createLasertagLspServer(
 			}
 
 			if (isTsxPath(filePath)) {
-				for (const cssPath of new Set([
+				const affectedCssPaths = new Set([
 					...affectedCssBeforeChange,
 					...state.getAffectedCssPathsForTsx(filePath),
-				])) {
+				])
+
+				logger.info(`tsx`, `file change affected css`, {
+					affectedCssCount: affectedCssPaths.size,
+					tsxPath: filePath,
+				})
+
+				for (const cssPath of affectedCssPaths) {
 					subscribeToCssDiagnostics(cssPath)
 					scheduleDiagnostics(cssPath)
 				}
 			}
 		}
 	})
-	documents.onDidOpen((event) => handleChangedDocument(event.document))
-	documents.onDidChangeContent((event) => handleChangedDocument(event.document))
+	documents.onDidOpen((event) =>
+		handleChangedDocument(event.document, `opened`),
+	)
+	documents.onDidChangeContent((event) =>
+		handleChangedDocument(event.document, `changed`),
+	)
 	documents.onDidClose((event) => {
 		const filePath = filePathFromDocument(event.document)
 
 		if (!filePath) return
 
+		logger.debug(`document`, `closed`, {
+			filePath,
+			languageId: event.document.languageId,
+			version: event.document.version,
+		})
 		state.closeDocument(filePath)
 
 		if (isCssModulePath(filePath)) {

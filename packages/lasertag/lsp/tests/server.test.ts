@@ -13,6 +13,11 @@ import {
 	type LspDocumentInput,
 } from "../src/state.ts"
 import {
+	createLasertagLspLogger,
+	logLevelFromEnvironment,
+	type LasertagLspLogSink,
+} from "../src/logger.ts"
+import {
 	clientSupportsWorkspaceFolderChangeEvents,
 	createInitializeResult,
 	createRefractorDiagnostics,
@@ -124,6 +129,25 @@ function createMemoryFileSystem(files: Record<string, string>) {
 	}
 }
 
+function createMemoryLogSink() {
+	const messages = {
+		debug: [] as string[],
+		error: [] as string[],
+		info: [] as string[],
+		log: [] as string[],
+		warn: [] as string[],
+	}
+	const sink: LasertagLspLogSink = {
+		debug: (message) => messages.debug.push(message),
+		error: (message) => messages.error.push(message),
+		info: (message) => messages.info.push(message),
+		log: (message) => messages.log.push(message),
+		warn: (message) => messages.warn.push(message),
+	}
+
+	return { messages, sink }
+}
+
 describe(`lasertag lsp`, () => {
 	it(`advertises workspace folder notifications when the client supports them`, () => {
 		const params = {
@@ -232,6 +256,61 @@ describe(`lasertag lsp`, () => {
 			},
 		])
 		expect(diagnostics[0]?.message).toContain(`does not match`)
+	})
+})
+
+describe(`lasertag lsp logging`, () => {
+	it(`parses log levels from the environment`, () => {
+		expect(logLevelFromEnvironment({ LASERTAG_LSP_LOG_LEVEL: `debug` })).toBe(
+			`debug`,
+		)
+		expect(logLevelFromEnvironment({ LASERTAG_LSP_LOG_LEVEL: `nope` })).toBe(
+			`info`,
+		)
+	})
+
+	it(`routes structured log messages through the lsp console sink`, () => {
+		const { messages, sink } = createMemoryLogSink()
+		const logger = createLasertagLspLogger(sink, `info`)
+
+		logger.info(`diagnostics`, `published`, {
+			cssPath,
+			diagnosticCount: 1,
+		})
+
+		expect(messages.info).toHaveLength(1)
+		expect(messages.info[0]).toContain(`diagnostics published`)
+		expect(messages.info[0]).toContain(`diagnosticCount: 1`)
+		expect(messages.info[0]).toContain(cssPath)
+	})
+
+	it(`filters messages below the configured log level`, () => {
+		const { messages, sink } = createMemoryLogSink()
+		const logger = createLasertagLspLogger(sink, `warn`)
+
+		logger.debug(`document`, `changed`, { path: tsxPath })
+		logger.info(`diagnostics`, `scheduled`, { path: cssPath })
+		logger.warn(`watchers`, `could not register`, { error: `boom` })
+		logger.error(`server`, `failed`, { error: `boom` })
+
+		expect(messages.debug).toEqual([])
+		expect(messages.info).toEqual([])
+		expect(messages.warn).toHaveLength(1)
+		expect(messages.error).toHaveLength(1)
+	})
+
+	it(`routes takua chronicle marks through the lsp console sink`, () => {
+		const { messages, sink } = createMemoryLogSink()
+		const logger = createLasertagLspLogger(sink, `info`)
+		const chronicle = logger.makeChronicle()
+
+		chronicle.mark(`start`)
+		chronicle.mark(`done`)
+		chronicle.logMarks()
+
+		expect(
+			messages.info.some((message) => message.includes(`TOTAL TIME`)),
+		).toBe(true)
 	})
 })
 

@@ -97,6 +97,13 @@ const vscodeManifest = {
 					description:
 						"Trace communication between VSCode and the lasertag language server.",
 				},
+				"lasertag.log.level": {
+					type: "string",
+					enum: ["off", "error", "warn", "info", "debug"],
+					default: "info",
+					description:
+						"Controls lasertag language server operational logging. These logs are separate from protocol tracing.",
+				},
 			},
 		},
 	},

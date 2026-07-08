@@ -53,6 +53,9 @@ importers:
       comline:
         specifier: 0.5.0
         version: 0.5.0(zod@4.4.3)
+      takua:
+        specifier: 0.2.1
+        version: 0.2.1
       tinyglobby:
         specifier: 0.2.17
         version: 0.2.17
@@ -2636,6 +2639,9 @@ packages:
   table@6.9.0:
     resolution: {integrity: sha512-9kY+CygyYM6j02t5YFHbNz2FN5QmYGv9zAjVp4lCDjlCw7amdckXlEt/bjMhUIfj4ThGRE4gCUH5+yGnNuPo5A==}
     engines: {node: '>=10.0.0'}
+
+  takua@0.2.1:
+    resolution: {integrity: sha512-dQYQrvPHjLfxe0D/Uu+D7ToPLrndukby7JAp8KnJ+mLumskA1AQCP9hxquHWarCNcd7Io33tzzAy2X2VwQJMMw==}
 
   tar-fs@2.1.5:
     resolution: {integrity: sha512-OboTd8mmMhZDNPV+UjQcK9yKAatXu2aJ+r1w4im1Otd4M4fl2hwvdoXUxIYHFTHWK/3y3FarBP70v3vwmGlOxw==}
@@ -5388,6 +5394,8 @@ snapshots:
       slice-ansi: 4.0.0
       string-width: 4.2.3
       strip-ansi: 6.0.1
+
+  takua@0.2.1: {}
 
   tar-fs@2.1.5:
     dependencies:

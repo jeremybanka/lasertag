@@ -74,6 +74,17 @@ function getConfiguredLspPath(): string | undefined {
 		: configuredPath
 }
 
+function getConfiguredLogLevel(): string {
+	return vscode.workspace.getConfiguration("lasertag").get("log.level", "info")
+}
+
+function createServerEnvironment() {
+	return {
+		...process.env,
+		LASERTAG_LSP_LOG_LEVEL: getConfiguredLogLevel(),
+	}
+}
+
 function createServerOptions(context: ExtensionContext) {
 	const command = getConfiguredLspPath()
 
@@ -82,7 +93,10 @@ function createServerOptions(context: ExtensionContext) {
 		const executable = {
 			args: ["--stdio"],
 			command,
-			...(workspaceRoot ? { options: { cwd: workspaceRoot } } : {}),
+			options: {
+				env: createServerEnvironment(),
+				...(workspaceRoot ? { cwd: workspaceRoot } : {}),
+			},
 			transport: TransportKind.stdio,
 		}
 
@@ -94,6 +108,7 @@ function createServerOptions(context: ExtensionContext) {
 
 	const module = getServerModulePath(context)
 	const debugOptions = {
+		env: createServerEnvironment(),
 		execArgv: ["--nolazy", "--inspect=6011"],
 	}
 
@@ -105,6 +120,9 @@ function createServerOptions(context: ExtensionContext) {
 		},
 		run: {
 			module,
+			options: {
+				env: createServerEnvironment(),
+			},
 			transport: TransportKind.ipc,
 		},
 	}
@@ -123,6 +141,7 @@ function createClientOptions() {
 				scheme: "file",
 			},
 		],
+		outputChannelName: "Lasertag",
 		synchronize: {
 			fileEvents: [
 				vscode.workspace.createFileSystemWatcher("**/*.module.css"),
