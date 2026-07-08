@@ -25,6 +25,7 @@ export default defineConfig({
 			clean: true,
 			copy: { from: "../../LasertagIcon.png" },
 			deps: {
+				alwaysBundle: [/^[\w@]/],
 				neverBundle: ["vscode"],
 				onlyBundle: false,
 			},
@@ -36,7 +37,10 @@ export default defineConfig({
 		},
 		{
 			clean: false,
-			deps: { onlyBundle: false },
+			deps: {
+				alwaysBundle: [/^[\w@]/],
+				onlyBundle: false,
+			},
 			dts: false,
 			entry: { server: "lsp/src/server.ts" },
 			format: "esm",
