@@ -40,11 +40,24 @@ export function logLevelFromEnvironment(
 	return normalizeLogLevel(environment.LASERTAG_LSP_LOG_LEVEL, `info`)
 }
 
+function bindLogSink(sink: LasertagLspLogSink): LasertagLspLogSink {
+	const boundSink: LasertagLspLogSink = {
+		error: (message) => sink.error(message),
+		info: (message) => sink.info(message),
+		warn: (message) => sink.warn(message),
+	}
+
+	if (sink.debug) boundSink.debug = (message) => sink.debug?.(message)
+	if (sink.log) boundSink.log = (message) => sink.log?.(message)
+
+	return boundSink
+}
+
 export class LasertagLspLogger extends TakuaLogger {
 	private level: LasertagLspLogLevel
 
 	public constructor(sink: LasertagLspLogSink, level: LasertagLspLogLevel) {
-		super({ colorEnabled: false, sink })
+		super({ colorEnabled: false, sink: bindLogSink(sink) })
 		this.level = level
 	}
 

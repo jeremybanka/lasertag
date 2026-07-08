@@ -284,6 +284,30 @@ describe(`lasertag lsp logging`, () => {
 		expect(messages.info[0]).toContain(cssPath)
 	})
 
+	it(`binds sink methods before handing them to takua`, () => {
+		type ReceiverSensitiveLogSink = LasertagLspLogSink & {
+			messages: string[]
+		}
+		const sink: ReceiverSensitiveLogSink = {
+			error(message) {
+				this.messages.push(`error:${message}`)
+			},
+			info(message) {
+				this.messages.push(`info:${message}`)
+			},
+			messages: [],
+			warn(message) {
+				this.messages.push(`warn:${message}`)
+			},
+		}
+		const logger = createLasertagLspLogger(sink, `info`)
+
+		logger.info(`server`, `initialized`, { workspaceFolderCount: 1 })
+
+		expect(sink.messages).toHaveLength(1)
+		expect(sink.messages[0]).toContain(`info:info server initialized`)
+	})
+
 	it(`filters messages below the configured log level`, () => {
 		const { messages, sink } = createMemoryLogSink()
 		const logger = createLasertagLspLogger(sink, `warn`)
