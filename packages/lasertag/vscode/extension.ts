@@ -1,3 +1,5 @@
+import { LASERTAG_RESTART_SERVER_COMMAND } from "../lsp/src/code-actions.ts"
+
 declare const require: (id: string) => unknown
 
 type Disposable = {
@@ -12,6 +14,12 @@ type ExtensionContext = {
 }
 
 type VscodeModule = {
+	commands: {
+		registerCommand(
+			command: string,
+			callback: (...args: unknown[]) => unknown,
+		): Disposable
+	}
 	workspace: {
 		createFileSystemWatcher(globPattern: string): unknown
 		getConfiguration(section: string): {
@@ -165,6 +173,15 @@ function createClientOptions() {
 }
 
 export async function activate(context: ExtensionContext) {
+	context.subscriptions.push(
+		vscode.commands.registerCommand(
+			LASERTAG_RESTART_SERVER_COMMAND,
+			async () => {
+				await client?.restart()
+			},
+		),
+	)
+
 	client = new LasertagLanguageClient(
 		"lasertag",
 		"lasertag",

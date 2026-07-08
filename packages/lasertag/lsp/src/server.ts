@@ -3,13 +3,17 @@
 import { existsSync, readFileSync } from "node:fs"
 
 import {
+	CodeActionKind,
 	createConnection,
 	DidChangeWatchedFilesNotification,
 	FileChangeType,
 	Files,
+	type CodeAction,
+	type CodeActionParams,
 	type Diagnostic,
 	type InitializeParams,
 	type InitializeResult,
+	type TextEdit,
 	TextDocumentSyncKind,
 	TextDocuments,
 	WatchKind,
@@ -21,6 +25,7 @@ import {
 	findSiblingTsxPathFromConvention,
 	isCssModulePath as isCssModuleFilePath,
 	isTsxPath,
+	offsetToPosition,
 	type LasertagLspStateEnvironment,
 	type LspDocumentInput,
 } from "./state.ts"
@@ -30,6 +35,13 @@ import {
 	type LasertagLspLogger,
 	type LasertagLspLogLevel,
 } from "./logger.ts"
+import {
+	createDeadSelectorCleanupRanges,
+	LASERTAG_CLEAN_UP_DEAD_SELECTORS_TITLE,
+	LASERTAG_RESTART_SERVER_COMMAND,
+	LASERTAG_RESTART_SERVER_TITLE,
+	type OffsetRange,
+} from "./code-actions.ts"
 
 export type LasertagLspReadOptions = {
 	cssPath?: string
@@ -111,6 +123,9 @@ export function createInitializeResult(
 ): InitializeResult {
 	return {
 		capabilities: {
+			codeActionProvider: {
+				codeActionKinds: [CodeActionKind.QuickFix],
+			},
 			textDocumentSync: TextDocumentSyncKind.Incremental,
 			workspace: {
 				workspaceFolders: {
@@ -238,6 +253,37 @@ function watchedFileChangeTypeName(type: FileChangeType): string {
 	}
 }
 
+function isLasertagDeadSelectorDiagnostic(diagnostic: Diagnostic): boolean {
+	return (
+		diagnostic.source === `lasertag` &&
+		(diagnostic.code === `dead-selector` ||
+			diagnostic.code === `impossible-local-class`)
+	)
+}
+
+function diagnosticToOffsetRange(
+	document: TextDocument,
+	diagnostic: Diagnostic,
+): OffsetRange {
+	return {
+		end: document.offsetAt(diagnostic.range.end),
+		start: document.offsetAt(diagnostic.range.start),
+	}
+}
+
+function createDeleteTextEdit(
+	sourceText: string,
+	range: OffsetRange,
+): TextEdit {
+	return {
+		newText: ``,
+		range: {
+			end: offsetToPosition(sourceText, range.end),
+			start: offsetToPosition(sourceText, range.start),
+		},
+	}
+}
+
 export function createLasertagLspServer(
 	options: LasertagLspServerOptions = {},
 ) {
@@ -346,6 +392,76 @@ export function createLasertagLspServer(
 		for (const cssPath of affectedCssPaths) {
 			scheduleDiagnostics(cssPath)
 		}
+	}
+
+	function createRestartCodeAction(): CodeAction {
+		return {
+			command: {
+				command: LASERTAG_RESTART_SERVER_COMMAND,
+				title: LASERTAG_RESTART_SERVER_TITLE,
+			},
+			kind: CodeActionKind.QuickFix,
+			title: LASERTAG_RESTART_SERVER_TITLE,
+		}
+	}
+
+	function createCleanUpDeadSelectorsCodeAction(
+		document: TextDocument,
+		diagnostics: Diagnostic[],
+	): CodeAction | undefined {
+		const deadSelectorDiagnostics = diagnostics.filter(
+			isLasertagDeadSelectorDiagnostic,
+		)
+
+		if (deadSelectorDiagnostics.length === 0) return
+
+		const sourceText = document.getText()
+		const cleanupRanges = createDeadSelectorCleanupRanges(
+			sourceText,
+			deadSelectorDiagnostics.map((diagnostic) =>
+				diagnosticToOffsetRange(document, diagnostic),
+			),
+		)
+
+		if (cleanupRanges.length === 0) return
+
+		return {
+			diagnostics: deadSelectorDiagnostics,
+			edit: {
+				changes: {
+					[document.uri]: cleanupRanges.map((range) =>
+						createDeleteTextEdit(sourceText, range),
+					),
+				},
+			},
+			kind: CodeActionKind.QuickFix,
+			title: LASERTAG_CLEAN_UP_DEAD_SELECTORS_TITLE,
+		}
+	}
+
+	function createCodeActions(params: CodeActionParams): CodeAction[] {
+		const filePath = filePathFromUri(params.textDocument.uri)
+
+		if (!filePath || (!isCssModulePath(filePath) && !isTsxPath(filePath))) {
+			return []
+		}
+
+		const actions = [createRestartCodeAction()]
+
+		if (!isCssModulePath(filePath)) return actions
+
+		const document = documents.get(params.textDocument.uri)
+
+		if (!document) return actions
+
+		const cleanUpAction = createCleanUpDeadSelectorsCodeAction(
+			document,
+			state.getDiagnostics(filePath),
+		)
+
+		if (cleanUpAction) actions.unshift(cleanUpAction)
+
+		return actions
 	}
 
 	function handleChangedDocument(
@@ -468,6 +584,7 @@ export function createLasertagLspServer(
 			})
 		}
 	})
+	connection.onCodeAction(createCodeActions)
 	connection.onDidChangeWatchedFiles((event) => {
 		logger.info(`watchers`, `received file changes`, {
 			changeCount: event.changes.length,

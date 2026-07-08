@@ -3,6 +3,11 @@ import { mkdir, readFile, writeFile } from "node:fs/promises"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 
+import {
+	LASERTAG_RESTART_SERVER_COMMAND,
+	LASERTAG_RESTART_SERVER_TITLE,
+} from "../lsp/src/code-actions.ts"
+
 type SpawnResult = {
 	exitCode: number
 }
@@ -75,6 +80,12 @@ const vscodeManifest = {
 	main: "./dist/extension.cjs",
 	files: ["dist", "README.md"],
 	contributes: {
+		commands: [
+			{
+				command: LASERTAG_RESTART_SERVER_COMMAND,
+				title: LASERTAG_RESTART_SERVER_TITLE,
+			},
+		],
 		configuration: {
 			title: "Lasertag",
 			properties: {
