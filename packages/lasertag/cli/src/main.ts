@@ -438,7 +438,7 @@ function runVscodeInstall(
 
 	if (!fileExists(vsixPath)) {
 		io.error(
-			`lasertag vscode: bundled extension not found at ${vsixPath}. Run pnpm --filter lasertag vscode:package before installing from the workspace.`,
+			`lasertag vscode: bundled extension not found at ${vsixPath}. Run pnpm --filter lasertag pack before installing from the workspace.`,
 		)
 
 		return {

@@ -52,11 +52,17 @@
 		"lasertag-lsp": "./dist/lsp.mjs"
 	},
 	"scripts": {
-		"build": "vp pack",
-		"prepack": "pnpm run vscode:package",
-		"test": "vp test",
-		"vscode:check": "pnpm --dir vscode run check",
-		"vscode:package": "pnpm --dir vscode run package"
+		"build": "vp pack && pnpm build:visx",
+		"build:visx": "node __scripts__/build-visx.node.ts",
+		"test": "vp test"
+	},
+	"dependencies": {
+		"atom.io": "0.49.6",
+		"comline": "0.5.0",
+		"tinyglobby": "0.2.17",
+		"vscode-languageserver": "10.1.0",
+		"vscode-languageserver-textdocument": "1.0.12",
+		"zod": "4.4.3"
 	},
 	"devDependencies": {
 		"@eslint/core": "1.2.1",
@@ -68,7 +74,6 @@
 		"eslint": "10.6.0",
 		"preact": "10.29.5",
 		"solid-js": "1.9.14",
-		"tsdown": "0.22.3",
 		"typescript": "6.0.3",
 		"vitest": "npm:@voidzero-dev/vite-plus-test@0.1.24",
 		"vscode-languageclient": "10.1.0"
@@ -97,13 +102,5 @@
 		"node": "26.4.0",
 		"pnpm": "11.10.0"
 	},
-	"packageManager": "pnpm@11.10.0",
-	"dependencies": {
-		"atom.io": "0.49.6",
-		"comline": "0.5.0",
-		"tinyglobby": "0.2.17",
-		"vscode-languageserver": "10.1.0",
-		"vscode-languageserver-textdocument": "1.0.12",
-		"zod": "4.4.3"
-	}
+	"packageManager": "pnpm@11.10.0"
 }
