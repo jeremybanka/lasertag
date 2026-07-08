@@ -1,9 +1,9 @@
 {
 	"name": "lasertag-vscode",
-	"displayName": "lasertag",
-	"description": "VSCode diagnostics for lasertag CSS module reachability.",
+	"displayName": "Lasertag",
+	"description": "CSS Modules done right: dead selectors, caught from your component's real render story.",
 	"version": "0.1.1",
-	"publisher": "lasertag",
+	"publisher": "jeremybanka",
 	"type": "module",
 	"repository": {
 		"type": "git",
@@ -34,7 +34,7 @@
 	],
 	"contributes": {
 		"configuration": {
-			"title": "lasertag",
+			"title": "Lasertag",
 			"properties": {
 				"lasertag.lsp.path": {
 					"type": "string",
