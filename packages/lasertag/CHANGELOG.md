@@ -1,5 +1,11 @@
 # lasertag
 
+## 0.3.2
+
+### Patch Changes
+
+- 530513c: Clarify the consumer-facing agent guidance by moving project maintenance instructions out of the published package guidance.
+
 ## 0.3.1
 
 ### Patch Changes
