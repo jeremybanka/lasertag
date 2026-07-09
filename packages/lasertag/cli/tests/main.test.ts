@@ -1,4 +1,5 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { createRequire } from "node:module"
 import { tmpdir } from "node:os"
 import path from "node:path"
 
@@ -6,6 +7,7 @@ import { afterEach, describe, expect, it } from "vitest"
 
 import { runLasertagCli } from "../src/main.ts"
 
+const requireFromTest = createRequire(import.meta.url)
 const fixtureRoots: string[] = []
 
 function createTestIO() {
@@ -40,6 +42,19 @@ function createFixture(files: Record<string, string>) {
 	}
 }
 
+function resolveTypescriptExecutable(): string {
+	const typescriptPackageJsonPath = requireFromTest.resolve(
+		`typescript/package.json`,
+	)
+	const requireFromTypescript = createRequire(typescriptPackageJsonPath)
+	const nativePackageJsonPath = requireFromTypescript.resolve(
+		`@typescript/typescript-${process.platform}-${process.arch}/package.json`,
+	)
+	const executableName = process.platform === `win32` ? `tsc.exe` : `tsc`
+
+	return path.join(path.dirname(nativePackageJsonPath), `lib`, executableName)
+}
+
 describe(`lasertag cli`, () => {
 	afterEach(() => {
 		for (const root of fixtureRoots.splice(0)) {
@@ -47,7 +62,55 @@ describe(`lasertag cli`, () => {
 		}
 	})
 
-	it(`validates css modules by default`, () => {
+	it(`prints top-level help when no command is passed`, async () => {
+		const { io, logs } = createTestIO()
+		const result = await runLasertagCli([`lasertag`], io)
+
+		expect(result.mode).toBe(`help`)
+		expect(result.exitCode).toBe(0)
+		expect(logs[0]).toContain(`USAGE`)
+		expect(logs[0]).toContain(`check`)
+		expect(logs[0]).toContain(`fix`)
+		expect(logs[0]).toContain(`vsix`)
+	})
+
+	it(`prints help when --help or -h is passed`, async () => {
+		const helpLong = createTestIO()
+		const helpShort = createTestIO()
+		const longResult = await runLasertagCli([`lasertag`, `--help`], helpLong.io)
+		const shortResult = await runLasertagCli([`lasertag`, `-h`], helpShort.io)
+
+		expect(longResult.mode).toBe(`help`)
+		expect(shortResult.mode).toBe(`help`)
+		expect(helpLong.logs[0]).toContain(`USAGE`)
+		expect(helpShort.logs[0]).toContain(`USAGE`)
+	})
+
+	it(`prints the package version when --version or -v is passed`, async () => {
+		const versionLong = createTestIO()
+		const versionShort = createTestIO()
+		const longResult = await runLasertagCli(
+			[`lasertag`, `--version`],
+			versionLong.io,
+			{
+				packageVersion: `1.2.3-test`,
+			},
+		)
+		const shortResult = await runLasertagCli(
+			[`lasertag`, `-v`],
+			versionShort.io,
+			{
+				packageVersion: `1.2.3-test`,
+			},
+		)
+
+		expect(longResult.mode).toBe(`version`)
+		expect(shortResult.mode).toBe(`version`)
+		expect(versionLong.logs).toEqual([`1.2.3-test`])
+		expect(versionShort.logs).toEqual([`1.2.3-test`])
+	})
+
+	it(`checks default css module globs`, async () => {
 		const fixture = createFixture({
 			"src/AppPanel.module.css": `
 				app-panel.class {
@@ -67,18 +130,19 @@ describe(`lasertag cli`, () => {
 			`,
 		})
 		const { io, logs } = createTestIO()
-		const result = runLasertagCli([`lasertag`], io, { cwd: fixture.root })
+		const result = await runLasertagCli([`lasertag`, `check`], io, {
+			cwd: fixture.root,
+		})
 
-		expect(result.mode).toBe(`validate`)
-		expect(result.options.fix).toBe(false)
+		expect(result.mode).toBe(`check`)
 		expect(result.targets).toEqual([`**/*.module.css`])
 		expect(result.files).toEqual([fixture.path(`src/AppPanel.module.css`)])
 		expect(result.diagnostics).toEqual([])
 		expect(result.exitCode).toBe(0)
-		expect(logs).toEqual([`lasertag validate: no dead CSS found in 1 file.`])
+		expect(logs).toEqual([`lasertag check: no dead CSS found in 1 file.`])
 	})
 
-	it(`reports diagnostics for a positional glob`, () => {
+	it(`reports diagnostics for a single positional check glob`, async () => {
 		const fixture = createFixture({
 			"src/AppPanel.module.css": `
 				app-panel.class {
@@ -101,11 +165,15 @@ describe(`lasertag cli`, () => {
 			`,
 		})
 		const { io, logs } = createTestIO()
-		const result = runLasertagCli([`lasertag`, `src/**/*.module.css`], io, {
-			cwd: fixture.root,
-		})
+		const result = await runLasertagCli(
+			[`lasertag`, `check`, `src/**/*.module.css`],
+			io,
+			{
+				cwd: fixture.root,
+			},
+		)
 
-		expect(result.mode).toBe(`validate`)
+		expect(result.mode).toBe(`check`)
 		expect(result.targets).toEqual([`src/**/*.module.css`])
 		expect(result.files).toEqual([fixture.path(`src/AppPanel.module.css`)])
 		expect(result.diagnostics).toMatchObject([
@@ -121,7 +189,59 @@ describe(`lasertag cli`, () => {
 		expect(logs[0]).toContain(`app-panel.class > footer`)
 	})
 
-	it(`accepts shell-expanded css module file paths`, () => {
+	it(`accepts comma-separated patterns in the single positional check glob`, async () => {
+		const fixture = createFixture({
+			"src/AppPanel.module.css": `
+				app-panel.class {
+					> header {}
+				}
+			`,
+			"src/AppPanel.tsx": `
+				import css from "./AppPanel.module.css"
+
+				export function AppPanel() {
+					return (
+						<app-panel className={css.class}>
+							<header />
+						</app-panel>
+					)
+				}
+			`,
+			"test/TestPanel.module.css": `
+				test-panel.class {
+					> footer {}
+				}
+			`,
+			"test/TestPanel.tsx": `
+				import css from "./TestPanel.module.css"
+
+				export function TestPanel() {
+					return <test-panel className={css.class} />
+				}
+			`,
+		})
+		const { io } = createTestIO()
+		const result = await runLasertagCli(
+			[`lasertag`, `check`, `src/**/*.module.css,test/**/*.module.css`],
+			io,
+			{
+				cwd: fixture.root,
+			},
+		)
+
+		expect(result.targets).toEqual([
+			`src/**/*.module.css`,
+			`test/**/*.module.css`,
+		])
+		expect(result.files).toEqual([
+			fixture.path(`src/AppPanel.module.css`),
+			fixture.path(`test/TestPanel.module.css`),
+		])
+		expect(result.diagnostics).toHaveLength(1)
+		expect(result.exitCode).toBe(1)
+	})
+
+	it(`accepts one css module file path as the positional check glob`, async () => {
 		const fixture = createFixture({
 			"src/AppPanel.module.css": `
 				app-panel.class {
@@ -138,7 +258,7 @@ describe(`lasertag cli`, () => {
 		})
 		const { io } = createTestIO()
 		const cssPath = fixture.path(`src/AppPanel.module.css`)
-		const result = runLasertagCli([`lasertag`, cssPath], io, {
+		const result = await runLasertagCli([`lasertag`, `check`, cssPath], io, {
 			cwd: fixture.root,
 		})
 
@@ -148,7 +268,18 @@ describe(`lasertag cli`, () => {
 		expect(result.exitCode).toBe(1)
 	})
 
-	it(`prints json diagnostics when --format=json is passed`, () => {
+	it(`rejects multiple positional check glob values`, async () => {
+		const { io } = createTestIO()
+
+		await expect(
+			runLasertagCli(
+				[`lasertag`, `check`, `src/**/*.module.css`, `test/**/*.module.css`],
+				io,
+			),
+		).rejects.toThrow(`There are no positional arguments for lasertag`)
+	})
+
+	it(`prints json diagnostics when check --format=json is passed`, async () => {
 		const fixture = createFixture({
 			"src/AppPanel.module.css": `
 				app-panel.class {
@@ -164,8 +295,8 @@ describe(`lasertag cli`, () => {
 			`,
 		})
 		const { io, logs } = createTestIO()
-		const result = runLasertagCli(
-			[`lasertag`, `--format=json`, `--`, `src/**/*.module.css`],
+		const result = await runLasertagCli(
+			[`lasertag`, `check`, `--format=json`, `src/**/*.module.css`],
 			io,
 			{ cwd: fixture.root },
 		)
@@ -174,7 +305,7 @@ describe(`lasertag cli`, () => {
 			files: string[]
 		}
 
-		expect(result.options.format).toBe(`json`)
+		expect(result.options).toMatchObject({ format: `json` })
 		expect(result.targets).toEqual([`src/**/*.module.css`])
 		expect(output.files).toEqual([fixture.path(`src/AppPanel.module.css`)])
 		expect(output.diagnostics).toMatchObject([
@@ -185,156 +316,189 @@ describe(`lasertag cli`, () => {
 		])
 	})
 
-	it(`runs the fix stub when --fix is passed`, () => {
+	it(`runs the fix stub under the fix command`, async () => {
 		const { io, logs } = createTestIO()
-		const result = runLasertagCli(
-			[`lasertag`, `--fix`, `src/**/*.module.css`],
+		const result = await runLasertagCli(
+			[`lasertag`, `fix`, `src/**/*.module.css`],
 			io,
 		)
 
 		expect(result.mode).toBe(`fix`)
-		expect(result.options.fix).toBe(true)
 		expect(result.targets).toEqual([`src/**/*.module.css`])
 		expect(result.exitCode).toBe(0)
 		expect(logs).toEqual([`lasertag fix: dead CSS cleanup is stubbed.`])
 	})
 
-	it(`keeps validate mode when --fix=false is passed`, () => {
-		const fixture = createFixture({})
-		const { io } = createTestIO()
-		const result = runLasertagCli([`lasertag`, `--fix=false`], io, {
-			cwd: fixture.root,
-		})
-
-		expect(result.mode).toBe(`validate`)
-		expect(result.options.fix).toBe(false)
-		expect(result.exitCode).toBe(0)
-	})
-
-	it(`installs the bundled VSCode extension when --vscode-install is passed`, () => {
+	it(`checks with an explicit TypeScript SDK executable path`, async () => {
 		const fixture = createFixture({
-			"dist/Lasertag.vsix": `fake vsix`,
 			"src/AppPanel.module.css": `
 				app-panel.class {
-					> footer {}
+					> header {}
 				}
 			`,
 			"src/AppPanel.tsx": `
 				import css from "./AppPanel.module.css"
 
 				export function AppPanel() {
-					return <app-panel className={css.class} />
+					return (
+						<app-panel className={css.class}>
+							<header />
+						</app-panel>
+					)
 				}
 			`,
 		})
 		const { io, logs } = createTestIO()
-		const requests: Array<{
-			cwd: string
+		const result = await runLasertagCli([`lasertag`, `check`], io, {
+			cwd: fixture.root,
+			typescriptSdkPath: resolveTypescriptExecutable(),
+		})
+
+		expect(result.mode).toBe(`check`)
+		expect(result.exitCode).toBe(0)
+		expect(logs).toEqual([`lasertag check: no dead CSS found in 1 file.`])
+	})
+
+	it(`builds and installs a VSIX with default options`, async () => {
+		const fixture = createFixture({
+			"package.json": JSON.stringify({ version: `1.0.0` }),
+		})
+		const { io, logs } = createTestIO()
+		const buildRequests: Array<{ outdir: string; packageRoot: string }> = []
+		const installRequests: Array<{
 			editorCommand: string
 			vsixPath: string
 		}> = []
-		const result = runLasertagCli(
-			[`lasertag`, `--vscode-install`, `code-insiders`],
-			io,
-			{
-				cwd: fixture.root,
-				installVscodeExtension: (request) => {
-					requests.push(request)
-					return { exitCode: 0 }
-				},
-				vsixPath: fixture.path(`dist/Lasertag.vsix`),
+		const result = await runLasertagCli([`lasertag`, `vsix`], io, {
+			cwd: fixture.root,
+			buildVsix: async (request) => {
+				buildRequests.push({
+					outdir: request.outdir,
+					packageRoot: request.packageRoot ?? ``,
+				})
+				return {
+					buildRoot: fixture.path(`dist/.lasertag-vsix`),
+					vscodeTarget: `linux-x64`,
+					vsixPath: fixture.path(`dist/Lasertag.vsix`),
+				}
 			},
-		)
+			installVscodeExtension: (request) => {
+				installRequests.push({
+					editorCommand: request.editorCommand,
+					vsixPath: request.vsixPath,
+				})
+				return { exitCode: 0 }
+			},
+			packageRoot: fixture.root,
+		})
 
-		expect(result.mode).toBe(`vscode-install`)
-		expect(result.options[`vscode-install`]).toBe(`code-insiders`)
-		expect(result.targets).toEqual([`**/*.module.css`])
-		expect(result.diagnostics).toEqual([])
-		expect(result.files).toEqual([])
+		expect(result.mode).toBe(`vsix`)
 		expect(result.exitCode).toBe(0)
-		expect(requests).toEqual([
+		expect(buildRequests).toEqual([
 			{
-				cwd: fixture.root,
-				editorCommand: `code-insiders`,
+				outdir: fixture.path(`dist`),
+				packageRoot: fixture.root,
+			},
+		])
+		expect(installRequests).toEqual([
+			{
+				editorCommand: `code`,
 				vsixPath: fixture.path(`dist/Lasertag.vsix`),
 			},
 		])
 		expect(logs).toEqual([
-			`lasertag vscode: installed Lasertag with code-insiders.`,
+			`lasertag vsix: installed ${fixture.path(`dist/Lasertag.vsix`)} with code.`,
 		])
 	})
 
-	it(`defaults the VSCode extension installer to code`, () => {
+	it(`builds and installs a VSIX with explicit outdir and target`, async () => {
 		const fixture = createFixture({
-			"dist/Lasertag.vsix": `fake vsix`,
+			"package.json": JSON.stringify({ version: `1.0.0` }),
+		})
+		const { io } = createTestIO()
+		const buildRequests: Array<{ outdir: string }> = []
+		const installRequests: Array<{ editorCommand: string }> = []
+		const result = await runLasertagCli(
+			[`lasertag`, `vsix`, `-o`, `tmp/vsix`, `-t`, `code-insiders`],
+			io,
+			{
+				buildVsix: async (request) => {
+					buildRequests.push({ outdir: request.outdir })
+					return {
+						buildRoot: fixture.path(`tmp/vsix/.lasertag-vsix`),
+						vscodeTarget: `linux-x64`,
+						vsixPath: fixture.path(`tmp/vsix/Lasertag.vsix`),
+					}
+				},
+				installVscodeExtension: (request) => {
+					installRequests.push({ editorCommand: request.editorCommand })
+					return { exitCode: 0 }
+				},
+				packageRoot: fixture.root,
+			},
+		)
+
+		expect(result.mode).toBe(`vsix`)
+		expect(result.options).toMatchObject({
+			outdir: `tmp/vsix`,
+			target: `code-insiders`,
+		})
+		expect(buildRequests).toEqual([{ outdir: fixture.path(`tmp/vsix`) }])
+		expect(installRequests).toEqual([{ editorCommand: `code-insiders` }])
+	})
+
+	it(`builds a VSIX without installing when --build-only is passed`, async () => {
+		const fixture = createFixture({
+			"package.json": JSON.stringify({ version: `1.0.0` }),
 		})
 		const { io, logs } = createTestIO()
-		const requests: Array<{
-			editorCommand: string
-		}> = []
-		const result = runLasertagCli([`lasertag`, `--vscode-install`], io, {
-			cwd: fixture.root,
-			installVscodeExtension: (request) => {
-				requests.push({ editorCommand: request.editorCommand })
-				return { exitCode: 0 }
-			},
-			vsixPath: fixture.path(`dist/Lasertag.vsix`),
-		})
-
-		expect(result.mode).toBe(`vscode-install`)
-		expect(result.options[`vscode-install`]).toBe(``)
-		expect(result.exitCode).toBe(0)
-		expect(requests).toEqual([{ editorCommand: `code` }])
-		expect(logs).toEqual([`lasertag vscode: installed Lasertag with code.`])
-	})
-
-	it(`reports a missing bundled VSCode extension`, () => {
-		const fixture = createFixture({})
-		const { errors, io } = createTestIO()
 		let installed = false
-		const result = runLasertagCli([`lasertag`, `--vscode-install`], io, {
-			cwd: fixture.root,
-			installVscodeExtension: () => {
-				installed = true
-				return { exitCode: 0 }
+		const result = await runLasertagCli(
+			[`lasertag`, `vsix`, `--build-only`, `--outdir`, `tmp/vsix`],
+			io,
+			{
+				buildVsix: async () => ({
+					buildRoot: fixture.path(`tmp/vsix/.lasertag-vsix`),
+					vscodeTarget: `linux-x64`,
+					vsixPath: fixture.path(`tmp/vsix/Lasertag.vsix`),
+				}),
+				installVscodeExtension: () => {
+					installed = true
+					return { exitCode: 0 }
+				},
+				packageRoot: fixture.root,
 			},
-			vsixPath: fixture.path(`dist/Lasertag.vsix`),
-		})
+		)
 
-		expect(result.mode).toBe(`vscode-install`)
-		expect(result.exitCode).toBe(1)
+		expect(result.mode).toBe(`vsix`)
+		expect(result.exitCode).toBe(0)
+		expect(result.options).toMatchObject({ "build-only": true })
 		expect(installed).toBe(false)
-		expect(errors[0]).toContain(`bundled extension not found`)
-		expect(errors[0]).toContain(fixture.path(`dist/Lasertag.vsix`))
+		expect(logs).toEqual([
+			`lasertag vsix: built ${fixture.path(`tmp/vsix/Lasertag.vsix`)}.`,
+		])
 	})
 
-	it(`reports VSCode extension installer failures`, () => {
+	it(`reports VSIX installer failures`, async () => {
 		const fixture = createFixture({
-			"dist/Lasertag.vsix": `fake vsix`,
+			"package.json": JSON.stringify({ version: `1.0.0` }),
 		})
 		const { errors, io } = createTestIO()
-		const result = runLasertagCli([`lasertag`, `--vscode-install`], io, {
-			cwd: fixture.root,
+		const result = await runLasertagCli([`lasertag`, `vsix`], io, {
+			buildVsix: async () => ({
+				buildRoot: fixture.path(`dist/.lasertag-vsix`),
+				vscodeTarget: `linux-x64`,
+				vsixPath: fixture.path(`dist/Lasertag.vsix`),
+			}),
 			installVscodeExtension: () => ({
 				error: `code was not found on PATH.`,
 				exitCode: 1,
 			}),
-			vsixPath: fixture.path(`dist/Lasertag.vsix`),
+			packageRoot: fixture.root,
 		})
 
-		expect(result.mode).toBe(`vscode-install`)
+		expect(result.mode).toBe(`vsix`)
 		expect(result.exitCode).toBe(1)
-		expect(errors).toEqual([`lasertag vscode: code was not found on PATH.`])
-	})
-
-	it(`prints help when --help is passed`, () => {
-		const { io, logs } = createTestIO()
-		const result = runLasertagCli([`lasertag`, `--help`], io)
-
-		expect(result.mode).toBe(`help`)
-		expect(logs[0]).toContain(`USAGE`)
-		expect(logs[0]).toContain(`--fix`)
-		expect(logs[0]).toContain(`--format`)
-		expect(logs[0]).toContain(`--vscode-install`)
+		expect(errors).toEqual([`lasertag vsix: code was not found on PATH.`])
 	})
 })

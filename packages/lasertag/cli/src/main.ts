@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 
-import { spawnSync } from "node:child_process"
 import { existsSync, readFileSync } from "node:fs"
 import path from "node:path"
-import { fileURLToPath } from "node:url"
 
 import {
 	cli,
 	help,
+	noOptions,
 	options,
+	optional,
 	parseBooleanOption,
 	parseStringOption,
 } from "comline"
@@ -19,6 +19,15 @@ import {
 	validateCssReachability,
 	type CssReachabilityDiagnostic,
 } from "../../refractor/src/index.ts"
+import {
+	buildLasertagVsix,
+	defaultLasertagPackageRoot,
+	installVscodeExtensionWithEditor,
+	type LasertagVscodeInstallRequest,
+	type LasertagVscodeInstallResult,
+	type LasertagVsixBuildOptions,
+	type LasertagVsixBuildResult,
+} from "./vsix.ts"
 
 const DEFAULT_TARGET_PATTERNS = [`**/*.module.css`]
 const DEFAULT_IGNORE_PATTERNS = [
@@ -30,17 +39,28 @@ const DEFAULT_IGNORE_PATTERNS = [
 ]
 const FORMAT_OPTIONS = [`stylish`, `json`] as const
 
-const lasertagOptionsSchema = z.object({
-	fix: z.boolean().default(false),
-	format: z.enum(FORMAT_OPTIONS).default(`stylish`),
+const rootOptionsSchema = z.object({
 	help: z.boolean().default(false),
-	"vscode-install": z.string().optional(),
+	version: z.boolean().default(false),
 })
 
-type LasertagOptions = z.infer<typeof lasertagOptionsSchema>
-type LasertagOutputFormat = LasertagOptions[`format`]
+const checkOptionsSchema = z.object({
+	format: z.enum(FORMAT_OPTIONS).default(`stylish`),
+})
 
-export type LasertagCliMode = `fix` | `help` | `validate` | `vscode-install`
+const vsixOptionsSchema = z.object({
+	"build-only": z.boolean().default(false),
+	outdir: z.string().optional(),
+	target: z.string().default(`code`),
+})
+
+type RootOptions = z.infer<typeof rootOptionsSchema>
+type CheckOptions = z.infer<typeof checkOptionsSchema>
+type FixOptions = Record<never, never>
+type VsixOptions = z.infer<typeof vsixOptionsSchema>
+type LasertagOutputFormat = CheckOptions[`format`]
+
+export type LasertagCliMode = `check` | `fix` | `help` | `version` | `vsix`
 
 export type LasertagCliDiagnostic = CssReachabilityDiagnostic & {
 	cssPath: string
@@ -49,13 +69,20 @@ export type LasertagCliDiagnostic = CssReachabilityDiagnostic & {
 	tsxPath: string
 }
 
+export type LasertagCliOptions =
+	| CheckOptions
+	| FixOptions
+	| RootOptions
+	| VsixOptions
+
 export type LasertagCliResult = {
 	diagnostics: LasertagCliDiagnostic[]
 	exitCode: number
 	files: string[]
 	mode: LasertagCliMode
-	options: LasertagOptions
+	options: LasertagCliOptions
 	targets: string[]
+	vsix?: LasertagVsixBuildResult & { editorCommand: string }
 }
 
 export type LasertagCliIO = {
@@ -63,59 +90,94 @@ export type LasertagCliIO = {
 	log: (message: string, ...data: unknown[]) => void
 }
 
-export type LasertagVscodeInstallRequest = {
-	cwd: string
-	editorCommand: string
-	vsixPath: string
-}
-
-export type LasertagVscodeInstallResult = {
-	error?: string
-	exitCode: number
-}
-
 export type LasertagCliEnvironment = {
+	buildVsix?: (
+		options: LasertagVsixBuildOptions,
+	) => Promise<LasertagVsixBuildResult>
 	cwd?: string
 	fileExists?: (filePath: string) => boolean
 	glob?: typeof globSync
 	installVscodeExtension?: (
 		request: LasertagVscodeInstallRequest,
-	) => LasertagVscodeInstallResult
+	) => Promise<LasertagVscodeInstallResult> | LasertagVscodeInstallResult
+	packageRoot?: string
+	packageVersion?: string
 	readFile?: (filePath: string) => string
-	vsixPath?: string
+	typescriptSdkPath?: string
 }
+
+const lasertagRoutes = optional({
+	check: optional({
+		$glob: null,
+	}),
+	fix: optional({
+		$glob: null,
+	}),
+	vsix: null,
+})
+
+const checkRouteOptions = options(
+	`Validate component-owned CSS modules.`,
+	checkOptionsSchema,
+	{
+		format: {
+			description: `output format`,
+			flag: `f`,
+			example: `--format json`,
+			required: false,
+		},
+	},
+)
+
+const fixRouteOptions = noOptions(`Remove dead CSS when implemented.`)
 
 const lasertagCli = cli({
 	cliName: `lasertag`,
-	cliDescription: `Validate lasertag CSS modules against component render stories. Pass an optional quoted glob such as "src/**/*.module.css".`,
+	cliDescription: `Validate Lasertag CSS modules and build the workspace VSCode extension.`,
 	discoverConfigPath: () => undefined,
+	routes: lasertagRoutes,
 	routeOptions: {
-		"": options(
-			`Validate component-owned CSS modules. Use --fix to remove dead CSS when implemented.`,
-			lasertagOptionsSchema,
+		"": options(`Show Lasertag command help.`, rootOptionsSchema, {
+			help: {
+				description: `show this help text`,
+				example: `--help`,
+				flag: `h`,
+				parse: parseBooleanOption,
+				required: false,
+			},
+			version: {
+				description: `print the Lasertag CLI version`,
+				example: `--version`,
+				flag: `v`,
+				parse: parseBooleanOption,
+				required: false,
+			},
+		}),
+		check: checkRouteOptions,
+		"check/$glob": checkRouteOptions,
+		fix: fixRouteOptions,
+		"fix/$glob": fixRouteOptions,
+		vsix: options(
+			`Build and install the current-platform VSCode extension.`,
+			vsixOptionsSchema,
 			{
-				fix: {
-					description: `remove dead CSS when implemented`,
-					example: `--fix`,
-					flag: `f`,
+				"build-only": {
+					description: `build the VSIX without installing it`,
+					example: `--build-only`,
 					parse: parseBooleanOption,
 					required: false,
 				},
-				format: {
-					description: `output format`,
-					example: `--format=json`,
+				outdir: {
+					description: `directory for the generated VSIX`,
+					example: `--outdir dist`,
+					flag: `o`,
+					parse: parseStringOption,
 					required: false,
 				},
-				help: {
-					description: `show this help text`,
-					example: `--help`,
-					flag: `h`,
-					parse: parseBooleanOption,
-					required: false,
-				},
-				"vscode-install": {
-					description: `install the bundled Lasertag VSCode extension with an optional editor command`,
-					example: `--vscode-install=code-insiders`,
+				target: {
+					description: `editor command used to install the VSIX`,
+					example: `--target code-insiders`,
+					flag: `t`,
 					parse: parseStringOption,
 					required: false,
 				},
@@ -138,82 +200,8 @@ function findSiblingTsxPath(
 	return fileExists(candidate) ? candidate : undefined
 }
 
-function findCliInvocationIndex(args: string[]): number {
-	const index = args.findIndex((arg) => path.basename(arg).includes(`lasertag`))
-
-	if (index !== -1) return index
-
-	return Math.min(1, Math.max(args.length - 1, 0))
-}
-
-function optionConsumesNextValue(arg: string): boolean {
-	return arg === `--format` || arg === `--vscode-install`
-}
-
-function extractTargetPatterns(args: string[]): {
-	cliArgs: string[]
-	targets: string[]
-} {
-	const invocationIndex = findCliInvocationIndex(args)
-	const targets: string[] = []
-	const cliArgs = args.slice(0, invocationIndex + 1)
-	let inExplicitPositionals = false
-	let consumeNextOptionValue = false
-
-	for (const arg of args.slice(invocationIndex + 1)) {
-		if (consumeNextOptionValue && !arg.startsWith(`-`)) {
-			cliArgs.push(arg)
-			consumeNextOptionValue = false
-			continue
-		}
-		consumeNextOptionValue = false
-
-		if (inExplicitPositionals) {
-			targets.push(arg)
-			continue
-		}
-
-		if (arg === `--`) {
-			inExplicitPositionals = true
-			continue
-		}
-
-		if (optionConsumesNextValue(arg)) {
-			cliArgs.push(arg)
-			consumeNextOptionValue = true
-			continue
-		}
-
-		if (arg.startsWith(`-`)) {
-			cliArgs.push(arg)
-			continue
-		}
-
-		targets.push(arg)
-	}
-
-	return {
-		cliArgs,
-		targets: targets.length > 0 ? targets : DEFAULT_TARGET_PATTERNS,
-	}
-}
-
 function resolvePath(cwd: string, filePath: string): string {
 	return path.isAbsolute(filePath) ? filePath : path.resolve(cwd, filePath)
-}
-
-function defaultVscodeVsixPath(
-	fileExists: (filePath: string) => boolean = existsSync,
-): string {
-	const modulePath = fileURLToPath(import.meta.url)
-	const moduleDirectory = path.dirname(modulePath)
-	const bundledVsixPath = path.join(moduleDirectory, `Lasertag.vsix`)
-	const candidates = [
-		bundledVsixPath,
-		path.resolve(moduleDirectory, `..`, `..`, `dist`, `Lasertag.vsix`),
-	]
-
-	return candidates.find(fileExists) ?? bundledVsixPath
 }
 
 function discoverCssModuleFiles(
@@ -291,7 +279,7 @@ function formatDiagnostics(
 	if (diagnostics.length === 0) {
 		const noun = files.length === 1 ? `file` : `files`
 
-		return `lasertag validate: no dead CSS found in ${files.length} ${noun}.`
+		return `lasertag check: no dead CSS found in ${files.length} ${noun}.`
 	}
 
 	return diagnostics
@@ -334,6 +322,9 @@ function validateCssModuleFiles(
 		const result = validateCssReachability({
 			cssPath,
 			cssSource,
+			...(environment.typescriptSdkPath
+				? { typescriptSdkPath: environment.typescriptSdkPath }
+				: {}),
 			tsxPath,
 			tsxSource: readFile(tsxPath),
 		})
@@ -348,9 +339,9 @@ function validateCssModuleFiles(
 	return diagnostics
 }
 
-function runValidate(
+function runCheck(
 	targets: string[],
-	options: LasertagOptions,
+	options: CheckOptions,
 	io: LasertagCliIO,
 	environment: LasertagCliEnvironment,
 ): LasertagCliResult {
@@ -364,17 +355,13 @@ function runValidate(
 		diagnostics,
 		exitCode: diagnostics.length > 0 ? 1 : 0,
 		files,
-		mode: `validate`,
+		mode: `check`,
 		options,
 		targets,
 	}
 }
 
-function runFixStub(
-	targets: string[],
-	options: LasertagOptions,
-	io: LasertagCliIO,
-): LasertagCliResult {
+function runFixStub(targets: string[], io: LasertagCliIO): LasertagCliResult {
 	io.log(`lasertag fix: dead CSS cleanup is stubbed.`)
 
 	return {
@@ -382,128 +369,164 @@ function runFixStub(
 		exitCode: 0,
 		files: [],
 		mode: `fix`,
-		options,
+		options: {},
 		targets,
 	}
 }
 
-function installVscodeExtensionWithEditor(
-	request: LasertagVscodeInstallRequest,
-): LasertagVscodeInstallResult {
-	const child = spawnSync(
-		request.editorCommand,
-		[`--install-extension`, request.vsixPath, `--force`],
-		{
-			cwd: request.cwd,
-			stdio: `inherit`,
-		},
-	)
+function readPackageVersion(environment: LasertagCliEnvironment): string {
+	if (environment.packageVersion) return environment.packageVersion
 
-	if (child.error) {
-		return {
-			error: child.error.message,
-			exitCode: 1,
-		}
-	}
+	const packageRoot = environment.packageRoot ?? defaultLasertagPackageRoot()
+	const packageJson = JSON.parse(
+		readFileSync(path.join(packageRoot, "package.json"), "utf-8"),
+	) as { version?: string }
 
-	if (child.signal) {
-		return {
-			error: `${request.editorCommand} exited from signal ${child.signal}.`,
-			exitCode: 1,
-		}
-	}
-
-	return {
-		exitCode: child.status ?? 1,
-	}
+	return packageJson.version ?? `0.0.0`
 }
 
-function runVscodeInstall(
-	targets: string[],
-	options: LasertagOptions,
+async function runVsix(
+	options: VsixOptions,
 	io: LasertagCliIO,
 	environment: LasertagCliEnvironment,
-): LasertagCliResult {
+): Promise<LasertagCliResult> {
 	const cwd = environment.cwd ?? process.cwd()
-	const fileExists = environment.fileExists ?? existsSync
-	const editorCommand = options[`vscode-install`] || `code`
-	const vsixPath = environment.vsixPath ?? defaultVscodeVsixPath(fileExists)
-
-	if (!fileExists(vsixPath)) {
-		io.error(
-			`lasertag vscode: bundled extension not found at ${vsixPath}. Run pnpm --filter lasertag pack before installing from the workspace.`,
-		)
-
-		return {
-			diagnostics: [],
-			exitCode: 1,
-			files: [],
-			mode: `vscode-install`,
-			options,
-			targets,
-		}
-	}
-
+	const packageRoot = environment.packageRoot ?? defaultLasertagPackageRoot()
+	const outdir = path.resolve(packageRoot, options.outdir ?? `dist`)
+	const build = environment.buildVsix ?? buildLasertagVsix
 	const install =
 		environment.installVscodeExtension ?? installVscodeExtensionWithEditor
-	const result = install({ cwd, editorCommand, vsixPath })
+	const vsix = await build({ outdir, packageRoot })
 
-	if (result.error) {
-		io.error(`lasertag vscode: ${result.error}`)
-	} else if (result.exitCode !== 0) {
-		io.error(
-			`lasertag vscode: ${editorCommand} exited with code ${result.exitCode}.`,
-		)
-	} else {
-		io.log(`lasertag vscode: installed Lasertag with ${editorCommand}.`)
-	}
+	if (options[`build-only`]) {
+		io.log(`lasertag vsix: built ${vsix.vsixPath}.`)
 
-	return {
-		diagnostics: [],
-		exitCode: result.exitCode,
-		files: [],
-		mode: `vscode-install`,
-		options,
-		targets,
-	}
-}
-
-export function runLasertagCli(
-	args: string[] = process.argv,
-	io: LasertagCliIO = console,
-	environment: LasertagCliEnvironment = {},
-): LasertagCliResult {
-	const { cliArgs, targets } = extractTargetPatterns(args)
-	const parsed = lasertagCli(cliArgs)
-	const { opts } = parsed.inputs
-
-	if (opts.help) {
-		io.log(help(lasertagCli.definition))
 		return {
 			diagnostics: [],
 			exitCode: 0,
 			files: [],
-			mode: `help`,
-			options: opts,
-			targets,
+			mode: `vsix`,
+			options,
+			targets: [],
+			vsix: {
+				...vsix,
+				editorCommand: options.target,
+			},
 		}
 	}
 
-	if (opts[`vscode-install`] !== undefined) {
-		return runVscodeInstall(targets, opts, io, environment)
+	const installResult = await install({
+		cwd,
+		editorCommand: options.target,
+		vsixPath: vsix.vsixPath,
+	})
+
+	if (installResult.error) {
+		io.error(`lasertag vsix: ${installResult.error}`)
+	} else if (installResult.exitCode !== 0) {
+		io.error(
+			`lasertag vsix: ${options.target} exited with code ${installResult.exitCode}.`,
+		)
+	} else {
+		io.log(`lasertag vsix: installed ${vsix.vsixPath} with ${options.target}.`)
 	}
 
-	if (opts.fix) {
-		return runFixStub(targets, opts, io)
+	return {
+		diagnostics: [],
+		exitCode: installResult.exitCode,
+		files: [],
+		mode: `vsix`,
+		options,
+		targets: [],
+		vsix: {
+			...vsix,
+			editorCommand: options.target,
+		},
 	}
+}
 
-	return runValidate(targets, opts, io, environment)
+function targetsFromGlob(glob: string | undefined): string[] {
+	const targets =
+		glob
+			?.split(`,`)
+			.map((target) => target.trim())
+			.filter((target) => target.length > 0) ?? []
+
+	return targets.length > 0 ? targets : DEFAULT_TARGET_PATTERNS
+}
+
+export async function runLasertagCli(
+	args: string[] = process.argv,
+	io: LasertagCliIO = console,
+	environment: LasertagCliEnvironment = {},
+): Promise<LasertagCliResult> {
+	const parsed = lasertagCli(args)
+
+	switch (parsed.inputs.case) {
+		case ``: {
+			const rootOptions = parsed.inputs.opts
+
+			if (rootOptions.help) {
+				io.log(help(lasertagCli.definition))
+				return {
+					diagnostics: [],
+					exitCode: 0,
+					files: [],
+					mode: `help`,
+					options: rootOptions,
+					targets: [],
+				}
+			}
+
+			if (rootOptions.version) {
+				const version = readPackageVersion(environment)
+				io.log(version)
+				return {
+					diagnostics: [],
+					exitCode: 0,
+					files: [],
+					mode: `version`,
+					options: rootOptions,
+					targets: [],
+				}
+			}
+
+			io.log(help(lasertagCli.definition))
+			return {
+				diagnostics: [],
+				exitCode: 0,
+				files: [],
+				mode: `help`,
+				options: rootOptions,
+				targets: [],
+			}
+		}
+		case `fix`:
+			return runFixStub(DEFAULT_TARGET_PATTERNS, io)
+		case `fix/$glob`:
+			return runFixStub(targetsFromGlob(parsed.inputs.path[1]), io)
+		case `check`:
+			return runCheck(
+				DEFAULT_TARGET_PATTERNS,
+				parsed.inputs.opts,
+				io,
+				environment,
+			)
+		case `check/$glob`:
+			return runCheck(
+				targetsFromGlob(parsed.inputs.path[1]),
+				parsed.inputs.opts,
+				io,
+				environment,
+			)
+		case `vsix`:
+			return runVsix(parsed.inputs.opts, io, environment)
+	}
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
 	try {
-		const result = runLasertagCli()
-
+		const result = await runLasertagCli()
 		process.exitCode = result.exitCode
 	} catch (error) {
 		console.error(error instanceof Error ? error.message : error)

@@ -17,6 +17,7 @@ export type AnalyzeTsxOptions = {
 	filePath?: string
 	componentName?: string
 	maxComponentDepth?: number
+	typescriptSdkPath?: string
 }
 
 export type AnalyzeTsxRenderStoriesOptions = Omit<
@@ -755,6 +756,9 @@ function createSourceFile(options: AnalyzeTsxOptions): ts.SourceFile {
 	return createTsxSourceFile(
 		options.sourceText,
 		options.filePath ?? `component.tsx`,
+		options.typescriptSdkPath
+			? { typescriptSdkPath: options.typescriptSdkPath }
+			: {},
 	)
 }
 
