@@ -1,5 +1,29 @@
 # lasertag
 
+## 0.3.0
+
+### Minor Changes
+
+- 822299d: Reshape the CLI around explicit `check`, `fix`, and `vsix` commands. Previously,
+  bare `lasertag` validated CSS modules, `--fix` selected the cleanup stub, and
+  `--vscode-install` installed a prebuilt VS Code extension artifact.
+
+  Now, bare `lasertag` prints help, `lasertag check` validates CSS modules,
+  `lasertag fix` keeps the existing cleanup stub, and `lasertag vsix` builds a
+  current-platform VS Code extension from the installed SDK before installing it
+  into the requested editor command.
+
+### Patch Changes
+
+- 822299d: Add a configurable TypeScript 7 native executable path for CLI validation and
+  the VS Code extension. The extension exposes `lasertag.typescript.sdk.path` and
+  forwards the resolved value to the language server as
+  `LASERTAG_TYPESCRIPT_SDK_PATH`.
+- 822299d: Bundle the TypeScript 7 JavaScript SDK into the VS Code language server bundle
+  and package only the current platform's native TypeScript executable on disk.
+  Empty `lasertag.typescript.sdk.path` settings now use that bundled native
+  executable by default.
+
 ## 0.2.1
 
 ### Patch Changes
