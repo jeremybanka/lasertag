@@ -4,6 +4,8 @@ import {
 	LASERTAG_RESTART_SERVER_COMMAND,
 } from "../lsp/src/code-actions.ts"
 import {
+	resolveBundledTypescriptSdkPath,
+	resolveTypescriptSdkPath,
 	resolveWorkspacePath,
 	withTypescriptSdkPathEnvironment,
 } from "./config.ts"
@@ -95,19 +97,26 @@ function getConfiguredLspPath(): string | undefined {
 	return resolveWorkspacePath(configuredPath, getWorkspaceRoot())
 }
 
-function getConfiguredTypescriptSdkPath(): string | undefined {
+function getTypescriptSdkPath(context: ExtensionContext): string {
 	const configuredPath = vscode.workspace
 		.getConfiguration("lasertag")
 		.get("typescript.sdk.path", "")
+	const bundledPath = resolveBundledTypescriptSdkPath(
+		context.asAbsolutePath("."),
+	)
 
-	return resolveWorkspacePath(configuredPath, getWorkspaceRoot())
+	return resolveTypescriptSdkPath(
+		configuredPath,
+		getWorkspaceRoot(),
+		bundledPath,
+	)
 }
 
 function getConfiguredLogLevel(): string {
 	return vscode.workspace.getConfiguration("lasertag").get("log.level", "info")
 }
 
-function createServerEnvironment() {
+function createServerEnvironment(context: ExtensionContext) {
 	const baseEnvironment = {
 		...process.env,
 		ELECTRON_NO_ASAR: "1",
@@ -117,7 +126,7 @@ function createServerEnvironment() {
 
 	return withTypescriptSdkPathEnvironment(
 		baseEnvironment,
-		getConfiguredTypescriptSdkPath(),
+		getTypescriptSdkPath(context),
 	)
 }
 
@@ -130,7 +139,7 @@ function createServerOptions(context: ExtensionContext) {
 			args: [],
 			command,
 			options: {
-				env: createServerEnvironment(),
+				env: createServerEnvironment(context),
 				...(workspaceRoot ? { cwd: workspaceRoot } : {}),
 			},
 			transport: TransportKind.stdio,
@@ -145,7 +154,7 @@ function createServerOptions(context: ExtensionContext) {
 	const module = getServerModulePath(context)
 	const workspaceRoot = getWorkspaceRoot()
 	const options = {
-		env: createServerEnvironment(),
+		env: createServerEnvironment(context),
 		...(workspaceRoot ? { cwd: workspaceRoot } : {}),
 	}
 

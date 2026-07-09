@@ -149,7 +149,7 @@ function createVscodeManifest(version: string) {
 						type: "string",
 						default: "",
 						description:
-							"Optional path to the TypeScript native executable used by the TypeScript 7 SDK. Relative paths resolve from the workspace root.",
+							"Optional path to the TypeScript native executable used by the TypeScript 7 SDK. Relative paths resolve from the workspace root. Leave empty to use the bundled native executable.",
 					},
 					"lasertag.trace.server": {
 						type: "string",
@@ -184,12 +184,19 @@ async function copyPackageRoot(packageRoot: string, destination: string) {
 	})
 }
 
-async function copyTypescriptRuntime(destinationNodeModules: string) {
+function resolveTypescriptNativePackageName(
+	platform = process.platform,
+	arch = process.arch,
+): string {
+	return `@typescript/typescript-${platform}-${arch}`
+}
+
+async function copyTypescriptNativeRuntime(destinationNodeModules: string) {
 	const typescriptRoot = resolvePackageRoot("typescript")
 	const requireFromTypescript = createRequire(
 		path.join(typescriptRoot, "package.json"),
 	)
-	const nativePackageName = `@typescript/typescript-${process.platform}-${process.arch}`
+	const nativePackageName = resolveTypescriptNativePackageName()
 	const nativePackageRoot = resolvePackageRoot(
 		nativePackageName,
 		requireFromTypescript,
@@ -199,10 +206,6 @@ async function copyTypescriptRuntime(destinationNodeModules: string) {
 	await mkdir(path.join(destinationNodeModules, "@typescript"), {
 		recursive: true,
 	})
-	await copyPackageRoot(
-		typescriptRoot,
-		path.join(destinationNodeModules, "typescript"),
-	)
 	await copyPackageRoot(
 		nativePackageRoot,
 		path.join(
@@ -242,10 +245,7 @@ async function bundleVscodeRuntime(packageRoot: string, distRoot: string) {
 		outfile: path.join(distRoot, "extension.mjs"),
 	})
 	await bundleEntry({
-		external: (id) =>
-			id === "typescript" ||
-			id.startsWith("typescript/") ||
-			id.startsWith("@typescript/"),
+		external: (id) => id.startsWith("@typescript/"),
 		input: path.join(packageRoot, "lsp", "src", "server.ts"),
 		outfile: path.join(distRoot, "server.mjs"),
 	})
@@ -303,7 +303,7 @@ export async function buildLasertagVsix(
 		path.join(packageRoot, "vscode", "README.md"),
 		path.join(buildRoot, "README.md"),
 	)
-	await copyTypescriptRuntime(path.join(packageDist, "node_modules"))
+	await copyTypescriptNativeRuntime(path.join(packageDist, "node_modules"))
 	await writeFile(
 		path.join(buildRoot, "package.json"),
 		`${JSON.stringify(createVscodeManifest(lasertagPackageJson.version), null, "\t")}\n`,

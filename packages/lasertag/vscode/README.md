@@ -11,4 +11,5 @@ instead of the bundled server. Relative paths resolve from the workspace root.
 
 Set `lasertag.typescript.sdk.path` to use a workspace-provided TypeScript 7
 native executable for TSX parsing. Relative paths resolve from the workspace
-root. The same value is forwarded to the server as `LASERTAG_TYPESCRIPT_SDK_PATH`.
+root. Leave it empty to use the bundled native executable. The resolved value is
+forwarded to the server as `LASERTAG_TYPESCRIPT_SDK_PATH`.

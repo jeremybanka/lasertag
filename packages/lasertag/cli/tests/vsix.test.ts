@@ -59,7 +59,7 @@ describe(`lasertag vsix builder`, () => {
 		)
 	})
 
-	it(`writes the VSCode manifest and copies TypeScript runtime packages`, async () => {
+	it(`writes the VSCode manifest and copies the TypeScript native runtime package`, async () => {
 		const fixture = createFixture({
 			"package.json": JSON.stringify({ version: `9.8.7-test` }),
 			"vscode/extension.ts": `
@@ -114,8 +114,14 @@ describe(`lasertag vsix builder`, () => {
 		)
 		expect(
 			existsSync(path.join(result.buildRoot, `dist/node_modules/typescript`)),
-		).toBe(true)
+		).toBe(false)
 		expect(existsSync(nativeRuntimePath)).toBe(true)
+		expect(existsSync(path.join(nativeRuntimePath, `lib`, `tsc`))).toBe(
+			process.platform !== `win32`,
+		)
+		expect(existsSync(path.join(nativeRuntimePath, `lib`, `tsc.exe`))).toBe(
+			process.platform === `win32`,
+		)
 		expect(commands).toHaveLength(1)
 		expect(commands[0]?.cwd).toBe(result.buildRoot)
 		expect(commands[0]?.args).toContain(`--no-dependencies`)

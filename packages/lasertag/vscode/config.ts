@@ -16,6 +16,32 @@ export function resolveWorkspacePath(
 	return workspaceRoot ? path.join(workspaceRoot, trimmedPath) : trimmedPath
 }
 
+export function resolveBundledTypescriptSdkPath(
+	extensionRoot: string,
+	platform = process.platform,
+	arch = process.arch,
+): string {
+	const executableName = platform === `win32` ? `tsc.exe` : `tsc`
+
+	return path.join(
+		extensionRoot,
+		`dist`,
+		`node_modules`,
+		`@typescript`,
+		`typescript-${platform}-${arch}`,
+		`lib`,
+		executableName,
+	)
+}
+
+export function resolveTypescriptSdkPath(
+	configuredPath: string,
+	workspaceRoot: string | undefined,
+	bundledPath: string,
+): string {
+	return resolveWorkspacePath(configuredPath, workspaceRoot) ?? bundledPath
+}
+
 export function withTypescriptSdkPathEnvironment(
 	environment: NodeJS.ProcessEnv,
 	typescriptSdkPath: string | undefined,
