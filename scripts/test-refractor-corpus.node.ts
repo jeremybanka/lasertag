@@ -6,9 +6,10 @@ import { performance } from "node:perf_hooks"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { promisify } from "node:util"
-import ts from "typescript"
+import * as ts from "typescript/unstable/ast"
 
 import { analyzeTsxRenderStories } from "../packages/lasertag/refractor/src/analyze-tsx.ts"
+import { createTsxSourceFile } from "../packages/lasertag/refractor/src/typescript-ast.ts"
 import type {
 	OpaqueStoryNode,
 	RenderStory,
@@ -707,13 +708,7 @@ async function analyzeFile(
 }
 
 function collectSourcePatterns(sourceText: string, filePath: string): string[] {
-	const sourceFile = ts.createSourceFile(
-		filePath,
-		sourceText,
-		ts.ScriptTarget.Latest,
-		true,
-		ts.ScriptKind.TSX,
-	)
+	const sourceFile = createTsxSourceFile(sourceText, filePath)
 	const patterns = new Set<string>()
 
 	function visit(node: ts.Node): void {
@@ -774,7 +769,7 @@ function collectSourcePatterns(sourceText: string, filePath: string): string[] {
 			collectCallPatterns(node, patterns)
 		}
 
-		ts.forEachChild(node, visit)
+		node.forEachChild(visit)
 	}
 
 	visit(sourceFile)
@@ -876,7 +871,7 @@ function isChildrenExpression(expression: ts.Expression): boolean {
 	const argumentExpression = expression.argumentExpression
 
 	return (
-		ts.isStringLiteralLike(argumentExpression) &&
+		ts.isStringLiteralLikeNode(argumentExpression) &&
 		argumentExpression.text === `children`
 	)
 }

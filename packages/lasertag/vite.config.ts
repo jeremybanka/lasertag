@@ -39,6 +39,7 @@ export default defineConfig({
 			clean: false,
 			deps: {
 				alwaysBundle: [/^[\w@]/],
+				neverBundle: [/^typescript(?:\/|$)/, /^@typescript\//],
 				onlyBundle: false,
 			},
 			dts: false,
