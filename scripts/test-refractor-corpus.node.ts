@@ -8,8 +8,8 @@ import { fileURLToPath } from "node:url"
 import { promisify } from "node:util"
 import * as ts from "typescript/unstable/ast"
 
-import { analyzeTsxRenderStories } from "../packages/lasertag/refractor/src/analyze-tsx.ts"
-import { createTsxSourceFile } from "../packages/lasertag/refractor/src/typescript-ast.ts"
+import { analyzeTsxRenderStories } from "../packages/lasertag/src/refractor/analyze-tsx.ts"
+import { createTsxSourceFile } from "../packages/lasertag/src/refractor/typescript-ast.ts"
 import type {
 	OpaqueStoryNode,
 	RenderStory,
@@ -17,8 +17,8 @@ import type {
 	SourceRange,
 	StoryChild,
 	StoryNode,
-} from "../packages/lasertag/refractor/src/diagnostics.ts"
-import { canReachSelectorPath } from "../packages/lasertag/refractor/src/reachability.ts"
+} from "../packages/lasertag/src/refractor/diagnostics.ts"
+import { canReachSelectorPath } from "../packages/lasertag/src/refractor/reachability.ts"
 
 type IncludePattern = {
 	from: string
@@ -171,7 +171,7 @@ const scriptDir = path.dirname(fileURLToPath(import.meta.url))
 const workspaceRoot = path.resolve(scriptDir, `..`)
 const corpusRoot = path.join(
 	workspaceRoot,
-	`packages/lasertag/refractor/corpus`,
+	`packages/lasertag/tests/refractor/corpus`,
 )
 const manifestPath = path.join(corpusRoot, `manifest.json`)
 const providersRoot = path.join(corpusRoot, `providers`)

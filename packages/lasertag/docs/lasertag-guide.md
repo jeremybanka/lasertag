@@ -107,7 +107,7 @@ Avoid single-child wrapper tags unless the wrapper distinguishes a meaningful th
 
 ## Type Support
 
-`lasertag/types/module.css.d.ts` constrains CSS Modules to a single exported `class` member:
+The `lasertag/css-modules` type export constrains CSS Modules to a single exported `class` member:
 
 ```ts
 declare module "*.module.css" {

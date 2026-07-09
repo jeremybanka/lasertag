@@ -8,7 +8,7 @@ artifacts/
 .mise.local.toml
 .env
 *.log
-packages/lasertag/refractor/corpus/providers/
-packages/lasertag/refractor/corpus/reports/
+packages/lasertag/tests/refractor/corpus/providers/
+packages/lasertag/tests/refractor/corpus/reports/
 packages/lasertag/vscode/package.json
 packages/lasertag-vscode/server/
