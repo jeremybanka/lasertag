@@ -27,12 +27,6 @@ export default defineConfig({
 		},
 	],
 	test: {
-		include: [
-			"cli/tests/**/*.test.ts",
-			"eslint/tests/**/*.test.ts",
-			"lsp/tests/**/*.test.ts",
-			"refractor/tests/**/*.test.ts",
-			"vscode/tests/**/*.test.ts",
-		],
+		include: ["tests/**/*.test.ts"],
 	},
 })

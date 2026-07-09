@@ -8,7 +8,10 @@
 		"directory": "packages/lasertag"
 	},
 	"files": [
-		"dist",
+		"dist/*.d.mts",
+		"dist/*.d.mts.map",
+		"dist/*.mjs",
+		"dist/*.mjs.map",
 		"docs",
 		"examples",
 		"src",

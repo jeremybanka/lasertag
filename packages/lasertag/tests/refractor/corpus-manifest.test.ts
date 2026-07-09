@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
 
 const manifestPath = fileURLToPath(
-	new URL(`../corpus/manifest.json`, import.meta.url),
+	new URL(`../../refractor/corpus/manifest.json`, import.meta.url),
 )
 
 type CorpusManifest = {
