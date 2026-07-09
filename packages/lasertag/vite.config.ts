@@ -21,34 +21,6 @@ export default defineConfig({
 			format: "esm",
 			outDir: "dist",
 		},
-		{
-			clean: true,
-			copy: { from: "../../LasertagIcon.png" },
-			deps: {
-				alwaysBundle: [/^[\w@]/],
-				neverBundle: ["vscode"],
-				onlyBundle: false,
-			},
-			dts: false,
-			entry: { extension: "vscode/extension.ts" },
-			format: "esm",
-			outDir: "vscode/dist",
-			platform: "node",
-		},
-		{
-			clean: false,
-			deps: {
-				alwaysBundle: [/^[\w@]/],
-				neverBundle: [/^typescript(?:\/|$)/, /^@typescript\//],
-				onlyBundle: false,
-			},
-			dts: false,
-			entry: { server: "lsp/src/server.ts" },
-			format: "esm",
-			outDir: "vscode/dist",
-			platform: "node",
-			shims: true,
-		},
 	],
 	test: {
 		include: [

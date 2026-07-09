@@ -41,13 +41,13 @@ Use `lasertag/preact-jsx` or `lasertag/solid-jsx` instead for Preact or Solid.
 Install the VSCode extension from the same npm package:
 
 ```sh
-pnpm lasertag --vscode-install
+pnpm lasertag vsix
 ```
 
 Pass an editor command when you want to target another VSCode-compatible binary:
 
 ```sh
-pnpm lasertag --vscode-install=code-insiders
+pnpm lasertag vsix --target code-insiders
 ```
 
 ## Includes
