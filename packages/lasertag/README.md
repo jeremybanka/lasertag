@@ -50,6 +50,12 @@ Pass an editor command when you want to target another VSCode-compatible binary:
 pnpm lasertag vsix --target code-insiders
 ```
 
+Build the VSIX without installing it:
+
+```sh
+pnpm lasertag vsix --build-only
+```
+
 ## Includes
 
 - CSS Module typing for a single exported `class`

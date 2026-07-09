@@ -54,6 +54,7 @@ const fixOptionsSchema = z.object({
 })
 
 const vsixOptionsSchema = z.object({
+	"build-only": z.boolean().default(false),
 	help: z.boolean().default(false),
 	outdir: z.string().optional(),
 	target: z.string().default(`code`),
@@ -170,6 +171,12 @@ const lasertagCli = cli({
 			`Build and install the current-platform VSCode extension.`,
 			vsixOptionsSchema,
 			{
+				"build-only": {
+					description: `build the VSIX without installing it`,
+					example: `--build-only`,
+					parse: parseBooleanOption,
+					required: false,
+				},
 				help: {
 					description: `show this help text`,
 					example: `--help`,
@@ -502,6 +509,24 @@ async function runVsix(
 	const install =
 		environment.installVscodeExtension ?? installVscodeExtensionWithEditor
 	const vsix = await build({ outdir, packageRoot })
+
+	if (options[`build-only`]) {
+		io.log(`lasertag vsix: built ${vsix.vsixPath}.`)
+
+		return {
+			diagnostics: [],
+			exitCode: 0,
+			files: [],
+			mode: `vsix`,
+			options,
+			targets: [],
+			vsix: {
+				...vsix,
+				editorCommand: options.target,
+			},
+		}
+	}
+
 	const installResult = await install({
 		cwd,
 		editorCommand: options.target,
