@@ -82,6 +82,7 @@ export type LasertagCliEnvironment = {
 		request: LasertagVscodeInstallRequest,
 	) => LasertagVscodeInstallResult
 	readFile?: (filePath: string) => string
+	typescriptSdkPath?: string
 	vsixPath?: string
 }
 
@@ -334,6 +335,9 @@ function validateCssModuleFiles(
 		const result = validateCssReachability({
 			cssPath,
 			cssSource,
+			...(environment.typescriptSdkPath
+				? { typescriptSdkPath: environment.typescriptSdkPath }
+				: {}),
 			tsxPath,
 			tsxSource: readFile(tsxPath),
 		})

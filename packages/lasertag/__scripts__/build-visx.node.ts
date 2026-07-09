@@ -181,6 +181,12 @@ const vscodeManifest = {
 					description:
 						"Optional path to a lasertag-lsp server module. Ignored when lasertag.lsp.path is set.",
 				},
+				"lasertag.typescript.sdk.path": {
+					type: "string",
+					default: "",
+					description:
+						"Optional path to the TypeScript native executable used by the TypeScript 7 SDK. Relative paths resolve from the workspace root.",
+				},
 				"lasertag.trace.server": {
 					type: "string",
 					enum: ["off", "messages", "verbose"],

@@ -56,6 +56,7 @@ export default defineConfig({
 			"eslint/tests/**/*.test.ts",
 			"lsp/tests/**/*.test.ts",
 			"refractor/tests/**/*.test.ts",
+			"vscode/tests/**/*.test.ts",
 		],
 	},
 })

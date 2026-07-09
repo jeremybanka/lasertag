@@ -1,4 +1,5 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { createRequire } from "node:module"
 import { tmpdir } from "node:os"
 import path from "node:path"
 
@@ -6,6 +7,7 @@ import { afterEach, describe, expect, it } from "vitest"
 
 import { runLasertagCli } from "../src/main.ts"
 
+const requireFromTest = createRequire(import.meta.url)
 const fixtureRoots: string[] = []
 
 function createTestIO() {
@@ -38,6 +40,19 @@ function createFixture(files: Record<string, string>) {
 		path: (filePath: string) => path.join(root, filePath),
 		root,
 	}
+}
+
+function resolveTypescriptExecutable(): string {
+	const typescriptPackageJsonPath = requireFromTest.resolve(
+		`typescript/package.json`,
+	)
+	const requireFromTypescript = createRequire(typescriptPackageJsonPath)
+	const nativePackageJsonPath = requireFromTypescript.resolve(
+		`@typescript/typescript-${process.platform}-${process.arch}/package.json`,
+	)
+	const executableName = process.platform === `win32` ? `tsc.exe` : `tsc`
+
+	return path.join(path.dirname(nativePackageJsonPath), `lib`, executableName)
 }
 
 describe(`lasertag cli`, () => {
@@ -209,6 +224,36 @@ describe(`lasertag cli`, () => {
 		expect(result.mode).toBe(`validate`)
 		expect(result.options.fix).toBe(false)
 		expect(result.exitCode).toBe(0)
+	})
+
+	it(`validates with an explicit TypeScript SDK executable path`, () => {
+		const fixture = createFixture({
+			"src/AppPanel.module.css": `
+				app-panel.class {
+					> header {}
+				}
+			`,
+			"src/AppPanel.tsx": `
+				import css from "./AppPanel.module.css"
+
+				export function AppPanel() {
+					return (
+						<app-panel className={css.class}>
+							<header />
+						</app-panel>
+					)
+				}
+			`,
+		})
+		const { io, logs } = createTestIO()
+		const result = runLasertagCli([`lasertag`], io, {
+			cwd: fixture.root,
+			typescriptSdkPath: resolveTypescriptExecutable(),
+		})
+
+		expect(result.mode).toBe(`validate`)
+		expect(result.exitCode).toBe(0)
+		expect(logs).toEqual([`lasertag validate: no dead CSS found in 1 file.`])
 	})
 
 	it(`installs the bundled VSCode extension when --vscode-install is passed`, () => {

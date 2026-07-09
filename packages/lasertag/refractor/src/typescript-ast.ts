@@ -3,6 +3,11 @@ import type { FileSystem } from "typescript/unstable/fs"
 import { API } from "typescript/unstable/sync"
 import type { SourceFile } from "typescript/unstable/ast"
 
+import {
+	resolveTypescriptSdkPath,
+	type TypescriptRuntimeOptions,
+} from "./typescript-runtime.ts"
+
 function normalizeFilePath(filePath: string): string {
 	return path.resolve(filePath)
 }
@@ -27,11 +32,14 @@ function createSingleFileSystem(
 export function createTsxSourceFile(
 	sourceText: string,
 	filePath = `component.tsx`,
+	options: TypescriptRuntimeOptions = {},
 ): SourceFile {
 	const normalizedFilePath = normalizeFilePath(filePath)
+	const typescriptSdkPath = resolveTypescriptSdkPath(options)
 	const api = new API({
 		cwd: path.dirname(normalizedFilePath),
 		fs: createSingleFileSystem(normalizedFilePath, sourceText),
+		...(typescriptSdkPath ? { tsserverPath: typescriptSdkPath } : {}),
 	})
 
 	try {

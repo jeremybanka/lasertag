@@ -10,6 +10,7 @@ export type ValidateCssReachabilityOptions = {
 	tsxPath?: string
 	cssPath?: string
 	componentName?: string
+	typescriptSdkPath?: string
 }
 
 export type ValidateCssReachabilityResult = {
@@ -75,6 +76,9 @@ export function validateCssReachability(
 		sourceText: options.tsxSource,
 		...(options.tsxPath ? { filePath: options.tsxPath } : {}),
 		...(options.componentName ? { componentName: options.componentName } : {}),
+		...(options.typescriptSdkPath
+			? { typescriptSdkPath: options.typescriptSdkPath }
+			: {}),
 	}
 	const renderStory = analyzeTsxRenderStory(tsxOptions)
 	const selectorAnalyses = analyzeCssModuleSelectors(options.cssSource)

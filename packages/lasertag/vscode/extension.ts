@@ -3,6 +3,10 @@ import {
 	LASERTAG_CLEAN_UP_DEAD_SELECTORS_KIND,
 	LASERTAG_RESTART_SERVER_COMMAND,
 } from "../lsp/src/code-actions.ts"
+import {
+	resolveWorkspacePath,
+	withTypescriptSdkPathEnvironment,
+} from "./config.ts"
 
 declare const require: (id: string) => unknown
 
@@ -88,16 +92,15 @@ function getConfiguredLspPath(): string | undefined {
 	const configuredPath = vscode.workspace
 		.getConfiguration("lasertag")
 		.get("lsp.path", "")
-		.trim()
+	return resolveWorkspacePath(configuredPath, getWorkspaceRoot())
+}
 
-	if (!configuredPath) return undefined
-	if (path.isAbsolute(configuredPath)) return configuredPath
+function getConfiguredTypescriptSdkPath(): string | undefined {
+	const configuredPath = vscode.workspace
+		.getConfiguration("lasertag")
+		.get("typescript.sdk.path", "")
 
-	const workspaceRoot = getWorkspaceRoot()
-
-	return workspaceRoot
-		? path.join(workspaceRoot, configuredPath)
-		: configuredPath
+	return resolveWorkspacePath(configuredPath, getWorkspaceRoot())
 }
 
 function getConfiguredLogLevel(): string {
@@ -105,12 +108,17 @@ function getConfiguredLogLevel(): string {
 }
 
 function createServerEnvironment() {
-	return {
+	const baseEnvironment = {
 		...process.env,
 		ELECTRON_NO_ASAR: "1",
 		ELECTRON_RUN_AS_NODE: "1",
 		LASERTAG_LSP_LOG_LEVEL: getConfiguredLogLevel(),
 	}
+
+	return withTypescriptSdkPathEnvironment(
+		baseEnvironment,
+		getConfiguredTypescriptSdkPath(),
+	)
 }
 
 function createServerOptions(context: ExtensionContext) {
