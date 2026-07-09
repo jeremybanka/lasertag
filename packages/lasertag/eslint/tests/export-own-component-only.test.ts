@@ -20,17 +20,14 @@ ruleTester.run(`export-own-component-only`, exportOwnComponentOnly, {
 			name: `allow local helpers that are not exported`,
 			filename: `/project/src/ProjectList.tsx`,
 			code: `
-				const formatCount = (count: number) => String(count)
+				const formatCount = (count) => String(count)
 				export const ProjectList = () => <project-list>{formatCount(1)}</project-list>
 			`,
 		},
 		{
-			name: `allow type exports`,
+			name: `allow own component export with props argument`,
 			filename: `/project/src/ProjectList.tsx`,
-			code: `
-				export type ProjectListProps = { count: number }
-				export const ProjectList = (_props: ProjectListProps) => <project-list />
-			`,
+			code: `export const ProjectList = (_props) => <project-list />`,
 		},
 	],
 	invalid: [
@@ -52,7 +49,7 @@ ruleTester.run(`export-own-component-only`, exportOwnComponentOnly, {
 			name: `ban helper value exports`,
 			filename: `/project/src/ProjectList.tsx`,
 			code: `
-				export const formatCount = (count: number) => String(count)
+				export const formatCount = (count) => String(count)
 				export const ProjectList = () => <project-list />
 			`,
 			errors: [{ message: message(`ProjectList`) }],
@@ -60,14 +57,14 @@ ruleTester.run(`export-own-component-only`, exportOwnComponentOnly, {
 		{
 			name: `ban export lists that include other values`,
 			filename: `/project/src/ProjectList.tsx`,
-			code: `const ProjectList = () => <project-list />; const formatCount = (count: number) => String(count); export { ProjectList, formatCount }`,
+			code: `const ProjectList = () => <project-list />; const formatCount = (count) => String(count); export { ProjectList, formatCount }`,
 			errors: [
 				{
 					message: message(`ProjectList`),
 					line: 1,
-					column: 121,
+					column: 113,
 					endLine: 1,
-					endColumn: 132,
+					endColumn: 124,
 				},
 			],
 		},

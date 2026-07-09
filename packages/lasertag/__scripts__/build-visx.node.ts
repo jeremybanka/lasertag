@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process"
-import { mkdir, readFile, writeFile } from "node:fs/promises"
+import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises"
+import { createRequire } from "node:module"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -21,9 +22,11 @@ type LasertagPackageJson = {
 const scriptsRoot = path.dirname(fileURLToPath(import.meta.url))
 const packageRoot = path.resolve(scriptsRoot, "..")
 const vscodeRoot = path.resolve(packageRoot, "vscode")
+const vscodeDist = path.join(vscodeRoot, "dist")
 const packageDist = path.join(packageRoot, "dist")
 const vsixPath = path.join(packageDist, "Lasertag.vsix")
 const vscodePackageJsonPath = path.join(vscodeRoot, "package.json")
+const runtimeNodeModules = path.join(vscodeDist, "node_modules")
 const vsceBin = path.join(
 	packageRoot,
 	"node_modules",
@@ -31,6 +34,76 @@ const vsceBin = path.join(
 	"vsce",
 	"vsce",
 )
+const requireFromScript = createRequire(import.meta.url)
+
+function resolveVscodeTarget(): string {
+	const targetByPlatform = new Map([
+		[`darwin-arm64`, `darwin-arm64`],
+		[`darwin-x64`, `darwin-x64`],
+		[`linux-arm64`, `linux-arm64`],
+		[`linux-x64`, `linux-x64`],
+		[`win32-arm64`, `win32-arm64`],
+		[`win32-x64`, `win32-x64`],
+	])
+	const platformKey = `${process.platform}-${process.arch}`
+	const target = targetByPlatform.get(platformKey)
+
+	if (!target) {
+		throw new Error(`Unsupported VSCode extension target ${platformKey}.`)
+	}
+
+	return target
+}
+
+function resolvePackageRoot(
+	packageName: string,
+	fromRequire = requireFromScript,
+): string {
+	const packageJsonPath = fromRequire.resolve(`${packageName}/package.json`)
+
+	return path.dirname(packageJsonPath)
+}
+
+async function copyPackageRoot(packageRoot: string, destination: string) {
+	await cp(packageRoot, destination, {
+		dereference: true,
+		filter(source) {
+			const relative = path.relative(packageRoot, source)
+
+			return !relative.split(path.sep).includes("node_modules")
+		},
+		force: true,
+		recursive: true,
+	})
+}
+
+async function copyTypescriptRuntime() {
+	const typescriptRoot = resolvePackageRoot("typescript")
+	const requireFromTypescript = createRequire(
+		path.join(typescriptRoot, "package.json"),
+	)
+	const nativePackageName = `@typescript/typescript-${process.platform}-${process.arch}`
+	const nativePackageRoot = resolvePackageRoot(
+		nativePackageName,
+		requireFromTypescript,
+	)
+
+	await rm(runtimeNodeModules, { force: true, recursive: true })
+	await mkdir(path.join(runtimeNodeModules, "@typescript"), { recursive: true })
+	await copyPackageRoot(
+		typescriptRoot,
+		path.join(runtimeNodeModules, "typescript"),
+	)
+	await cp(
+		nativePackageRoot,
+		path.join(runtimeNodeModules, "@typescript", nativePackageName.slice(12)),
+		{
+			dereference: true,
+			force: true,
+			recursive: true,
+		},
+	)
+}
 
 async function run(
 	command: string,
@@ -52,6 +125,7 @@ async function run(
 const lasertagPackageJson = JSON.parse(
 	await readFile(path.join(packageRoot, "package.json"), "utf-8"),
 ) as LasertagPackageJson
+const vscodeTarget = resolveVscodeTarget()
 
 const vscodeManifest = {
 	name: "lasertag-vscode",
@@ -131,12 +205,15 @@ await writeFile(
 	vscodePackageJsonPath,
 	`${JSON.stringify(vscodeManifest, null, "\t")}\n`,
 )
+await copyTypescriptRuntime()
 
 const vsce = await run(
 	process.execPath,
 	[
 		vsceBin,
 		"package",
+		"--target",
+		vscodeTarget,
 		"--no-dependencies",
 		"--skip-license",
 		"--out",

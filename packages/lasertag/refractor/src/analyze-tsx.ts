@@ -1,5 +1,5 @@
 import path from "node:path"
-import ts from "typescript"
+import * as ts from "typescript/unstable/ast"
 
 import type {
 	OpaqueStoryNode,
@@ -10,6 +10,7 @@ import type {
 	StoryChild,
 	StoryNode,
 } from "./diagnostics.ts"
+import { createTsxSourceFile } from "./typescript-ast.ts"
 
 export type AnalyzeTsxOptions = {
 	sourceText: string
@@ -46,6 +47,10 @@ type AnalyzeContext = {
 
 const DEFAULT_MAX_COMPONENT_DEPTH = 25
 
+type NodeWithModifiers = ts.Node & {
+	modifiers?: ts.NodeArray<ts.ModifierLike>
+}
+
 function rangeOf(sourceFile: ts.SourceFile, node: ts.Node): SourceRange {
 	return {
 		start: node.getStart(sourceFile),
@@ -65,10 +70,10 @@ function hasModifier(
 	node: ts.Node,
 	kind: ts.SyntaxKind.ExportKeyword | ts.SyntaxKind.DefaultKeyword,
 ): boolean {
-	return (
-		ts.canHaveModifiers(node) &&
-		ts.getModifiers(node)?.some((modifier) => modifier.kind === kind) === true
-	)
+	const modifiers =
+		`modifiers` in node ? (node as NodeWithModifiers).modifiers : undefined
+
+	return modifiers?.some((modifier) => modifier.kind === kind) === true
 }
 
 function isComponentName(name: string): boolean {
@@ -90,7 +95,7 @@ function containsJsx(node: ts.Node): boolean {
 			return
 		}
 
-		ts.forEachChild(child, visit)
+		child.forEachChild(visit)
 	}
 
 	visit(node)
@@ -116,7 +121,7 @@ function functionBodyFromExpression(
 		ts.isSatisfiesExpression(expression) ||
 		ts.isNonNullExpression(expression) ||
 		ts.isParenthesizedExpression(expression) ||
-		ts.isTypeAssertionExpression(expression)
+		ts.isTypeAssertion(expression)
 	) {
 		return functionBodyFromExpression(expression.expression)
 	}
@@ -326,9 +331,9 @@ function collectReturnedExpressions(
 			return
 		}
 
-		if (node !== block && ts.isFunctionLike(node)) return
+		if (node !== block && ts.isFunctionLikeDeclaration(node)) return
 
-		ts.forEachChild(node, visit)
+		node.forEachChild(visit)
 	}
 
 	for (const statement of block.statements) {
@@ -447,7 +452,7 @@ function stringLiteralAttributeValue(
 	if (
 		ts.isJsxExpression(initializer) &&
 		initializer.expression &&
-		ts.isStringLiteralLike(initializer.expression)
+		ts.isStringLiteralLikeNode(initializer.expression)
 	) {
 		return {
 			value: initializer.expression.text,
@@ -627,7 +632,7 @@ function isChildrenExpression(expression: ts.Expression): boolean {
 	const argumentExpression = expression.argumentExpression
 
 	return (
-		ts.isStringLiteralLike(argumentExpression) &&
+		ts.isStringLiteralLikeNode(argumentExpression) &&
 		argumentExpression.text === `children`
 	)
 }
@@ -667,7 +672,7 @@ function analyzeExpression(
 		ts.isAsExpression(expression) ||
 		ts.isSatisfiesExpression(expression) ||
 		ts.isNonNullExpression(expression) ||
-		ts.isTypeAssertionExpression(expression)
+		ts.isTypeAssertion(expression)
 	) {
 		return analyzeExpression(context, expression.expression, stack)
 	}
@@ -747,12 +752,9 @@ function analyzeExpression(
 }
 
 function createSourceFile(options: AnalyzeTsxOptions): ts.SourceFile {
-	return ts.createSourceFile(
-		options.filePath ?? `component.tsx`,
+	return createTsxSourceFile(
 		options.sourceText,
-		ts.ScriptTarget.Latest,
-		true,
-		ts.ScriptKind.TSX,
+		options.filePath ?? `component.tsx`,
 	)
 }
 

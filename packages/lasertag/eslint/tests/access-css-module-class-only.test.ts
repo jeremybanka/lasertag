@@ -37,7 +37,7 @@ ruleTester.run(`access-css-module-class-only`, accessCssModuleClassOnly, {
 			code: `
 				import css from "./App.module.css"
 
-				function getClassName(css: { className: string }) {
+				function getClassName(css) {
 					return css.className
 				}
 			`,
