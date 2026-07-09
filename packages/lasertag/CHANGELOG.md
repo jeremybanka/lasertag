@@ -1,5 +1,11 @@
 # lasertag
 
+## 0.2.1
+
+### Patch Changes
+
+- 6bde285: Build the bundled VS Code extension entrypoint as ESM/MJS instead of CommonJS.
+
 ## 0.2.0
 
 ### Minor Changes
