@@ -142,7 +142,7 @@ describe(`lasertag cli`, () => {
 		expect(logs).toEqual([`lasertag check: no dead CSS found in 1 file.`])
 	})
 
-	it(`reports diagnostics for an explicit check glob`, async () => {
+	it(`reports diagnostics for a single positional check glob`, async () => {
 		const fixture = createFixture({
 			"src/AppPanel.module.css": `
 				app-panel.class {
@@ -189,7 +189,59 @@ describe(`lasertag cli`, () => {
 		expect(logs[0]).toContain(`app-panel.class > footer`)
 	})
 
-	it(`accepts shell-expanded css module file paths`, async () => {
+	it(`accepts comma-separated patterns in the single positional check glob`, async () => {
+		const fixture = createFixture({
+			"src/AppPanel.module.css": `
+				app-panel.class {
+					> header {}
+				}
+			`,
+			"src/AppPanel.tsx": `
+				import css from "./AppPanel.module.css"
+
+				export function AppPanel() {
+					return (
+						<app-panel className={css.class}>
+							<header />
+						</app-panel>
+					)
+				}
+			`,
+			"test/TestPanel.module.css": `
+				test-panel.class {
+					> footer {}
+				}
+			`,
+			"test/TestPanel.tsx": `
+				import css from "./TestPanel.module.css"
+
+				export function TestPanel() {
+					return <test-panel className={css.class} />
+				}
+			`,
+		})
+		const { io } = createTestIO()
+		const result = await runLasertagCli(
+			[`lasertag`, `check`, `src/**/*.module.css,test/**/*.module.css`],
+			io,
+			{
+				cwd: fixture.root,
+			},
+		)
+
+		expect(result.targets).toEqual([
+			`src/**/*.module.css`,
+			`test/**/*.module.css`,
+		])
+		expect(result.files).toEqual([
+			fixture.path(`src/AppPanel.module.css`),
+			fixture.path(`test/TestPanel.module.css`),
+		])
+		expect(result.diagnostics).toHaveLength(1)
+		expect(result.exitCode).toBe(1)
+	})
+
+	it(`accepts one css module file path as the positional check glob`, async () => {
 		const fixture = createFixture({
 			"src/AppPanel.module.css": `
 				app-panel.class {
@@ -216,6 +268,17 @@ describe(`lasertag cli`, () => {
 		expect(result.exitCode).toBe(1)
 	})
 
+	it(`rejects multiple positional check glob values`, async () => {
+		const { io } = createTestIO()
+
+		await expect(
+			runLasertagCli(
+				[`lasertag`, `check`, `src/**/*.module.css`, `test/**/*.module.css`],
+				io,
+			),
+		).rejects.toThrow(`There are no positional arguments for lasertag`)
+	})
+
 	it(`prints json diagnostics when check --format=json is passed`, async () => {
 		const fixture = createFixture({
 			"src/AppPanel.module.css": `
@@ -233,7 +296,7 @@ describe(`lasertag cli`, () => {
 		})
 		const { io, logs } = createTestIO()
 		const result = await runLasertagCli(
-			[`lasertag`, `check`, `--format=json`, `--`, `src/**/*.module.css`],
+			[`lasertag`, `check`, `--format=json`, `src/**/*.module.css`],
 			io,
 			{ cwd: fixture.root },
 		)

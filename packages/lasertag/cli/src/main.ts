@@ -6,11 +6,11 @@ import path from "node:path"
 import {
 	cli,
 	help,
+	noOptions,
 	options,
 	optional,
 	parseBooleanOption,
 	parseStringOption,
-	noOptions,
 } from "comline"
 import { globSync } from "tinyglobby"
 import { z } from "zod/v4"
@@ -38,7 +38,6 @@ const DEFAULT_IGNORE_PATTERNS = [
 	`**/refractor/corpus/providers/**`,
 ]
 const FORMAT_OPTIONS = [`stylish`, `json`] as const
-const CLI_COMMANDS = new Set([`check`, `fix`, `vsix`])
 
 const rootOptionsSchema = z.object({
 	help: z.boolean().default(false),
@@ -108,10 +107,29 @@ export type LasertagCliEnvironment = {
 }
 
 const lasertagRoutes = optional({
-	check: null,
-	fix: null,
+	check: optional({
+		$glob: null,
+	}),
+	fix: optional({
+		$glob: null,
+	}),
 	vsix: null,
 })
+
+const checkRouteOptions = options(
+	`Validate component-owned CSS modules.`,
+	checkOptionsSchema,
+	{
+		format: {
+			description: `output format`,
+			flag: `f`,
+			example: `--format json`,
+			required: false,
+		},
+	},
+)
+
+const fixRouteOptions = noOptions(`Remove dead CSS when implemented.`)
 
 const lasertagCli = cli({
 	cliName: `lasertag`,
@@ -135,19 +153,10 @@ const lasertagCli = cli({
 				required: false,
 			},
 		}),
-		check: options(
-			`Validate component-owned CSS modules.`,
-			checkOptionsSchema,
-			{
-				format: {
-					description: `output format`,
-					flag: `f`,
-					example: `--format json`,
-					required: false,
-				},
-			},
-		),
-		fix: noOptions(`Remove dead CSS when implemented.`),
+		check: checkRouteOptions,
+		"check/$glob": checkRouteOptions,
+		fix: fixRouteOptions,
+		"fix/$glob": fixRouteOptions,
 		vsix: options(
 			`Build and install the current-platform VSCode extension.`,
 			vsixOptionsSchema,
@@ -189,97 +198,6 @@ function findSiblingTsxPath(
 	const candidate = `${stemPath}.tsx`
 
 	return fileExists(candidate) ? candidate : undefined
-}
-
-function findCliInvocationIndex(args: string[]): number {
-	const index = args.findIndex((arg) => path.basename(arg).includes(`lasertag`))
-
-	if (index !== -1) return index
-
-	return Math.min(1, Math.max(args.length - 1, 0))
-}
-
-function optionConsumesNextValue(arg: string): boolean {
-	return (
-		arg === `--format` ||
-		arg === `--outdir` ||
-		arg === `-o` ||
-		arg === `--target` ||
-		arg === `-t`
-	)
-}
-
-function extractCommandAndTargets(args: string[]): {
-	cliArgs: string[]
-	command: string
-	targets: string[]
-} {
-	const invocationIndex = findCliInvocationIndex(args)
-	const cliArgs = args.slice(0, invocationIndex + 1)
-	const remaining = args.slice(invocationIndex + 1)
-	const firstPositionalIndex = remaining.findIndex(
-		(arg) => !arg.startsWith(`-`),
-	)
-	const command =
-		firstPositionalIndex >= 0 &&
-		CLI_COMMANDS.has(remaining[firstPositionalIndex]!)
-			? remaining[firstPositionalIndex]!
-			: ``
-	const targets: string[] = []
-	let inExplicitPositionals = false
-	let consumeNextOptionValue = false
-
-	for (const [index, arg] of remaining.entries()) {
-		if (index === firstPositionalIndex && command) {
-			cliArgs.push(arg)
-			continue
-		}
-
-		if (consumeNextOptionValue && !arg.startsWith(`-`)) {
-			cliArgs.push(arg)
-			consumeNextOptionValue = false
-			continue
-		}
-		consumeNextOptionValue = false
-
-		if (inExplicitPositionals) {
-			if (command === `check` || command === `fix`) {
-				targets.push(arg)
-			} else {
-				cliArgs.push(arg)
-			}
-			continue
-		}
-
-		if (arg === `--`) {
-			inExplicitPositionals = true
-			continue
-		}
-
-		if (optionConsumesNextValue(arg)) {
-			cliArgs.push(arg)
-			consumeNextOptionValue = true
-			continue
-		}
-
-		if (arg.startsWith(`-`)) {
-			cliArgs.push(arg)
-			continue
-		}
-
-		if (command === `check` || command === `fix` || command === ``) {
-			targets.push(arg)
-			continue
-		}
-
-		cliArgs.push(arg)
-	}
-
-	return {
-		cliArgs,
-		command,
-		targets: targets.length > 0 ? targets : DEFAULT_TARGET_PATTERNS,
-	}
 }
 
 function resolvePath(cwd: string, filePath: string): string {
@@ -527,13 +445,22 @@ async function runVsix(
 	}
 }
 
+function targetsFromGlob(glob: string | undefined): string[] {
+	const targets =
+		glob
+			?.split(`,`)
+			.map((target) => target.trim())
+			.filter((target) => target.length > 0) ?? []
+
+	return targets.length > 0 ? targets : DEFAULT_TARGET_PATTERNS
+}
+
 export async function runLasertagCli(
 	args: string[] = process.argv,
 	io: LasertagCliIO = console,
 	environment: LasertagCliEnvironment = {},
 ): Promise<LasertagCliResult> {
-	const { cliArgs, command, targets } = extractCommandAndTargets(args)
-	const parsed = lasertagCli(cliArgs)
+	const parsed = lasertagCli(args)
 
 	switch (parsed.inputs.case) {
 		case ``: {
@@ -547,7 +474,7 @@ export async function runLasertagCli(
 					files: [],
 					mode: `help`,
 					options: rootOptions,
-					targets: command === `vsix` ? [] : targets,
+					targets: [],
 				}
 			}
 
@@ -575,9 +502,23 @@ export async function runLasertagCli(
 			}
 		}
 		case `fix`:
-			return runFixStub(targets, io)
+			return runFixStub(DEFAULT_TARGET_PATTERNS, io)
+		case `fix/$glob`:
+			return runFixStub(targetsFromGlob(parsed.inputs.path[1]), io)
 		case `check`:
-			return runCheck(targets, parsed.inputs.opts, io, environment)
+			return runCheck(
+				DEFAULT_TARGET_PATTERNS,
+				parsed.inputs.opts,
+				io,
+				environment,
+			)
+		case `check/$glob`:
+			return runCheck(
+				targetsFromGlob(parsed.inputs.path[1]),
+				parsed.inputs.opts,
+				io,
+				environment,
+			)
 		case `vsix`:
 			return runVsix(parsed.inputs.opts, io, environment)
 	}
