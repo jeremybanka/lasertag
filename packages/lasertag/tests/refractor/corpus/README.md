@@ -5,8 +5,8 @@ story extractor against real JSX patterns.
 
 The checked-in manifest pins release versions only. Provider source files are
 fetched into `providers/`, which is intentionally gitignored. Default tests use
-the smaller golden fixtures under `tests/refractor/fixtures/golden`; this corpus
-is for deeper local and scheduled CI runs.
+the smaller golden fixtures under `../fixtures/golden`; this corpus is for
+deeper local and scheduled CI runs.
 
 Fetch provider files from the workspace root:
 

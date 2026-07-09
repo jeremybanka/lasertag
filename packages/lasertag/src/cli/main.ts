@@ -35,7 +35,7 @@ const DEFAULT_IGNORE_PATTERNS = [
 	`**/dist/**`,
 	`**/build/**`,
 	`**/coverage/**`,
-	`**/refractor/corpus/providers/**`,
+	`**/tests/refractor/corpus/providers/**`,
 ]
 const FORMAT_OPTIONS = [`stylish`, `json`] as const
 
