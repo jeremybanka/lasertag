@@ -31,7 +31,7 @@ export default defineConfig({
 			},
 			dts: false,
 			entry: { extension: "vscode/extension.ts" },
-			format: "cjs",
+			format: "esm",
 			outDir: "vscode/dist",
 			platform: "node",
 		},

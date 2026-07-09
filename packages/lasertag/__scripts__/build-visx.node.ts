@@ -79,7 +79,7 @@ const vscodeManifest = {
 	],
 	extensionKind: ["workspace"],
 	icon: "dist/LasertagIcon.png",
-	main: "./dist/extension.cjs",
+	main: "./dist/extension.mjs",
 	files: ["dist", "README.md"],
 	contributes: {
 		commands: [
