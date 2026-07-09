@@ -14,7 +14,7 @@ import { afterEach, describe, expect, it } from "vitest"
 import {
 	buildLasertagVsix,
 	resolveCurrentVscodePlatformTarget,
-} from "../src/vsix.ts"
+} from "../../src/cli/vsix.ts"
 
 const fixtureRoots: string[] = []
 
@@ -62,13 +62,13 @@ describe(`lasertag vsix builder`, () => {
 	it(`writes the VSCode manifest and copies the TypeScript native runtime package`, async () => {
 		const fixture = createFixture({
 			"package.json": JSON.stringify({ version: `9.8.7-test` }),
-			"vscode/extension.ts": `
+			"src/vscode/extension.ts": `
 				export function activate() {}
 				export function deactivate() {}
 			`,
-			"vscode/README.md": `# Lasertag`,
-			"vscode/LasertagIcon.png": ``,
-			"lsp/src/server.ts": `console.log("server")`,
+			"src/vscode/README.md": `# Lasertag`,
+			"src/vscode/LasertagIcon.png": ``,
+			"src/lsp/server.ts": `console.log("server")`,
 		})
 		const commands: Array<{ args: string[]; cwd: string }> = []
 		const result = await buildLasertagVsix({
@@ -109,7 +109,13 @@ describe(`lasertag vsix builder`, () => {
 		expect(existsSync(path.join(result.buildRoot, `dist/extension.mjs`))).toBe(
 			true,
 		)
+		expect(
+			existsSync(path.join(result.buildRoot, `dist/extension.mjs.map`)),
+		).toBe(true)
 		expect(existsSync(path.join(result.buildRoot, `dist/server.mjs`))).toBe(
+			true,
+		)
+		expect(existsSync(path.join(result.buildRoot, `dist/server.mjs.map`))).toBe(
 			true,
 		)
 		expect(

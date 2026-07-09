@@ -9,7 +9,7 @@ import type {
 	StoryAttribute,
 	StoryChild,
 	StoryNode,
-} from "../../refractor/src/index.ts"
+} from "../refractor/index.ts"
 
 type CompletionContext =
 	| {

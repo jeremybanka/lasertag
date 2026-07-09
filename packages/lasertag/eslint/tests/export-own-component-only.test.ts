@@ -1,4 +1,4 @@
-import { exportOwnComponentOnly } from "../src/rules/export-own-component-only.ts"
+import { exportOwnComponentOnly } from "../../src/eslint/rules/export-own-component-only.ts"
 import { ruleTester } from "./rule-tester.ts"
 
 const message = (expectedExportName: string) =>

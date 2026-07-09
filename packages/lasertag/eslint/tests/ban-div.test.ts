@@ -1,4 +1,4 @@
-import { banDiv } from "../src/rules/ban-div.ts"
+import { banDiv } from "../../src/eslint/rules/ban-div.ts"
 import { ruleTester } from "./rule-tester.ts"
 
 ruleTester.run(`ban-div`, banDiv, {

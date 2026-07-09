@@ -138,7 +138,7 @@ For each open or watched TSX path:
 
 ## Implemented Slice
 
-1. Added `lsp/src/state.ts` with atom.io atoms, selectors, and transactions.
+1. Added `src/lsp/state.ts` with atom.io atoms, selectors, and transactions.
 2. Kept `server.ts` small: convert LSP events into transactions and subscribe to
    diagnostic selectors.
 3. Kept disk reads sync for now, matching the current server.

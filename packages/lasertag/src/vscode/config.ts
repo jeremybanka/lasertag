@@ -1,6 +1,6 @@
 import path from "node:path"
 
-import { LASERTAG_TYPESCRIPT_SDK_PATH } from "../refractor/src/typescript-runtime.ts"
+import { LASERTAG_TYPESCRIPT_SDK_PATH } from "../refractor/typescript-runtime.ts"
 
 export { LASERTAG_TYPESCRIPT_SDK_PATH }
 

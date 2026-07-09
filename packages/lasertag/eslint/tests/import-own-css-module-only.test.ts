@@ -1,4 +1,4 @@
-import { importOwnCssModuleOnly } from "../src/rules/import-own-css-module-only.ts"
+import { importOwnCssModuleOnly } from "../../src/eslint/rules/import-own-css-module-only.ts"
 import { ruleTester } from "./rule-tester.ts"
 
 const message = (expectedImport: string) =>

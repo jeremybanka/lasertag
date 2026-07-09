@@ -12,23 +12,23 @@ import {
 	createLasertagLspState,
 	type LasertagLspStateEnvironment,
 	type LspDocumentInput,
-} from "../src/state.ts"
+} from "../../src/lsp/state.ts"
 import {
 	createLasertagLspLogger,
 	logLevelFromEnvironment,
 	type LasertagLspLogSink,
-} from "../src/logger.ts"
+} from "../../src/lsp/logger.ts"
 import {
 	clientSupportsWorkspaceFolderChangeEvents,
 	createCleanUpDeadSelectorsCodeAction,
 	createInitializeResult,
 	createRefractorDiagnostics,
 	findSiblingTsxPath,
-} from "../src/server.ts"
+} from "../../src/lsp/server.ts"
 import {
 	LASERTAG_CLEAN_UP_DEAD_SELECTORS_KIND,
 	LASERTAG_CLEAN_UP_DEAD_SELECTORS_TITLE,
-} from "../src/code-actions.ts"
+} from "../../src/lsp/code-actions.ts"
 
 const cssPath = `/project/src/AppPanel.module.css`
 const tsxPath = `/project/src/AppPanel.tsx`

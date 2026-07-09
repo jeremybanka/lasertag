@@ -18,7 +18,7 @@ import { z } from "zod/v4"
 import {
 	validateCssReachability,
 	type CssReachabilityDiagnostic,
-} from "../../refractor/src/index.ts"
+} from "../refractor/index.ts"
 import {
 	buildLasertagVsix,
 	defaultLasertagPackageRoot,

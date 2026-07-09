@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest"
 import {
 	createDeadSelectorCleanupRanges,
 	type OffsetRange,
-} from "../src/code-actions.ts"
+} from "../../src/lsp/code-actions.ts"
 
 function applyRanges(sourceText: string, ranges: OffsetRange[]): string {
 	return [...ranges]

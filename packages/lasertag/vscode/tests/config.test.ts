@@ -6,7 +6,7 @@ import {
 	resolveTypescriptSdkPath,
 	resolveWorkspacePath,
 	withTypescriptSdkPathEnvironment,
-} from "../config.ts"
+} from "../../src/vscode/config.ts"
 
 describe(`VSCode extension configuration`, () => {
 	it(`resolves absolute TypeScript SDK paths unchanged`, () => {

@@ -24,7 +24,7 @@ import {
 	type CssReachabilityDiagnostic,
 	type CssSelectorAnalysis,
 	type RenderStory,
-} from "../../refractor/src/index.ts"
+} from "../refractor/index.ts"
 
 const CSS_MODULE_SUFFIX = `.module.css`
 const TSX_SUFFIX = `.tsx`

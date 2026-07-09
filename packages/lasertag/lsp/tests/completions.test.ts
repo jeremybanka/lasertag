@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 
-import type { RenderStory } from "../../refractor/src/index.ts"
-import { createCssModuleCompletionItems } from "../src/completions.ts"
+import type { RenderStory } from "../../src/refractor/index.ts"
+import { createCssModuleCompletionItems } from "../../src/lsp/completions.ts"
 
 const renderStory: RenderStory = {
 	componentName: `AppPanel`,

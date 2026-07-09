@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest"
 import {
 	analyzeTsxRenderStories,
 	analyzeTsxRenderStory,
-} from "../src/analyze-tsx.ts"
+} from "../../src/refractor/analyze-tsx.ts"
 
 const fixturesRoot = fileURLToPath(new URL(`fixtures/golden`, import.meta.url))
 

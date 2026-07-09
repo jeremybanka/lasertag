@@ -1,4 +1,4 @@
-import { headerMainFooterAsGroup } from "../src/rules/header-main-footer-as-group.ts"
+import { headerMainFooterAsGroup } from "../../src/eslint/rules/header-main-footer-as-group.ts"
 import { ruleTester } from "./rule-tester.ts"
 
 const message = `Use <header>, <main>, and <footer> only as a sibling group of two or more, with no unrelated element siblings.`

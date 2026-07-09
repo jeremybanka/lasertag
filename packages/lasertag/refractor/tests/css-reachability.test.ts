@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { validateCssReachability } from "../src/validate-css-reachability.ts"
+import { validateCssReachability } from "../../src/refractor/validate-css-reachability.ts"
 
 function diagnosticCodes(tsxSource: string, cssSource: string): string[] {
 	return validateCssReachability({

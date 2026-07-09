@@ -1,4 +1,4 @@
-import { nameImportedCssModuleAsCss } from "../src/rules/name-imported-css-module-as-css.ts"
+import { nameImportedCssModuleAsCss } from "../../src/eslint/rules/name-imported-css-module-as-css.ts"
 import { ruleTester } from "./rule-tester.ts"
 
 const message = (source: string) =>

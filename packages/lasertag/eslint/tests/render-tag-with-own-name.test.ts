@@ -1,4 +1,4 @@
-import { renderTagWithOwnName } from "../src/rules/render-tag-with-own-name.ts"
+import { renderTagWithOwnName } from "../../src/eslint/rules/render-tag-with-own-name.ts"
 import { ruleTester } from "./rule-tester.ts"
 
 const message = (componentName: string, expectedTagName: string) =>

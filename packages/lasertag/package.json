@@ -8,36 +8,27 @@
 		"directory": "packages/lasertag"
 	},
 	"files": [
-		"cli",
 		"dist",
 		"docs",
-		"eslint",
 		"examples",
-		"lsp",
-		"refractor",
+		"src",
 		"templates",
-		"types",
-		"vscode/config.ts",
-		"vscode/extension.ts",
-		"vscode/LasertagIcon.png",
-		"vscode/package.json",
-		"vscode/README.md",
 		"AGENTS.md"
 	],
 	"type": "module",
 	"exports": {
 		"./package.json": "./package.json",
 		"./css-modules": {
-			"types": "./types/module.css.d.ts"
+			"types": "./src/types/module.css.d.ts"
 		},
 		"./react-jsx": {
-			"types": "./types/react-jsx-intrinsic-elements.d.ts"
+			"types": "./src/types/react-jsx-intrinsic-elements.d.ts"
 		},
 		"./preact-jsx": {
-			"types": "./types/preact-jsx-intrinsic-elements.d.ts"
+			"types": "./src/types/preact-jsx-intrinsic-elements.d.ts"
 		},
 		"./solid-jsx": {
-			"types": "./types/solid-jsx-intrinsic-elements.d.ts"
+			"types": "./src/types/solid-jsx-intrinsic-elements.d.ts"
 		},
 		"./eslint-plugin": {
 			"import": "./dist/eslint-plugin.mjs",
@@ -48,8 +39,7 @@
 			"types": "./dist/refractor.d.mts"
 		},
 		"./lsp": {
-			"import": "./dist/lsp.mjs",
-			"types": "./dist/lsp.d.mts"
+			"import": "./dist/lsp.mjs"
 		}
 	},
 	"bin": {

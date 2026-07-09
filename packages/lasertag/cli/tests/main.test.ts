@@ -5,7 +5,7 @@ import path from "node:path"
 
 import { afterEach, describe, expect, it } from "vitest"
 
-import { runLasertagCli } from "../src/main.ts"
+import { runLasertagCli } from "../../src/cli/main.ts"
 
 const requireFromTest = createRequire(import.meta.url)
 const fixtureRoots: string[] = []

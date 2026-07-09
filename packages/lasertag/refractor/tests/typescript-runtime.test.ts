@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest"
 import {
 	LASERTAG_TYPESCRIPT_SDK_PATH,
 	resolveTypescriptSdkPath,
-} from "../src/typescript-runtime.ts"
+} from "../../src/refractor/typescript-runtime.ts"
 
 describe(`typescript runtime path resolution`, () => {
 	it(`prefers an explicit TypeScript SDK path`, () => {

@@ -11,7 +11,7 @@ import {
 	LASERTAG_CLEAN_UP_DEAD_SELECTORS_TITLE,
 	LASERTAG_RESTART_SERVER_COMMAND,
 	LASERTAG_RESTART_SERVER_TITLE,
-} from "../../lsp/src/code-actions.ts"
+} from "../lsp/code-actions.ts"
 
 export type LasertagVsixBuildResult = {
 	buildRoot: string
@@ -52,7 +52,7 @@ export function defaultLasertagPackageRoot(): string {
 	const modulePath = fileURLToPath(import.meta.url)
 	const moduleDirectory = path.dirname(modulePath)
 
-	if (path.basename(moduleDirectory) === `src`) {
+	if (path.basename(path.dirname(moduleDirectory)) === `src`) {
 		return path.resolve(moduleDirectory, `..`, `..`)
 	}
 
@@ -103,7 +103,7 @@ function createVscodeManifest(version: string) {
 		repository: {
 			type: "git",
 			url: "https://github.com/jeremybanka/lasertag.git",
-			directory: "packages/lasertag/vscode",
+			directory: "packages/lasertag/src/vscode",
 		},
 		license: "MIT",
 		engines: {
@@ -231,7 +231,7 @@ async function bundleEntry(options: {
 		await bundle.write({
 			file: options.outfile,
 			format: "esm",
-			sourcemap: false,
+			sourcemap: true,
 		})
 	} finally {
 		await bundle.close()
@@ -241,12 +241,12 @@ async function bundleEntry(options: {
 async function bundleVscodeRuntime(packageRoot: string, distRoot: string) {
 	await bundleEntry({
 		external: ["vscode"],
-		input: path.join(packageRoot, "vscode", "extension.ts"),
+		input: path.join(packageRoot, "src", "vscode", "extension.ts"),
 		outfile: path.join(distRoot, "extension.mjs"),
 	})
 	await bundleEntry({
 		external: (id) => id.startsWith("@typescript/"),
-		input: path.join(packageRoot, "lsp", "src", "server.ts"),
+		input: path.join(packageRoot, "src", "lsp", "server.ts"),
 		outfile: path.join(distRoot, "server.mjs"),
 	})
 }
@@ -296,11 +296,11 @@ export async function buildLasertagVsix(
 	await mkdir(packageDist, { recursive: true })
 	await bundleVscodeRuntime(packageRoot, packageDist)
 	await cp(
-		path.join(packageRoot, "vscode", "LasertagIcon.png"),
+		path.join(packageRoot, "src", "vscode", "LasertagIcon.png"),
 		path.join(packageDist, "LasertagIcon.png"),
 	)
 	await cp(
-		path.join(packageRoot, "vscode", "README.md"),
+		path.join(packageRoot, "src", "vscode", "README.md"),
 		path.join(buildRoot, "README.md"),
 	)
 	await copyTypescriptNativeRuntime(path.join(packageDist, "node_modules"))

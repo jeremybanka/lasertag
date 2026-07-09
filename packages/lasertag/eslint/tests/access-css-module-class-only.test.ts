@@ -1,4 +1,4 @@
-import { accessCssModuleClassOnly } from "../src/rules/access-css-module-class-only.ts"
+import { accessCssModuleClassOnly } from "../../src/eslint/rules/access-css-module-class-only.ts"
 import { ruleTester } from "./rule-tester.ts"
 
 const message = `Access only css.class from CSS module imports.`

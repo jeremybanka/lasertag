@@ -2,7 +2,7 @@ import {
 	LASERTAG_CLEAN_UP_DEAD_SELECTORS_COMMAND,
 	LASERTAG_CLEAN_UP_DEAD_SELECTORS_KIND,
 	LASERTAG_RESTART_SERVER_COMMAND,
-} from "../lsp/src/code-actions.ts"
+} from "../lsp/code-actions.ts"
 import {
 	resolveBundledTypescriptSdkPath,
 	resolveTypescriptSdkPath,
