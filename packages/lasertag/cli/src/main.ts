@@ -10,6 +10,7 @@ import {
 	optional,
 	parseBooleanOption,
 	parseStringOption,
+	noOptions,
 } from "comline"
 import { globSync } from "tinyglobby"
 import { z } from "zod/v4"
@@ -46,23 +47,17 @@ const rootOptionsSchema = z.object({
 
 const checkOptionsSchema = z.object({
 	format: z.enum(FORMAT_OPTIONS).default(`stylish`),
-	help: z.boolean().default(false),
-})
-
-const fixOptionsSchema = z.object({
-	help: z.boolean().default(false),
 })
 
 const vsixOptionsSchema = z.object({
 	"build-only": z.boolean().default(false),
-	help: z.boolean().default(false),
 	outdir: z.string().optional(),
 	target: z.string().default(`code`),
 })
 
 type RootOptions = z.infer<typeof rootOptionsSchema>
 type CheckOptions = z.infer<typeof checkOptionsSchema>
-type FixOptions = z.infer<typeof fixOptionsSchema>
+type FixOptions = Record<never, never>
 type VsixOptions = z.infer<typeof vsixOptionsSchema>
 type LasertagOutputFormat = CheckOptions[`format`]
 
@@ -146,27 +141,13 @@ const lasertagCli = cli({
 			{
 				format: {
 					description: `output format`,
-					example: `--format=json`,
-					required: false,
-				},
-				help: {
-					description: `show this help text`,
-					example: `--help`,
-					flag: `h`,
-					parse: parseBooleanOption,
+					flag: `f`,
+					example: `--format json`,
 					required: false,
 				},
 			},
 		),
-		fix: options(`Remove dead CSS when implemented.`, fixOptionsSchema, {
-			help: {
-				description: `show this help text`,
-				example: `--help`,
-				flag: `h`,
-				parse: parseBooleanOption,
-				required: false,
-			},
-		}),
+		fix: noOptions(`Remove dead CSS when implemented.`),
 		vsix: options(
 			`Build and install the current-platform VSCode extension.`,
 			vsixOptionsSchema,
@@ -174,13 +155,6 @@ const lasertagCli = cli({
 				"build-only": {
 					description: `build the VSIX without installing it`,
 					example: `--build-only`,
-					parse: parseBooleanOption,
-					required: false,
-				},
-				help: {
-					description: `show this help text`,
-					example: `--help`,
-					flag: `h`,
 					parse: parseBooleanOption,
 					required: false,
 				},
@@ -469,11 +443,7 @@ function runCheck(
 	}
 }
 
-function runFixStub(
-	targets: string[],
-	options: FixOptions,
-	io: LasertagCliIO,
-): LasertagCliResult {
+function runFixStub(targets: string[], io: LasertagCliIO): LasertagCliResult {
 	io.log(`lasertag fix: dead CSS cleanup is stubbed.`)
 
 	return {
@@ -481,7 +451,7 @@ function runFixStub(
 		exitCode: 0,
 		files: [],
 		mode: `fix`,
-		options,
+		options: {},
 		targets,
 	}
 }
@@ -564,63 +534,58 @@ export async function runLasertagCli(
 ): Promise<LasertagCliResult> {
 	const { cliArgs, command, targets } = extractCommandAndTargets(args)
 	const parsed = lasertagCli(cliArgs)
-	const { opts } = parsed.inputs
 
-	if (opts.help) {
-		io.log(help(lasertagCli.definition))
-		return {
-			diagnostics: [],
-			exitCode: 0,
-			files: [],
-			mode: `help`,
-			options: opts,
-			targets: command === `vsix` ? [] : targets,
-		}
-	}
+	switch (parsed.inputs.case) {
+		case ``: {
+			const rootOptions = parsed.inputs.opts
 
-	if (parsed.inputs.case === ``) {
-		const rootOptions = parsed.inputs.opts
+			if (rootOptions.help) {
+				io.log(help(lasertagCli.definition))
+				return {
+					diagnostics: [],
+					exitCode: 0,
+					files: [],
+					mode: `help`,
+					options: rootOptions,
+					targets: command === `vsix` ? [] : targets,
+				}
+			}
 
-		if (rootOptions.version) {
-			const version = readPackageVersion(environment)
+			if (rootOptions.version) {
+				const version = readPackageVersion(environment)
+				io.log(version)
+				return {
+					diagnostics: [],
+					exitCode: 0,
+					files: [],
+					mode: `version`,
+					options: rootOptions,
+					targets: [],
+				}
+			}
 
-			io.log(version)
+			io.log(help(lasertagCli.definition))
 			return {
 				diagnostics: [],
 				exitCode: 0,
 				files: [],
-				mode: `version`,
+				mode: `help`,
 				options: rootOptions,
 				targets: [],
 			}
 		}
-
-		io.log(help(lasertagCli.definition))
-		return {
-			diagnostics: [],
-			exitCode: 0,
-			files: [],
-			mode: `help`,
-			options: rootOptions,
-			targets: [],
-		}
+		case `fix`:
+			return runFixStub(targets, io)
+		case `check`:
+			return runCheck(targets, parsed.inputs.opts, io, environment)
+		case `vsix`:
+			return runVsix(parsed.inputs.opts, io, environment)
 	}
-
-	if (parsed.inputs.case === `fix`) {
-		return runFixStub(targets, parsed.inputs.opts, io)
-	}
-
-	if (parsed.inputs.case === `vsix`) {
-		return runVsix(parsed.inputs.opts, io, environment)
-	}
-
-	return runCheck(targets, parsed.inputs.opts, io, environment)
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
 	try {
 		const result = await runLasertagCli()
-
 		process.exitCode = result.exitCode
 	} catch (error) {
 		console.error(error instanceof Error ? error.message : error)
