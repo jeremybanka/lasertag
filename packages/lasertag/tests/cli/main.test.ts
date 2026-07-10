@@ -40,6 +40,12 @@ function createTestIO({ echo = false }: { echo?: boolean } = {}) {
 	}
 }
 
+function showFixCourseStage(stage: string, lessonCount: number): void {
+	if (!SHOW_FIX_COURSE_CHRONICLE) return
+
+	process.stdout.write(`\n[fix course] ${stage} — ${lessonCount} lessons\n\n`)
+}
+
 function createFixture(files: Record<string, string>) {
 	const root = mkdtempSync(path.join(tmpdir(), `lasertag-cli-`))
 
@@ -367,7 +373,7 @@ export function AppPanel() {
 
 }
 `)
-		expect(logs.some((message) => message.includes(`found 1`))).toBe(true)
+		expect(logs.some((message) => message.includes(`discovered 1`))).toBe(true)
 		expect(logs.some((message) => message.includes(`1/1`))).toBe(true)
 		expect(logs.some((message) => message.includes(`TOTAL TIME`))).toBe(true)
 		expect(logs.at(-1)).toBe(
@@ -379,6 +385,9 @@ export function AppPanel() {
 		const course = createFixCourse()
 		const fixture = createFixture(course.files)
 		const firstRun = createTestIO({ echo: SHOW_FIX_COURSE_CHRONICLE })
+
+		showFixCourseStage(`cleanup pass`, course.lessons.length)
+
 		const result = await runLasertagCli(
 			[`lasertag`, `fix`, `course/**/*.module.css`],
 			firstRun.io,
@@ -425,11 +434,23 @@ export function AppPanel() {
 		expect(
 			firstRun.logs.some((message) => message.includes(`TOTAL TIME`)),
 		).toBe(true)
+		expect(
+			firstRun.logs.some((message) => message.includes(`started 2 workers`)),
+		).toBe(true)
+		expect(
+			firstRun.logs.some((message) => message.includes(`skipped no TSX`)),
+		).toBe(true)
+		expect(
+			firstRun.logs.some((message) => message.includes(`removed 1 selector`)),
+		).toBe(true)
 		expect(firstRun.logs.at(-1)).toBe(
 			`lasertag fix: removed ${expectedFixedCount} dead selectors from ${changedPaths.length} files.`,
 		)
 
 		const secondRun = createTestIO({ echo: SHOW_FIX_COURSE_CHRONICLE })
+
+		showFixCourseStage(`idempotence pass`, course.lessons.length)
+
 		const idempotentResult = await runLasertagCli(
 			[`lasertag`, `fix`, `course/**/*.module.css`],
 			secondRun.io,
@@ -446,6 +467,9 @@ export function AppPanel() {
 		expect(
 			secondRun.logs.some((message) => message.includes(`TOTAL TIME`)),
 		).toBe(true)
+		expect(
+			secondRun.logs.filter((message) => message.includes(` clean `)),
+		).toHaveLength(course.lessons.length - 1)
 		expect(secondRun.logs.at(-1)).toBe(
 			`lasertag fix: no dead CSS found in ${course.lessons.length} files.`,
 		)

@@ -36,6 +36,7 @@ export type LasertagFixFileResult = {
 	status: LasertagFixFileStatus
 	workerId: number
 	error?: string
+	stolenFrom?: number
 	tsxPath?: string
 }
 
@@ -43,6 +44,11 @@ export type LasertagFixProgress = {
 	completed: number
 	file: LasertagFixFileResult
 	total: number
+}
+
+export type LasertagFixStart = {
+	total: number
+	workerCount: number
 }
 
 export type LasertagFixResult = {
@@ -68,6 +74,7 @@ export type LasertagFixFileSystem = {
 export type RunLasertagFixOptions = {
 	fileSystem?: Partial<LasertagFixFileSystem>
 	onProgress?: (progress: LasertagFixProgress) => void
+	onStart?: (start: LasertagFixStart) => void
 	typescriptSdkPath?: string
 	workerCount?: number
 	workerModuleUrl?: string | URL
@@ -82,6 +89,7 @@ export type LasertagFixWorkerData = {
 type LasertagFixTask = {
 	cssPath: string
 	index: number
+	stolenFrom?: number
 }
 
 type LasertagFixWorkerMessage =
@@ -151,8 +159,9 @@ function fixFile(
 	fileSystem: LasertagFixFileSystem,
 	typescriptSdkPath: string | undefined,
 ): LasertagFixFileResult {
-	const { cssPath, index } = task
+	const { cssPath, index, stolenFrom } = task
 	const tsxPath = siblingTsxPath(cssPath)
+	const assignment = stolenFrom === undefined ? {} : { stolenFrom }
 
 	try {
 		if (!fileSystem.fileExists(tsxPath)) {
@@ -163,6 +172,7 @@ function fixFile(
 				index,
 				remainingDiagnostics: [],
 				status: `skipped`,
+				...assignment,
 				workerId,
 			}
 		}
@@ -191,6 +201,7 @@ function fixFile(
 				index,
 				remainingDiagnostics: diagnostics,
 				status: `unchanged`,
+				...assignment,
 				tsxPath,
 				workerId,
 			}
@@ -210,6 +221,7 @@ function fixFile(
 			index,
 			remainingDiagnostics,
 			status: `changed`,
+			...assignment,
 			tsxPath,
 			workerId,
 		}
@@ -222,6 +234,7 @@ function fixFile(
 			index,
 			remainingDiagnostics: [],
 			status: `failed`,
+			...assignment,
 			tsxPath,
 			workerId,
 		}
@@ -372,7 +385,7 @@ function stealWork(
 	const task = victim.items[victim.head]
 
 	victim.head += 1
-	return task
+	return task ? { ...task, stolenFrom: victimId } : undefined
 }
 
 function workerOptions(data: LasertagFixWorkerData): WorkerOptions {
@@ -546,8 +559,22 @@ export async function runLasertagFix(
 	const hasCustomFileSystem =
 		options.fileSystem !== undefined &&
 		Object.keys(options.fileSystem).length > 0
+	const runsInParallel =
+		workerCount > 1 &&
+		!hasCustomFileSystem &&
+		options.workerModuleUrl !== undefined
+	const effectiveWorkerCount = runsInParallel
+		? workerCount
+		: files.length === 0
+			? 0
+			: 1
 
-	if (workerCount <= 1 || hasCustomFileSystem) {
+	options.onStart?.({
+		total: files.length,
+		workerCount: effectiveWorkerCount,
+	})
+
+	if (!runsInParallel) {
 		return runSerialFix(files, options)
 	}
 

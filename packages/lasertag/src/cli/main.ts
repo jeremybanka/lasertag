@@ -26,6 +26,7 @@ import {
 	runLasertagFix,
 	runLasertagFixWorker,
 	type LasertagFixFileSystem,
+	type LasertagFixProgress,
 	type LasertagFixResult,
 } from "./fix.ts"
 import {
@@ -378,8 +379,6 @@ function runCheck(
 	}
 }
 
-let fixRunSequence = 0
-
 function createCliLogger(io: LasertagCliIO): Logger {
 	return new Logger({
 		colorEnabled: false,
@@ -390,6 +389,52 @@ function createCliLogger(io: LasertagCliIO): Logger {
 			warn: (message) => io.error(message),
 		},
 	})
+}
+
+const MAX_FIX_CHRONICLE_EVENT_LENGTH = 64
+
+function abbreviate(text: string, maximumLength: number): string {
+	if (text.length <= maximumLength) return text
+	if (maximumLength <= 1) return `…`
+
+	return `${text.slice(0, maximumLength - 1)}…`
+}
+
+function fixProgressMark({
+	completed,
+	file,
+	total,
+}: LasertagFixProgress): string {
+	const outcome = (() => {
+		switch (file.status) {
+			case `changed`:
+				return `removed ${file.fixedCount} ${plural(file.fixedCount, `selector`)}`
+			case `failed`:
+				return `FAILED`
+			case `skipped`:
+				return `skipped no TSX`
+			case `unchanged`:
+				return file.remainingDiagnostics.length > 0
+					? `${file.remainingDiagnostics.length} unresolved`
+					: `clean`
+		}
+	})()
+	const worker = file.workerId + 1
+	const assignment =
+		file.stolenFrom === undefined
+			? ` [w${worker}]`
+			: ` [w${worker} stole w${file.stolenFrom + 1}]`
+	const prefix = `fix ${completed}/${total} ${outcome} `
+	const name = path.basename(file.cssPath, `.module.css`)
+	const nameBudget = Math.max(
+		MAX_FIX_CHRONICLE_EVENT_LENGTH - prefix.length - assignment.length,
+		1,
+	)
+
+	return `${prefix}${abbreviate(name, nameBudget)}${assignment}`.slice(
+		0,
+		MAX_FIX_CHRONICLE_EVENT_LENGTH,
+	)
 }
 
 function plural(count: number, singular: string, pluralForm = `${singular}s`) {
@@ -422,17 +467,15 @@ async function runFix(
 	environment: LasertagCliEnvironment,
 ): Promise<LasertagCliResult> {
 	const cwd = environment.cwd ?? process.cwd()
-	const runId = (fixRunSequence += 1)
 	const chronicle = createCliLogger(io).makeChronicle({ inline: true })
-	const markPrefix = `fix#${runId}`
 
-	chronicle.mark(`${markPrefix} started`)
+	chronicle.mark(`fix started`)
 
 	const files = discoverCssModuleFiles(targets, environment)
 	const progressInterval = Math.max(1, Math.ceil(files.length / 100))
 	const fileSystem = fixFileSystemFromEnvironment(environment)
 
-	chronicle.mark(`${markPrefix} found ${files.length}`)
+	chronicle.mark(`fix discovered ${files.length} CSS modules`)
 
 	let fixResult: LasertagFixResult
 
@@ -442,10 +485,21 @@ async function runFix(
 				? { workerCount: environment.fixWorkerCount }
 				: {}),
 			...(fileSystem ? { fileSystem } : {}),
-			onProgress: ({ completed, total }) => {
+			onProgress: (progress) => {
+				const { completed, total } = progress
+
 				if (completed === total || completed % progressInterval === 0) {
-					chronicle.mark(`${markPrefix} ${completed}/${total}`)
+					chronicle.mark(fixProgressMark(progress))
 				}
+			},
+			onStart: ({ workerCount }) => {
+				chronicle.mark(
+					workerCount === 0
+						? `fix no workers needed`
+						: workerCount === 1
+							? `fix started 1 worker`
+							: `fix started ${workerCount} workers`,
+				)
 			},
 			...(environment.typescriptSdkPath
 				? { typescriptSdkPath: environment.typescriptSdkPath }
@@ -453,12 +507,16 @@ async function runFix(
 			workerModuleUrl: new URL(import.meta.url),
 		})
 	} catch (error) {
-		chronicle.mark(`${markPrefix} failed`)
+		chronicle.mark(`fix failed`)
 		chronicle.logMarks()
 		throw error
 	}
 
-	chronicle.mark(`${markPrefix} wrote ${fixResult.changedFiles.length}`)
+	chronicle.mark(
+		fixResult.workerCount === 0
+			? `fix finished: no files`
+			: `fix workers finished: ${fixResult.workerCount} ${plural(fixResult.workerCount, `worker`)}, ${fixResult.stealCount} ${plural(fixResult.stealCount, `steal`)}`,
+	)
 	chronicle.logMarks()
 
 	for (const failure of fixResult.failures) {
