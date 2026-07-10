@@ -16,16 +16,25 @@ import { createFixCourse } from "./fix-course.ts"
 
 const requireFromTest = createRequire(import.meta.url)
 const fixtureRoots: string[] = []
+const SHOW_FIX_COURSE_CHRONICLE =
+	process.env.LASERTAG_FIX_COURSE_CHRONICLE === `1` ||
+	(!process.env.CI && process.env.LASERTAG_FIX_COURSE_CHRONICLE !== `0`)
 
-function createTestIO() {
+function createTestIO({ echo = false }: { echo?: boolean } = {}) {
 	const logs: string[] = []
 	const errors: string[] = []
 
 	return {
 		errors,
 		io: {
-			error: (message: string) => errors.push(message),
-			log: (message: string) => logs.push(message),
+			error: (message: string) => {
+				errors.push(message)
+				if (echo) process.stderr.write(`${message}\n`)
+			},
+			log: (message: string) => {
+				logs.push(message)
+				if (echo) process.stdout.write(`${message}\n`)
+			},
 		},
 		logs,
 	}
@@ -369,7 +378,7 @@ export function AppPanel() {
 	it(`runs the generated fix course through real workers with readable chronicle progress`, async () => {
 		const course = createFixCourse()
 		const fixture = createFixture(course.files)
-		const firstRun = createTestIO()
+		const firstRun = createTestIO({ echo: SHOW_FIX_COURSE_CHRONICLE })
 		const result = await runLasertagCli(
 			[`lasertag`, `fix`, `course/**/*.module.css`],
 			firstRun.io,
@@ -420,7 +429,7 @@ export function AppPanel() {
 			`lasertag fix: removed ${expectedFixedCount} dead selectors from ${changedPaths.length} files.`,
 		)
 
-		const secondRun = createTestIO()
+		const secondRun = createTestIO({ echo: SHOW_FIX_COURSE_CHRONICLE })
 		const idempotentResult = await runLasertagCli(
 			[`lasertag`, `fix`, `course/**/*.module.css`],
 			secondRun.io,
