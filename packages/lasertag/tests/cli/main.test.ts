@@ -16,9 +16,12 @@ import { createFixCourse } from "./fix-course.ts"
 
 const requireFromTest = createRequire(import.meta.url)
 const fixtureRoots: string[] = []
-const SHOW_FIX_COURSE_CHRONICLE =
-	process.env.LASERTAG_FIX_COURSE_CHRONICLE === `1` ||
-	(!process.env.CI && process.env.LASERTAG_FIX_COURSE_CHRONICLE !== `0`)
+const TRAINING_COURSE_OUTPUT =
+	process.env.LASERTAG_TRAINING_COURSE_OUTPUT ??
+	process.env.LASERTAG_FIX_COURSE_CHRONICLE
+const SHOW_TRAINING_COURSE_OUTPUT =
+	TRAINING_COURSE_OUTPUT === `1` ||
+	(!process.env.CI && TRAINING_COURSE_OUTPUT !== `0`)
 
 function createTestIO({ echo = false }: { echo?: boolean } = {}) {
 	const logs: string[] = []
@@ -40,10 +43,12 @@ function createTestIO({ echo = false }: { echo?: boolean } = {}) {
 	}
 }
 
-function showFixCourseStage(stage: string, lessonCount: number): void {
-	if (!SHOW_FIX_COURSE_CHRONICLE) return
+function showTrainingCourseStage(stage: string, lessonCount: number): void {
+	if (!SHOW_TRAINING_COURSE_OUTPUT) return
 
-	process.stdout.write(`\n[fix course] ${stage} — ${lessonCount} lessons\n\n`)
+	process.stdout.write(
+		`\n[training course] ${stage} — ${lessonCount} lessons\n\n`,
+	)
 }
 
 function createFixture(files: Record<string, string>) {
@@ -338,6 +343,54 @@ describe(`lasertag cli`, () => {
 		])
 	})
 
+	it(`shows concise warning regions from the generated training course`, async () => {
+		const course = createFixCourse()
+		const fixture = createFixture(course.files)
+		const output = createTestIO({ echo: SHOW_TRAINING_COURSE_OUTPUT })
+		const expectedWarningCount = course.lessons.reduce(
+			(count, lesson) => count + lesson.expectedRemovedSelectors.length,
+			0,
+		)
+
+		showTrainingCourseStage(`check warning regions`, course.lessons.length)
+
+		const result = await runLasertagCli(
+			[`lasertag`, `check`, `course/**/*.module.css`],
+			output.io,
+			{ cwd: fixture.root },
+		)
+		const warningBlocks = (output.logs[0] ?? ``).split(/\n\n+/).filter(Boolean)
+
+		expect(output.errors).toEqual([])
+		expect(result.mode).toBe(`check`)
+		expect(result.exitCode).toBe(1)
+		expect(result.diagnostics).toHaveLength(expectedWarningCount)
+		expect(warningBlocks).toHaveLength(result.diagnostics.length)
+
+		for (const [index, diagnostic] of result.diagnostics.entries()) {
+			const block = warningBlocks[index]
+			const relativeCssPath = path.relative(fixture.root, diagnostic.cssPath)
+			const cssSource = course.files[relativeCssPath]
+
+			if (!block || !cssSource || !diagnostic.range) {
+				throw new Error(
+					`Course warning ${index + 1} is missing source context.`,
+				)
+			}
+
+			const warningRegion = cssSource
+				.slice(diagnostic.range.start, diagnostic.range.end)
+				.replaceAll(`\t`, `    `)
+				.trim()
+
+			expect(block).toContain(diagnostic.code)
+			expect(block).toContain(diagnostic.message)
+			expect(block).toContain(warningRegion)
+			expect(block).toContain(`^`)
+			expect(block.split(`\n`).length).toBeLessThanOrEqual(4)
+		}
+	})
+
 	it(`removes dead CSS under the fix command`, async () => {
 		const fixture = createFixture({
 			"src/AppPanel.module.css": `app-panel.class {
@@ -384,9 +437,9 @@ export function AppPanel() {
 	it(`runs the generated fix course through real workers with readable chronicle progress`, async () => {
 		const course = createFixCourse()
 		const fixture = createFixture(course.files)
-		const firstRun = createTestIO({ echo: SHOW_FIX_COURSE_CHRONICLE })
+		const firstRun = createTestIO({ echo: SHOW_TRAINING_COURSE_OUTPUT })
 
-		showFixCourseStage(`cleanup pass`, course.lessons.length)
+		showTrainingCourseStage(`fix cleanup pass`, course.lessons.length)
 
 		const result = await runLasertagCli(
 			[`lasertag`, `fix`, `course/**/*.module.css`],
@@ -447,9 +500,9 @@ export function AppPanel() {
 			`lasertag fix: removed ${expectedFixedCount} dead selectors from ${changedPaths.length} files.`,
 		)
 
-		const secondRun = createTestIO({ echo: SHOW_FIX_COURSE_CHRONICLE })
+		const secondRun = createTestIO({ echo: SHOW_TRAINING_COURSE_OUTPUT })
 
-		showFixCourseStage(`idempotence pass`, course.lessons.length)
+		showTrainingCourseStage(`fix idempotence pass`, course.lessons.length)
 
 		const idempotentResult = await runLasertagCli(
 			[`lasertag`, `fix`, `course/**/*.module.css`],

@@ -267,9 +267,103 @@ function offsetToLineColumn(sourceText: string, offset: number) {
 	return { column, line }
 }
 
+type WarningRegionLine = {
+	highlightEnd: number
+	highlightStart: number
+	line: number
+	text: string
+}
+
+const MAX_WARNING_REGION_LINES = 2
+
+function warningRegionLines(
+	sourceText: string,
+	startOffset: number,
+	endOffset: number,
+): WarningRegionLine[] {
+	const start = Math.min(Math.max(startOffset, 0), sourceText.length)
+	const end = Math.min(Math.max(endOffset, start + 1), sourceText.length)
+	const lastSelectedOffset = Math.max(end - 1, start)
+	const firstLineStart = sourceText.lastIndexOf(`\n`, start - 1) + 1
+	let line = offsetToLineColumn(sourceText, firstLineStart).line
+	let lineStart = firstLineStart
+	const lines: WarningRegionLine[] = []
+
+	while (lineStart <= lastSelectedOffset && lineStart < sourceText.length) {
+		const newline = sourceText.indexOf(`\n`, lineStart)
+		const lineEnd = newline === -1 ? sourceText.length : newline
+		const text = sourceText.slice(lineStart, lineEnd).replace(/\r$/, ``)
+		const highlightStart = Math.max(start - lineStart, 0)
+		const highlightEnd = Math.min(
+			Math.max(end - lineStart, highlightStart + 1),
+			text.length,
+		)
+
+		lines.push({ highlightEnd, highlightStart, line, text })
+
+		if (lineEnd > lastSelectedOffset || newline === -1) break
+
+		line += 1
+		lineStart = newline + 1
+	}
+
+	return lines
+}
+
+function expandTabs(text: string): string {
+	return text.replaceAll(`\t`, `    `)
+}
+
+function formatWarningRegion(
+	diagnostic: LasertagCliDiagnostic,
+	sourceText: string,
+): string | undefined {
+	if (!diagnostic.range) return
+
+	const lines = warningRegionLines(
+		sourceText,
+		diagnostic.range.start,
+		diagnostic.range.end,
+	)
+
+	if (lines.length === 0) return
+
+	const visibleLines =
+		lines.length <= MAX_WARNING_REGION_LINES
+			? lines
+			: [lines[0], undefined, lines.at(-1)]
+	const lineNumberWidth = String(lines.at(-1)?.line ?? diagnostic.line).length
+	const output: string[] = []
+
+	for (const line of visibleLines) {
+		if (!line) {
+			output.push(`${` `.repeat(lineNumberWidth)} │ …`)
+			continue
+		}
+
+		const expandedText = expandTabs(line.text).trimEnd()
+		const caretStart = expandTabs(
+			line.text.slice(0, line.highlightStart),
+		).length
+		const caretWidth = Math.max(
+			expandTabs(line.text.slice(line.highlightStart, line.highlightEnd))
+				.length,
+			1,
+		)
+
+		output.push(
+			`${String(line.line).padStart(lineNumberWidth)} │ ${expandedText}`,
+			`${` `.repeat(lineNumberWidth)} │ ${` `.repeat(caretStart)}${`^`.repeat(caretWidth)}`,
+		)
+	}
+
+	return output.join(`\n`)
+}
+
 function formatStylishDiagnostic(
 	diagnostic: LasertagCliDiagnostic,
 	cwd: string,
+	cssSource?: string,
 ): string {
 	const relativeCssPath = path.relative(cwd, diagnostic.cssPath)
 	const displayCssPath =
@@ -277,11 +371,16 @@ function formatStylishDiagnostic(
 			? relativeCssPath
 			: diagnostic.cssPath
 
-	return [
+	const message = [
 		`${displayCssPath}:${diagnostic.line}:${diagnostic.column}`,
 		diagnostic.code,
 		diagnostic.message,
 	].join(` `)
+	const region = cssSource
+		? formatWarningRegion(diagnostic, cssSource)
+		: undefined
+
+	return region ? `${message}\n${region}` : message
 }
 
 function formatDiagnostics(
@@ -289,6 +388,7 @@ function formatDiagnostics(
 	format: LasertagOutputFormat,
 	files: string[],
 	cwd: string,
+	readCssSource: (cssPath: string) => string,
 ): string {
 	if (format === `json`) {
 		return JSON.stringify({ diagnostics, files }, null, 2)
@@ -301,8 +401,14 @@ function formatDiagnostics(
 	}
 
 	return diagnostics
-		.map((diagnostic) => formatStylishDiagnostic(diagnostic, cwd))
-		.join(`\n`)
+		.map((diagnostic) =>
+			formatStylishDiagnostic(
+				diagnostic,
+				cwd,
+				readCssSource(diagnostic.cssPath),
+			),
+		)
+		.join(`\n\n`)
 }
 
 function createDiagnostic(
@@ -366,8 +472,24 @@ function runCheck(
 	const cwd = environment.cwd ?? process.cwd()
 	const files = discoverCssModuleFiles(targets, environment)
 	const diagnostics = validateCssModuleFiles(files, environment)
+	const readFile =
+		environment.readFile ??
+		((filePath: string) => readFileSync(filePath, `utf-8`))
+	const cssSources = new Map<string, string>()
+	const readCssSource = (cssPath: string) => {
+		const cachedSource = cssSources.get(cssPath)
 
-	io.log(formatDiagnostics(diagnostics, options.format, files, cwd))
+		if (cachedSource !== undefined) return cachedSource
+
+		const sourceText = readFile(cssPath)
+
+		cssSources.set(cssPath, sourceText)
+		return sourceText
+	}
+
+	io.log(
+		formatDiagnostics(diagnostics, options.format, files, cwd, readCssSource),
+	)
 
 	return {
 		diagnostics,
