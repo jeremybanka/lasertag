@@ -752,7 +752,7 @@ export function createLasertagLspServer(
 	}
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.main) {
 	const server = createLasertagLspServer()
 
 	registerProcessCrashLogging(server.logger)

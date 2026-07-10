@@ -850,7 +850,7 @@ if (!isMainThread && isLasertagWorkerData(workerData)) {
 	} finally {
 		typescriptSession.close()
 	}
-} else if (isMainThread && import.meta.url === `file://${process.argv[1]}`) {
+} else if (isMainThread && import.meta.main) {
 	try {
 		const result = await runLasertagCli()
 		process.exitCode = result.exitCode

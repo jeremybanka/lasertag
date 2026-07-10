@@ -1,8 +1,10 @@
+import { spawnSync } from "node:child_process"
 import {
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
 	rmSync,
+	symlinkSync,
 	writeFileSync,
 } from "node:fs"
 import { createRequire } from "node:module"
@@ -15,6 +17,11 @@ import { runLasertagCli } from "../../src/cli/main.ts"
 import { createFixCourse } from "./fix-course.ts"
 
 const requireFromTest = createRequire(import.meta.url)
+const packageJsonPath = requireFromTest.resolve(`../../package.json`)
+const packageRoot = path.dirname(packageJsonPath)
+const packageVersion = (
+	JSON.parse(readFileSync(packageJsonPath, `utf8`)) as { version: string }
+).version
 const fixtureRoots: string[] = []
 const TRAINING_COURSE_OUTPUT =
 	process.env.LASERTAG_TRAINING_COURSE_OUTPUT ??
@@ -87,6 +94,29 @@ describe(`lasertag cli`, () => {
 		for (const root of fixtureRoots.splice(0)) {
 			rmSync(root, { force: true, recursive: true })
 		}
+	})
+
+	it(`runs through a symlinked package path`, () => {
+		const root = mkdtempSync(path.join(tmpdir(), `lasertag-cli-symlink-`))
+		const linkedPackageRoot = path.join(root, `node_modules`, `lasertag`)
+
+		fixtureRoots.push(root)
+		mkdirSync(path.dirname(linkedPackageRoot), { recursive: true })
+		symlinkSync(
+			packageRoot,
+			linkedPackageRoot,
+			process.platform === `win32` ? `junction` : `dir`,
+		)
+
+		const result = spawnSync(
+			process.execPath,
+			[path.join(linkedPackageRoot, `src`, `cli`, `main.ts`), `--version`],
+			{ encoding: `utf8` },
+		)
+
+		expect(result.status).toBe(0)
+		expect(result.stderr).toBe(``)
+		expect(result.stdout).toBe(`${packageVersion}\n`)
 	})
 
 	it(`prints top-level help when no command is passed`, async () => {
