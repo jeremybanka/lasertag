@@ -1,0 +1,11 @@
+id = "lasertag"
+name = "Lasertag"
+version = "0.3.2"
+schema_version = 1
+authors = ["Jeremy Banka <jeremy@banka.dev>"]
+description = "Dead CSS Module selector diagnostics for Lasertag JSX components."
+repository = "https://github.com/jeremybanka/lasertag"
+
+[language_servers.lasertag]
+name = "Lasertag"
+languages = ["CSS", "TSX"]
