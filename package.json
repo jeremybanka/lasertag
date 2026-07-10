@@ -12,6 +12,7 @@
 		"release": "pnpm build && changeset publish",
 		"refractor:corpus": "./scripts/fetch-refractor-corpus.node.ts",
 		"refractor:corpus:test": "./scripts/test-refractor-corpus.node.ts",
+		"spellcheck": "cspell .",
 		"staged": "vp staged",
 		"test": "vp run -r test",
 		"workflows": "./scripts/update-workflows.node.ts"
@@ -23,6 +24,7 @@
 		"@dprint/markdown": "0.22.1",
 		"@dprint/oxc": "0.28.0",
 		"@dprint/toml": "0.7.0",
+		"cspell": "10.0.1",
 		"dprint": "0.55.1",
 		"dprint-plugin-malva": "0.16.0",
 		"dprint-plugin-markup": "0.27.3",
