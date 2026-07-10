@@ -1,4 +1,10 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import {
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs"
 import { createRequire } from "node:module"
 import { tmpdir } from "node:os"
 import path from "node:path"
@@ -6,22 +12,43 @@ import path from "node:path"
 import { afterEach, describe, expect, it } from "vitest"
 
 import { runLasertagCli } from "../../src/cli/main.ts"
+import { createFixCourse } from "./fix-course.ts"
 
 const requireFromTest = createRequire(import.meta.url)
 const fixtureRoots: string[] = []
+const TRAINING_COURSE_OUTPUT =
+	process.env.LASERTAG_TRAINING_COURSE_OUTPUT ??
+	process.env.LASERTAG_FIX_COURSE_CHRONICLE
+const SHOW_TRAINING_COURSE_OUTPUT =
+	TRAINING_COURSE_OUTPUT === `1` ||
+	(!process.env.CI && TRAINING_COURSE_OUTPUT !== `0`)
 
-function createTestIO() {
+function createTestIO({ echo = false }: { echo?: boolean } = {}) {
 	const logs: string[] = []
 	const errors: string[] = []
 
 	return {
 		errors,
 		io: {
-			error: (message: string) => errors.push(message),
-			log: (message: string) => logs.push(message),
+			error: (message: string) => {
+				errors.push(message)
+				if (echo) process.stderr.write(`${message}\n`)
+			},
+			log: (message: string) => {
+				logs.push(message)
+				if (echo) process.stdout.write(`${message}\n`)
+			},
 		},
 		logs,
 	}
+}
+
+function showTrainingCourseStage(stage: string, lessonCount: number): void {
+	if (!SHOW_TRAINING_COURSE_OUTPUT) return
+
+	process.stdout.write(
+		`\n[training course] ${stage} — ${lessonCount} lessons\n\n`,
+	)
 }
 
 function createFixture(files: Record<string, string>) {
@@ -316,18 +343,202 @@ describe(`lasertag cli`, () => {
 		])
 	})
 
-	it(`runs the fix stub under the fix command`, async () => {
-		const { io, logs } = createTestIO()
-		const result = await runLasertagCli(
-			[`lasertag`, `fix`, `src/**/*.module.css`],
-			io,
+	it(`shows concise warning regions from the generated training course`, async () => {
+		const course = createFixCourse()
+		const fixture = createFixture(course.files)
+		const output = createTestIO({ echo: SHOW_TRAINING_COURSE_OUTPUT })
+		const expectedWarningCount = course.lessons.reduce(
+			(count, lesson) => count + lesson.expectedRemovedSelectors.length,
+			0,
 		)
 
-		expect(result.mode).toBe(`fix`)
-		expect(result.targets).toEqual([`src/**/*.module.css`])
-		expect(result.exitCode).toBe(0)
-		expect(logs).toEqual([`lasertag fix: dead CSS cleanup is stubbed.`])
+		showTrainingCourseStage(`check warning regions`, course.lessons.length)
+
+		const result = await runLasertagCli(
+			[`lasertag`, `check`, `course/**/*.module.css`],
+			output.io,
+			{
+				checkWorkerCount: 2,
+				cwd: fixture.root,
+			},
+		)
+		const warningBlocks = (output.logs[0] ?? ``).split(/\n\n+/).filter(Boolean)
+
+		expect(output.errors).toEqual([])
+		expect(result.mode).toBe(`check`)
+		expect(result.exitCode).toBe(1)
+		expect(result.diagnostics).toHaveLength(expectedWarningCount)
+		expect(result.workerCount).toBe(2)
+		expect(result.stealCount).toBeGreaterThanOrEqual(0)
+		expect(result.diagnostics.map((diagnostic) => diagnostic.cssPath)).toEqual(
+			result.diagnostics.map((diagnostic) => diagnostic.cssPath).toSorted(),
+		)
+		expect(warningBlocks).toHaveLength(result.diagnostics.length)
+
+		for (const [index, diagnostic] of result.diagnostics.entries()) {
+			const block = warningBlocks[index]
+			const relativeCssPath = path.relative(fixture.root, diagnostic.cssPath)
+			const cssSource = course.files[relativeCssPath]
+
+			if (!block || !cssSource || !diagnostic.range) {
+				throw new Error(
+					`Course warning ${index + 1} is missing source context.`,
+				)
+			}
+
+			const warningRegion = cssSource
+				.slice(diagnostic.range.start, diagnostic.range.end)
+				.replaceAll(`\t`, `    `)
+				.trim()
+
+			expect(block).toContain(diagnostic.code)
+			expect(block).toContain(diagnostic.message)
+			expect(block).toContain(warningRegion)
+			expect(block).toContain(`^`)
+			expect(block.split(`\n`).length).toBeLessThanOrEqual(4)
+		}
 	})
+
+	it(`removes dead CSS under the fix command`, async () => {
+		const fixture = createFixture({
+			"src/AppPanel.module.css": `app-panel.class {
+	> header {}
+	> footer {}
+}
+`,
+			"src/AppPanel.tsx": `import css from "./AppPanel.module.css"
+
+export function AppPanel() {
+	return <app-panel className={css.class}><header /></app-panel>
+}
+`,
+		})
+		const { io, logs } = createTestIO()
+		const result = await runLasertagCli([`lasertag`, `fix`], io, {
+			cwd: fixture.root,
+		})
+
+		expect(result.mode).toBe(`fix`)
+		expect(result.targets).toEqual([`**/*.module.css`])
+		expect(result.files).toEqual([fixture.path(`src/AppPanel.module.css`)])
+		expect(result.changedFiles).toEqual([
+			fixture.path(`src/AppPanel.module.css`),
+		])
+		expect(result.fixedCount).toBe(1)
+		expect(result.workerCount).toBe(1)
+		expect(result.diagnostics).toEqual([])
+		expect(result.exitCode).toBe(0)
+		expect(readFileSync(fixture.path(`src/AppPanel.module.css`), `utf-8`))
+			.toBe(`app-panel.class {
+	> header {}
+
+}
+`)
+		expect(logs.some((message) => message.includes(`discovered 1`))).toBe(true)
+		expect(logs.some((message) => message.includes(`1/1`))).toBe(true)
+		expect(logs.some((message) => message.includes(`TOTAL TIME`))).toBe(true)
+		expect(logs.at(-1)).toBe(
+			`lasertag fix: removed 1 dead selector from 1 file.`,
+		)
+	})
+
+	it(`runs the generated fix course through real workers with readable chronicle progress`, async () => {
+		const course = createFixCourse()
+		const fixture = createFixture(course.files)
+		const firstRun = createTestIO({ echo: SHOW_TRAINING_COURSE_OUTPUT })
+
+		showTrainingCourseStage(`fix cleanup pass`, course.lessons.length)
+
+		const result = await runLasertagCli(
+			[`lasertag`, `fix`, `course/**/*.module.css`],
+			firstRun.io,
+			{
+				cwd: fixture.root,
+				fixWorkerCount: 2,
+			},
+		)
+		const cssPaths = Object.keys(course.expectedCss)
+			.map((filePath) => fixture.path(filePath))
+			.toSorted()
+		const changedPaths = course.lessons
+			.filter((lesson) => lesson.expectedAction === `changed`)
+			.map((lesson) => fixture.path(lesson.cssPath))
+			.toSorted()
+		const expectedFixedCount = course.lessons.reduce(
+			(count, lesson) => count + lesson.expectedRemovedSelectors.length,
+			0,
+		)
+
+		expect(firstRun.errors).toEqual([])
+		expect(result.exitCode).toBe(0)
+		expect(result.files).toEqual(cssPaths)
+		expect(result.changedFiles).toEqual(changedPaths)
+		expect(result.fixedCount).toBe(expectedFixedCount)
+		expect(result.workerCount).toBe(2)
+		expect(result.stealCount).toBeGreaterThanOrEqual(0)
+
+		for (const [filePath, expectedCss] of Object.entries(course.expectedCss)) {
+			expect(readFileSync(fixture.path(filePath), `utf-8`)).toBe(expectedCss)
+		}
+
+		const progressCounts = firstRun.logs.flatMap((message) => {
+			const match = /\b(\d+)\/(\d+)\b/.exec(message)
+
+			return match?.[1] && match[2]
+				? [[Number(match[1]), Number(match[2])]]
+				: []
+		})
+
+		expect(progressCounts).toEqual(
+			course.lessons.map((_, index) => [index + 1, course.lessons.length]),
+		)
+		expect(
+			firstRun.logs.some((message) => message.includes(`TOTAL TIME`)),
+		).toBe(true)
+		expect(
+			firstRun.logs.some((message) => message.includes(`started 2 workers`)),
+		).toBe(true)
+		expect(
+			firstRun.logs.some((message) => message.includes(`skipped no TSX`)),
+		).toBe(true)
+		expect(
+			firstRun.logs.some((message) => message.includes(`removed 1 selector`)),
+		).toBe(true)
+		expect(firstRun.logs.at(-1)).toBe(
+			`lasertag fix: removed ${expectedFixedCount} dead selectors from ${changedPaths.length} files.`,
+		)
+
+		const secondRun = createTestIO({ echo: SHOW_TRAINING_COURSE_OUTPUT })
+
+		showTrainingCourseStage(`fix idempotence pass`, course.lessons.length)
+
+		const idempotentResult = await runLasertagCli(
+			[`lasertag`, `fix`, `course/**/*.module.css`],
+			secondRun.io,
+			{
+				cwd: fixture.root,
+				fixWorkerCount: 2,
+			},
+		)
+
+		expect(secondRun.errors).toEqual([])
+		expect(idempotentResult.exitCode).toBe(0)
+		expect(idempotentResult.changedFiles).toEqual([])
+		expect(idempotentResult.fixedCount).toBe(0)
+		expect(
+			secondRun.logs.some((message) => message.includes(`TOTAL TIME`)),
+		).toBe(true)
+		expect(
+			secondRun.logs.filter((message) => message.includes(` clean `)),
+		).toHaveLength(course.lessons.length - 1)
+		expect(secondRun.logs.at(-1)).toBe(
+			`lasertag fix: no dead CSS found in ${course.lessons.length} files.`,
+		)
+
+		for (const [filePath, expectedCss] of Object.entries(course.expectedCss)) {
+			expect(readFileSync(fixture.path(filePath), `utf-8`)).toBe(expectedCss)
+		}
+	}, 30_000)
 
 	it(`checks with an explicit TypeScript SDK executable path`, async () => {
 		const fixture = createFixture({

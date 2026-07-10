@@ -3,6 +3,7 @@ import type { CssSelectorAnalysis } from "./analyze-css-module.ts"
 import { analyzeTsxRenderStory } from "./analyze-tsx.ts"
 import type { CssReachabilityDiagnostic, RenderStory } from "./diagnostics.ts"
 import { canReachSelectorPath } from "./reachability.ts"
+import type { TypescriptAstSession } from "./typescript-ast.ts"
 
 export type ValidateCssReachabilityOptions = {
 	tsxSource: string
@@ -71,6 +72,7 @@ export function createCssReachabilityDiagnostics({
 
 export function validateCssReachability(
 	options: ValidateCssReachabilityOptions,
+	typescriptSession?: TypescriptAstSession,
 ): ValidateCssReachabilityResult {
 	const tsxOptions = {
 		sourceText: options.tsxSource,
@@ -80,7 +82,7 @@ export function validateCssReachability(
 			? { typescriptSdkPath: options.typescriptSdkPath }
 			: {}),
 	}
-	const renderStory = analyzeTsxRenderStory(tsxOptions)
+	const renderStory = analyzeTsxRenderStory(tsxOptions, typescriptSession)
 	const selectorAnalyses = analyzeCssModuleSelectors(options.cssSource)
 	const diagnostics = createCssReachabilityDiagnostics({
 		renderStory,

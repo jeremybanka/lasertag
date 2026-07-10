@@ -38,6 +38,24 @@ import "lasertag/react-jsx"
 
 Use `lasertag/preact-jsx` or `lasertag/solid-jsx` instead for Preact or Solid.
 
+Check component-owned CSS Modules for unreachable selectors in parallel:
+
+```sh
+pnpm lasertag check
+```
+
+Remove unreachable selectors in parallel while reporting progress:
+
+```sh
+pnpm lasertag fix
+```
+
+Both commands accept one quoted glob or a comma-separated set of globs:
+
+```sh
+pnpm lasertag fix "src/**/*.module.css,examples/**/*.module.css"
+```
+
 Install the VSCode extension from the same npm package:
 
 ```sh

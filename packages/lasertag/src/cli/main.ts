@@ -2,6 +2,7 @@
 
 import { existsSync, readFileSync } from "node:fs"
 import path from "node:path"
+import { isMainThread, workerData } from "node:worker_threads"
 
 import {
 	cli,
@@ -12,13 +13,26 @@ import {
 	parseBooleanOption,
 	parseStringOption,
 } from "comline"
+import { Logger } from "takua"
 import { globSync } from "tinyglobby"
 import { z } from "zod/v4"
 
 import {
-	validateCssReachability,
+	createTypescriptAstSession,
 	type CssReachabilityDiagnostic,
 } from "../refractor/index.ts"
+import {
+	processLasertagCheckTask,
+	runLasertagCheck,
+	type LasertagCheckFileSystem,
+} from "./check.ts"
+import {
+	processLasertagFixTask,
+	runLasertagFix,
+	type LasertagFixFileSystem,
+	type LasertagFixProgress,
+	type LasertagFixResult,
+} from "./fix.ts"
 import {
 	buildLasertagVsix,
 	defaultLasertagPackageRoot,
@@ -28,6 +42,7 @@ import {
 	type LasertagVsixBuildOptions,
 	type LasertagVsixBuildResult,
 } from "./vsix.ts"
+import { isLasertagWorkerData, runLasertagWorker } from "./work-stealing.ts"
 
 const DEFAULT_TARGET_PATTERNS = [`**/*.module.css`]
 const DEFAULT_IGNORE_PATTERNS = [
@@ -76,13 +91,17 @@ export type LasertagCliOptions =
 	| VsixOptions
 
 export type LasertagCliResult = {
+	changedFiles?: string[]
 	diagnostics: LasertagCliDiagnostic[]
 	exitCode: number
 	files: string[]
+	fixedCount?: number
 	mode: LasertagCliMode
 	options: LasertagCliOptions
+	stealCount?: number
 	targets: string[]
 	vsix?: LasertagVsixBuildResult & { editorCommand: string }
+	workerCount?: number
 }
 
 export type LasertagCliIO = {
@@ -94,8 +113,10 @@ export type LasertagCliEnvironment = {
 	buildVsix?: (
 		options: LasertagVsixBuildOptions,
 	) => Promise<LasertagVsixBuildResult>
+	checkWorkerCount?: number
 	cwd?: string
 	fileExists?: (filePath: string) => boolean
+	fixWorkerCount?: number
 	glob?: typeof globSync
 	installVscodeExtension?: (
 		request: LasertagVscodeInstallRequest,
@@ -104,6 +125,7 @@ export type LasertagCliEnvironment = {
 	packageVersion?: string
 	readFile?: (filePath: string) => string
 	typescriptSdkPath?: string
+	writeFile?: (filePath: string, sourceText: string) => void
 }
 
 const lasertagRoutes = optional({
@@ -129,11 +151,13 @@ const checkRouteOptions = options(
 	},
 )
 
-const fixRouteOptions = noOptions(`Remove dead CSS when implemented.`)
+const fixRouteOptions = noOptions(
+	`Remove dead CSS from component-owned CSS modules.`,
+)
 
 const lasertagCli = cli({
 	cliName: `lasertag`,
-	cliDescription: `Validate Lasertag CSS modules and build the workspace VSCode extension.`,
+	cliDescription: `Validate and fix Lasertag CSS modules or build the workspace VSCode extension.`,
 	discoverConfigPath: () => undefined,
 	routes: lasertagRoutes,
 	routeOptions: {
@@ -190,16 +214,6 @@ function isCssModulePath(filePath: string): boolean {
 	return filePath.endsWith(`.module.css`)
 }
 
-function findSiblingTsxPath(
-	cssPath: string,
-	fileExists: (filePath: string) => boolean,
-): string | undefined {
-	const stemPath = cssPath.slice(0, -`.module.css`.length)
-	const candidate = `${stemPath}.tsx`
-
-	return fileExists(candidate) ? candidate : undefined
-}
-
 function resolvePath(cwd: string, filePath: string): string {
 	return path.isAbsolute(filePath) ? filePath : path.resolve(cwd, filePath)
 }
@@ -249,9 +263,103 @@ function offsetToLineColumn(sourceText: string, offset: number) {
 	return { column, line }
 }
 
+type WarningRegionLine = {
+	highlightEnd: number
+	highlightStart: number
+	line: number
+	text: string
+}
+
+const MAX_WARNING_REGION_LINES = 2
+
+function warningRegionLines(
+	sourceText: string,
+	startOffset: number,
+	endOffset: number,
+): WarningRegionLine[] {
+	const start = Math.min(Math.max(startOffset, 0), sourceText.length)
+	const end = Math.min(Math.max(endOffset, start + 1), sourceText.length)
+	const lastSelectedOffset = Math.max(end - 1, start)
+	const firstLineStart = sourceText.lastIndexOf(`\n`, start - 1) + 1
+	let line = offsetToLineColumn(sourceText, firstLineStart).line
+	let lineStart = firstLineStart
+	const lines: WarningRegionLine[] = []
+
+	while (lineStart <= lastSelectedOffset && lineStart < sourceText.length) {
+		const newline = sourceText.indexOf(`\n`, lineStart)
+		const lineEnd = newline === -1 ? sourceText.length : newline
+		const text = sourceText.slice(lineStart, lineEnd).replace(/\r$/, ``)
+		const highlightStart = Math.max(start - lineStart, 0)
+		const highlightEnd = Math.min(
+			Math.max(end - lineStart, highlightStart + 1),
+			text.length,
+		)
+
+		lines.push({ highlightEnd, highlightStart, line, text })
+
+		if (lineEnd > lastSelectedOffset || newline === -1) break
+
+		line += 1
+		lineStart = newline + 1
+	}
+
+	return lines
+}
+
+function expandTabs(text: string): string {
+	return text.replaceAll(`\t`, `    `)
+}
+
+function formatWarningRegion(
+	diagnostic: LasertagCliDiagnostic,
+	sourceText: string,
+): string | undefined {
+	if (!diagnostic.range) return
+
+	const lines = warningRegionLines(
+		sourceText,
+		diagnostic.range.start,
+		diagnostic.range.end,
+	)
+
+	if (lines.length === 0) return
+
+	const visibleLines =
+		lines.length <= MAX_WARNING_REGION_LINES
+			? lines
+			: [lines[0], undefined, lines.at(-1)]
+	const lineNumberWidth = String(lines.at(-1)?.line ?? diagnostic.line).length
+	const output: string[] = []
+
+	for (const line of visibleLines) {
+		if (!line) {
+			output.push(`${` `.repeat(lineNumberWidth)} │ …`)
+			continue
+		}
+
+		const expandedText = expandTabs(line.text).trimEnd()
+		const caretStart = expandTabs(
+			line.text.slice(0, line.highlightStart),
+		).length
+		const caretWidth = Math.max(
+			expandTabs(line.text.slice(line.highlightStart, line.highlightEnd))
+				.length,
+			1,
+		)
+
+		output.push(
+			`${String(line.line).padStart(lineNumberWidth)} │ ${expandedText}`,
+			`${` `.repeat(lineNumberWidth)} │ ${` `.repeat(caretStart)}${`^`.repeat(caretWidth)}`,
+		)
+	}
+
+	return output.join(`\n`)
+}
+
 function formatStylishDiagnostic(
 	diagnostic: LasertagCliDiagnostic,
 	cwd: string,
+	cssSource?: string,
 ): string {
 	const relativeCssPath = path.relative(cwd, diagnostic.cssPath)
 	const displayCssPath =
@@ -259,11 +367,16 @@ function formatStylishDiagnostic(
 			? relativeCssPath
 			: diagnostic.cssPath
 
-	return [
+	const message = [
 		`${displayCssPath}:${diagnostic.line}:${diagnostic.column}`,
 		diagnostic.code,
 		diagnostic.message,
 	].join(` `)
+	const region = cssSource
+		? formatWarningRegion(diagnostic, cssSource)
+		: undefined
+
+	return region ? `${message}\n${region}` : message
 }
 
 function formatDiagnostics(
@@ -271,6 +384,7 @@ function formatDiagnostics(
 	format: LasertagOutputFormat,
 	files: string[],
 	cwd: string,
+	readCssSource: (cssPath: string) => string,
 ): string {
 	if (format === `json`) {
 		return JSON.stringify({ diagnostics, files }, null, 2)
@@ -283,8 +397,14 @@ function formatDiagnostics(
 	}
 
 	return diagnostics
-		.map((diagnostic) => formatStylishDiagnostic(diagnostic, cwd))
-		.join(`\n`)
+		.map((diagnostic) =>
+			formatStylishDiagnostic(
+				diagnostic,
+				cwd,
+				readCssSource(diagnostic.cssPath),
+			),
+		)
+		.join(`\n\n`)
 }
 
 function createDiagnostic(
@@ -304,73 +424,260 @@ function createDiagnostic(
 	}
 }
 
-function validateCssModuleFiles(
-	files: string[],
-	environment: LasertagCliEnvironment,
-): LasertagCliDiagnostic[] {
-	const fileExists = environment.fileExists ?? existsSync
-	const readFile =
-		environment.readFile ?? ((filePath) => readFileSync(filePath, `utf-8`))
-	const diagnostics: LasertagCliDiagnostic[] = []
-
-	for (const cssPath of files) {
-		const tsxPath = findSiblingTsxPath(cssPath, fileExists)
-
-		if (!tsxPath) continue
-
-		const cssSource = readFile(cssPath)
-		const result = validateCssReachability({
-			cssPath,
-			cssSource,
-			...(environment.typescriptSdkPath
-				? { typescriptSdkPath: environment.typescriptSdkPath }
-				: {}),
-			tsxPath,
-			tsxSource: readFile(tsxPath),
-		})
-
-		diagnostics.push(
-			...result.diagnostics.map((diagnostic) =>
-				createDiagnostic(diagnostic, cssPath, cssSource, tsxPath),
-			),
-		)
-	}
-
-	return diagnostics
-}
-
-function runCheck(
+async function runCheck(
 	targets: string[],
 	options: CheckOptions,
 	io: LasertagCliIO,
 	environment: LasertagCliEnvironment,
-): LasertagCliResult {
+): Promise<LasertagCliResult> {
 	const cwd = environment.cwd ?? process.cwd()
 	const files = discoverCssModuleFiles(targets, environment)
-	const diagnostics = validateCssModuleFiles(files, environment)
+	const fileSystem = checkFileSystemFromEnvironment(environment)
+	const checkResult = await runLasertagCheck(files, {
+		...(environment.checkWorkerCount
+			? { workerCount: environment.checkWorkerCount }
+			: {}),
+		...(fileSystem ? { fileSystem } : {}),
+		...(environment.typescriptSdkPath
+			? { typescriptSdkPath: environment.typescriptSdkPath }
+			: {}),
+		workerModuleUrl: new URL(import.meta.url),
+	})
+	const readFile =
+		environment.readFile ??
+		((filePath: string) => readFileSync(filePath, `utf-8`))
+	const cssSources = new Map<string, string>()
+	const readCssSource = (cssPath: string) => {
+		const cachedSource = cssSources.get(cssPath)
 
-	io.log(formatDiagnostics(diagnostics, options.format, files, cwd))
+		if (cachedSource !== undefined) return cachedSource
+
+		const sourceText = readFile(cssPath)
+
+		cssSources.set(cssPath, sourceText)
+		return sourceText
+	}
+	const diagnostics = checkResult.diagnostics.map(
+		({ cssPath, diagnostic, tsxPath }) =>
+			createDiagnostic(diagnostic, cssPath, readCssSource(cssPath), tsxPath),
+	)
+
+	for (const failure of checkResult.failures) {
+		io.error(
+			`lasertag check: ${displayPath(cwd, failure.cssPath)}: ${failure.error ?? `unknown failure`}`,
+		)
+	}
+
+	io.log(
+		formatDiagnostics(diagnostics, options.format, files, cwd, readCssSource),
+	)
 
 	return {
 		diagnostics,
-		exitCode: diagnostics.length > 0 ? 1 : 0,
+		exitCode: checkResult.failures.length > 0 || diagnostics.length > 0 ? 1 : 0,
 		files,
 		mode: `check`,
 		options,
+		stealCount: checkResult.stealCount,
 		targets,
+		workerCount: checkResult.workerCount,
 	}
 }
 
-function runFixStub(targets: string[], io: LasertagCliIO): LasertagCliResult {
-	io.log(`lasertag fix: dead CSS cleanup is stubbed.`)
+function createCliLogger(io: LasertagCliIO): Logger {
+	return new Logger({
+		colorEnabled: false,
+		sink: {
+			error: (message) => io.error(message),
+			info: (message) => io.log(message),
+			log: (message) => io.log(message),
+			warn: (message) => io.error(message),
+		},
+	})
+}
+
+const MAX_FIX_CHRONICLE_EVENT_LENGTH = 64
+
+function abbreviate(text: string, maximumLength: number): string {
+	if (text.length <= maximumLength) return text
+	if (maximumLength <= 1) return `…`
+
+	return `${text.slice(0, maximumLength - 1)}…`
+}
+
+function fixProgressMark({
+	completed,
+	file,
+	total,
+}: LasertagFixProgress): string {
+	const outcome = (() => {
+		switch (file.status) {
+			case `changed`:
+				return `removed ${file.fixedCount} ${plural(file.fixedCount, `selector`)}`
+			case `failed`:
+				return `FAILED`
+			case `skipped`:
+				return `skipped no TSX`
+			case `unchanged`:
+				return file.remainingDiagnostics.length > 0
+					? `${file.remainingDiagnostics.length} unresolved`
+					: `clean`
+		}
+	})()
+	const worker = file.workerId + 1
+	const assignment =
+		file.stolenFrom === undefined
+			? ` [w${worker}]`
+			: ` [w${worker} stole w${file.stolenFrom + 1}]`
+	const prefix = `fix ${completed}/${total} ${outcome} `
+	const name = path.basename(file.cssPath, `.module.css`)
+	const nameBudget = Math.max(
+		MAX_FIX_CHRONICLE_EVENT_LENGTH - prefix.length - assignment.length,
+		1,
+	)
+
+	return `${prefix}${abbreviate(name, nameBudget)}${assignment}`.slice(
+		0,
+		MAX_FIX_CHRONICLE_EVENT_LENGTH,
+	)
+}
+
+function plural(count: number, singular: string, pluralForm = `${singular}s`) {
+	return count === 1 ? singular : pluralForm
+}
+
+function displayPath(cwd: string, filePath: string): string {
+	const relativePath = path.relative(cwd, filePath)
+
+	return relativePath && !relativePath.startsWith(`..`)
+		? relativePath
+		: filePath
+}
+
+function checkFileSystemFromEnvironment(
+	environment: LasertagCliEnvironment,
+): Partial<LasertagCheckFileSystem> | undefined {
+	const fileSystem: Partial<LasertagCheckFileSystem> = {
+		...(environment.fileExists ? { fileExists: environment.fileExists } : {}),
+		...(environment.readFile ? { readFile: environment.readFile } : {}),
+	}
+
+	return Object.keys(fileSystem).length > 0 ? fileSystem : undefined
+}
+
+function fixFileSystemFromEnvironment(
+	environment: LasertagCliEnvironment,
+): Partial<LasertagFixFileSystem> | undefined {
+	const fileSystem: Partial<LasertagFixFileSystem> = {
+		...(environment.fileExists ? { fileExists: environment.fileExists } : {}),
+		...(environment.readFile ? { readFile: environment.readFile } : {}),
+		...(environment.writeFile ? { writeFile: environment.writeFile } : {}),
+	}
+
+	return Object.keys(fileSystem).length > 0 ? fileSystem : undefined
+}
+
+async function runFix(
+	targets: string[],
+	io: LasertagCliIO,
+	environment: LasertagCliEnvironment,
+): Promise<LasertagCliResult> {
+	const cwd = environment.cwd ?? process.cwd()
+	const chronicle = createCliLogger(io).makeChronicle({ inline: true })
+
+	chronicle.mark(`fix started`)
+
+	const files = discoverCssModuleFiles(targets, environment)
+	const progressInterval = Math.max(1, Math.ceil(files.length / 100))
+	const fileSystem = fixFileSystemFromEnvironment(environment)
+
+	chronicle.mark(`fix discovered ${files.length} CSS modules`)
+
+	let fixResult: LasertagFixResult
+
+	try {
+		fixResult = await runLasertagFix(files, {
+			...(environment.fixWorkerCount
+				? { workerCount: environment.fixWorkerCount }
+				: {}),
+			...(fileSystem ? { fileSystem } : {}),
+			onProgress: (progress) => {
+				const { completed, total } = progress
+
+				if (completed === total || completed % progressInterval === 0) {
+					chronicle.mark(fixProgressMark(progress))
+				}
+			},
+			onStart: ({ workerCount }) => {
+				chronicle.mark(
+					workerCount === 0
+						? `fix no workers needed`
+						: workerCount === 1
+							? `fix started 1 worker`
+							: `fix started ${workerCount} workers`,
+				)
+			},
+			...(environment.typescriptSdkPath
+				? { typescriptSdkPath: environment.typescriptSdkPath }
+				: {}),
+			workerModuleUrl: new URL(import.meta.url),
+		})
+	} catch (error) {
+		chronicle.mark(`fix failed`)
+		chronicle.logMarks()
+		throw error
+	}
+
+	chronicle.mark(
+		fixResult.workerCount === 0
+			? `fix finished: no files`
+			: `fix workers finished: ${fixResult.workerCount} ${plural(fixResult.workerCount, `worker`)}, ${fixResult.stealCount} ${plural(fixResult.stealCount, `steal`)}`,
+	)
+	chronicle.logMarks()
+
+	for (const failure of fixResult.failures) {
+		io.error(
+			`lasertag fix: ${displayPath(cwd, failure.cssPath)}: ${failure.error ?? `unknown failure`}`,
+		)
+	}
+
+	const readFile =
+		environment.readFile ??
+		((filePath: string) => readFileSync(filePath, `utf-8`))
+	const diagnostics = fixResult.remainingDiagnostics.map(
+		({ cssPath, diagnostic, tsxPath }) =>
+			createDiagnostic(diagnostic, cssPath, readFile(cssPath), tsxPath),
+	)
+
+	for (const diagnostic of diagnostics) {
+		io.error(formatStylishDiagnostic(diagnostic, cwd))
+	}
+
+	if (
+		fixResult.fixedCount === 0 &&
+		fixResult.failures.length === 0 &&
+		diagnostics.length === 0
+	) {
+		io.log(
+			`lasertag fix: no dead CSS found in ${files.length} ${plural(files.length, `file`)}.`,
+		)
+	} else {
+		io.log(
+			`lasertag fix: removed ${fixResult.fixedCount} dead ${plural(fixResult.fixedCount, `selector`)} from ${fixResult.changedFiles.length} ${plural(fixResult.changedFiles.length, `file`)}.`,
+		)
+	}
 
 	return {
-		diagnostics: [],
-		exitCode: 0,
-		files: [],
+		changedFiles: fixResult.changedFiles,
+		diagnostics,
+		exitCode: fixResult.failures.length > 0 || diagnostics.length > 0 ? 1 : 0,
+		files,
+		fixedCount: fixResult.fixedCount,
 		mode: `fix`,
 		options: {},
+		stealCount: fixResult.stealCount,
 		targets,
+		workerCount: fixResult.workerCount,
 	}
 }
 
@@ -502,9 +809,9 @@ export async function runLasertagCli(
 			}
 		}
 		case `fix`:
-			return runFixStub(DEFAULT_TARGET_PATTERNS, io)
+			return runFix(DEFAULT_TARGET_PATTERNS, io, environment)
 		case `fix/$glob`:
-			return runFixStub(targetsFromGlob(parsed.inputs.path[1]), io)
+			return runFix(targetsFromGlob(parsed.inputs.path[1]), io, environment)
 		case `check`:
 			return runCheck(
 				DEFAULT_TARGET_PATTERNS,
@@ -524,7 +831,26 @@ export async function runLasertagCli(
 	}
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (!isMainThread && isLasertagWorkerData(workerData)) {
+	const typescriptSession = createTypescriptAstSession(
+		workerData.typescriptSdkPath
+			? { typescriptSdkPath: workerData.typescriptSdkPath }
+			: {},
+	)
+
+	try {
+		await runLasertagWorker(workerData, (task, workerId) => {
+			switch (task.operation) {
+				case `check`:
+					return processLasertagCheckTask(task, workerId, typescriptSession)
+				case `fix`:
+					return processLasertagFixTask(task, workerId, typescriptSession)
+			}
+		})
+	} finally {
+		typescriptSession.close()
+	}
+} else if (isMainThread && import.meta.url === `file://${process.argv[1]}`) {
 	try {
 		const result = await runLasertagCli()
 		process.exitCode = result.exitCode
