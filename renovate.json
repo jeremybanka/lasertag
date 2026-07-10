@@ -62,7 +62,13 @@
 			]
 		},
 		{
-			"matchPackageNames": ["@typescript/*"],
+			"matchPackageNames": [
+				"agents.yaml",
+				"atom.io",
+				"comline",
+				"takua",
+				"treetrunks"
+			],
 			"minimumReleaseAge": null
 		}
 	]
