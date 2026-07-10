@@ -17,7 +17,10 @@ import { Logger } from "takua"
 import { globSync } from "tinyglobby"
 import { z } from "zod/v4"
 
-import type { CssReachabilityDiagnostic } from "../refractor/index.ts"
+import {
+	createTypescriptAstSession,
+	type CssReachabilityDiagnostic,
+} from "../refractor/index.ts"
 import {
 	processLasertagCheckTask,
 	runLasertagCheck,
@@ -829,22 +832,24 @@ export async function runLasertagCli(
 }
 
 if (!isMainThread && isLasertagWorkerData(workerData)) {
-	await runLasertagWorker(workerData, (task, workerId) => {
-		switch (task.operation) {
-			case `check`:
-				return processLasertagCheckTask(
-					task,
-					workerId,
-					workerData.typescriptSdkPath,
-				)
-			case `fix`:
-				return processLasertagFixTask(
-					task,
-					workerId,
-					workerData.typescriptSdkPath,
-				)
-		}
-	})
+	const typescriptSession = createTypescriptAstSession(
+		workerData.typescriptSdkPath
+			? { typescriptSdkPath: workerData.typescriptSdkPath }
+			: {},
+	)
+
+	try {
+		await runLasertagWorker(workerData, (task, workerId) => {
+			switch (task.operation) {
+				case `check`:
+					return processLasertagCheckTask(task, workerId, typescriptSession)
+				case `fix`:
+					return processLasertagFixTask(task, workerId, typescriptSession)
+			}
+		})
+	} finally {
+		typescriptSession.close()
+	}
 } else if (isMainThread && import.meta.url === `file://${process.argv[1]}`) {
 	try {
 		const result = await runLasertagCli()

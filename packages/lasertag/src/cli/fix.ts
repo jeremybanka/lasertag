@@ -6,9 +6,11 @@ import {
 } from "../lsp/code-actions.ts"
 import {
 	analyzeCssModuleSelectors,
+	createTypescriptAstSession,
 	createCssReachabilityDiagnostics,
 	validateCssReachability,
 	type CssReachabilityDiagnostic,
+	type TypescriptAstSession,
 	type ValidateCssReachabilityResult,
 } from "../refractor/index.ts"
 import {
@@ -103,22 +105,24 @@ function validateSources(
 	cssSource: string,
 	tsxPath: string,
 	tsxSource: string,
-	typescriptSdkPath: string | undefined,
+	typescriptSession: TypescriptAstSession,
 ): ValidateCssReachabilityResult {
-	return validateCssReachability({
-		cssPath,
-		cssSource,
-		...(typescriptSdkPath ? { typescriptSdkPath } : {}),
-		tsxPath,
-		tsxSource,
-	})
+	return validateCssReachability(
+		{
+			cssPath,
+			cssSource,
+			tsxPath,
+			tsxSource,
+		},
+		typescriptSession,
+	)
 }
 
 function fixFile(
 	task: LasertagWorkTask,
 	workerId: number,
 	fileSystem: LasertagFixFileSystem,
-	typescriptSdkPath: string | undefined,
+	typescriptSession: TypescriptAstSession,
 ): LasertagFixFileResult {
 	const { cssPath, index, stolenFrom } = task
 	const tsxPath = siblingTsxPath(cssPath)
@@ -145,7 +149,7 @@ function fixFile(
 			cssSource,
 			tsxPath,
 			tsxSource,
-			typescriptSdkPath,
+			typescriptSession,
 		)
 		const { diagnostics } = validation
 		const cleanupRanges = createDeadSelectorCleanupRanges(
@@ -250,13 +254,13 @@ function summarizeFix(
 export function processLasertagFixTask(
 	task: LasertagWorkTask,
 	workerId: number,
-	typescriptSdkPath?: string,
+	typescriptSession: TypescriptAstSession,
 ): LasertagFixFileResult {
 	if (task.operation !== `fix`) {
 		throw new Error(`Cannot process ${task.operation} task as a fix.`)
 	}
 
-	return fixFile(task, workerId, defaultFileSystem, typescriptSdkPath)
+	return fixFile(task, workerId, defaultFileSystem, typescriptSession)
 }
 
 export async function runLasertagFix(
@@ -264,25 +268,35 @@ export async function runLasertagFix(
 	options: RunLasertagFixOptions = {},
 ): Promise<LasertagFixResult> {
 	const fileSystem = resolveFileSystem(options.fileSystem)
+	const typescriptSession = createTypescriptAstSession(
+		options.typescriptSdkPath
+			? { typescriptSdkPath: options.typescriptSdkPath }
+			: {},
+	)
 	const hasCustomFileSystem =
 		options.fileSystem !== undefined &&
 		Object.keys(options.fileSystem).length > 0
-	const work = await runWorkStealing<LasertagFixFileResult>({
-		files,
-		forceSerial: hasCustomFileSystem,
-		...(options.onProgress ? { onProgress: options.onProgress } : {}),
-		...(options.onStart ? { onStart: options.onStart } : {}),
-		operation: `fix`,
-		processSerial: (task, workerId) =>
-			fixFile(task, workerId, fileSystem, options.typescriptSdkPath),
-		...(options.typescriptSdkPath
-			? { typescriptSdkPath: options.typescriptSdkPath }
-			: {}),
-		...(options.workerCount ? { workerCount: options.workerCount } : {}),
-		...(options.workerModuleUrl
-			? { workerModuleUrl: options.workerModuleUrl }
-			: {}),
-	})
 
-	return summarizeFix(work.fileResults, work.workerCount, work.stealCount)
+	try {
+		const work = await runWorkStealing<LasertagFixFileResult>({
+			files,
+			forceSerial: hasCustomFileSystem,
+			...(options.onProgress ? { onProgress: options.onProgress } : {}),
+			...(options.onStart ? { onStart: options.onStart } : {}),
+			operation: `fix`,
+			processSerial: (task, workerId) =>
+				fixFile(task, workerId, fileSystem, typescriptSession),
+			...(options.typescriptSdkPath
+				? { typescriptSdkPath: options.typescriptSdkPath }
+				: {}),
+			...(options.workerCount ? { workerCount: options.workerCount } : {}),
+			...(options.workerModuleUrl
+				? { workerModuleUrl: options.workerModuleUrl }
+				: {}),
+		})
+
+		return summarizeFix(work.fileResults, work.workerCount, work.stealCount)
+	} finally {
+		typescriptSession.close()
+	}
 }

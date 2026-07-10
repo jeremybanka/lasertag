@@ -10,7 +10,10 @@ import type {
 	StoryChild,
 	StoryNode,
 } from "./diagnostics.ts"
-import { createTsxSourceFile } from "./typescript-ast.ts"
+import {
+	createTypescriptAstSession,
+	type TypescriptAstSession,
+} from "./typescript-ast.ts"
 
 export type AnalyzeTsxOptions = {
 	sourceText: string
@@ -752,14 +755,28 @@ function analyzeExpression(
 	]
 }
 
-function createSourceFile(options: AnalyzeTsxOptions): ts.SourceFile {
-	return createTsxSourceFile(
-		options.sourceText,
-		options.filePath ?? `component.tsx`,
-		options.typescriptSdkPath
-			? { typescriptSdkPath: options.typescriptSdkPath }
-			: {},
-	)
+function withSourceFile<TResult>(
+	options: AnalyzeTsxOptions,
+	typescriptSession: TypescriptAstSession | undefined,
+	use: (sourceFile: ts.SourceFile) => TResult,
+): TResult {
+	const session =
+		typescriptSession ??
+		createTypescriptAstSession(
+			options.typescriptSdkPath
+				? { typescriptSdkPath: options.typescriptSdkPath }
+				: {},
+		)
+
+	try {
+		return session.withSourceFile(
+			options.sourceText,
+			options.filePath ?? `component.tsx`,
+			use,
+		)
+	} finally {
+		if (!typescriptSession) session.close()
+	}
 }
 
 function createAnalyzeContext(
@@ -792,36 +809,42 @@ function analyzeIndexedComponent(
 	}
 }
 
-export function analyzeTsxRenderStory(options: AnalyzeTsxOptions): RenderStory {
-	const sourceFile = createSourceFile(options)
-	const index = collectComponentIndex(sourceFile)
-	const warnings: RenderStoryWarning[] = []
-	const componentName = selectMainComponent(index, options, warnings)
+export function analyzeTsxRenderStory(
+	options: AnalyzeTsxOptions,
+	typescriptSession?: TypescriptAstSession,
+): RenderStory {
+	return withSourceFile(options, typescriptSession, (sourceFile) => {
+		const index = collectComponentIndex(sourceFile)
+		const warnings: RenderStoryWarning[] = []
+		const componentName = selectMainComponent(index, options, warnings)
 
-	if (!componentName) {
+		if (!componentName) {
+			return {
+				componentName: options.componentName ?? `unknown`,
+				roots: [opaque(`main component not found`, sourceFile, sourceFile)],
+				warnings,
+			}
+		}
+
+		const context = createAnalyzeContext(sourceFile, index, warnings, options)
+
 		return {
-			componentName: options.componentName ?? `unknown`,
-			roots: [opaque(`main component not found`, sourceFile, sourceFile)],
+			componentName,
+			roots: analyzeComponent(context, componentName, []),
 			warnings,
 		}
-	}
-
-	const context = createAnalyzeContext(sourceFile, index, warnings, options)
-
-	return {
-		componentName,
-		roots: analyzeComponent(context, componentName, []),
-		warnings,
-	}
+	})
 }
 
 export function analyzeTsxRenderStories(
 	options: AnalyzeTsxRenderStoriesOptions,
+	typescriptSession?: TypescriptAstSession,
 ): RenderStory[] {
-	const sourceFile = createSourceFile(options)
-	const index = collectComponentIndex(sourceFile)
+	return withSourceFile(options, typescriptSession, (sourceFile) => {
+		const index = collectComponentIndex(sourceFile)
 
-	return selectComponentStories(index, options).map((componentName) =>
-		analyzeIndexedComponent(sourceFile, index, componentName, options),
-	)
+		return selectComponentStories(index, options).map((componentName) =>
+			analyzeIndexedComponent(sourceFile, index, componentName, options),
+		)
+	})
 }

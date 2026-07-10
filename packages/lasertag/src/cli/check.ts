@@ -1,8 +1,10 @@
 import { existsSync, readFileSync } from "node:fs"
 
 import {
+	createTypescriptAstSession,
 	validateCssReachability,
 	type CssReachabilityDiagnostic,
+	type TypescriptAstSession,
 } from "../refractor/index.ts"
 import {
 	runWorkStealing,
@@ -60,7 +62,7 @@ function checkFile(
 	task: LasertagWorkTask,
 	workerId: number,
 	fileSystem: LasertagCheckFileSystem,
-	typescriptSdkPath: string | undefined,
+	typescriptSession: TypescriptAstSession,
 ): LasertagCheckFileResult {
 	const { cssPath, index, stolenFrom } = task
 	const tsxPath = siblingTsxPath(cssPath)
@@ -79,13 +81,15 @@ function checkFile(
 		}
 
 		const cssSource = fileSystem.readFile(cssPath)
-		const diagnostics = validateCssReachability({
-			cssPath,
-			cssSource,
-			...(typescriptSdkPath ? { typescriptSdkPath } : {}),
-			tsxPath,
-			tsxSource: fileSystem.readFile(tsxPath),
-		}).diagnostics
+		const diagnostics = validateCssReachability(
+			{
+				cssPath,
+				cssSource,
+				tsxPath,
+				tsxSource: fileSystem.readFile(tsxPath),
+			},
+			typescriptSession,
+		).diagnostics
 
 		return {
 			cssPath,
@@ -150,13 +154,13 @@ function summarizeCheck(
 export function processLasertagCheckTask(
 	task: LasertagWorkTask,
 	workerId: number,
-	typescriptSdkPath?: string,
+	typescriptSession: TypescriptAstSession,
 ): LasertagCheckFileResult {
 	if (task.operation !== `check`) {
 		throw new Error(`Cannot process ${task.operation} task as a check.`)
 	}
 
-	return checkFile(task, workerId, defaultFileSystem, typescriptSdkPath)
+	return checkFile(task, workerId, defaultFileSystem, typescriptSession)
 }
 
 export async function runLasertagCheck(
@@ -164,23 +168,33 @@ export async function runLasertagCheck(
 	options: RunLasertagCheckOptions = {},
 ): Promise<LasertagCheckResult> {
 	const fileSystem = resolveFileSystem(options.fileSystem)
+	const typescriptSession = createTypescriptAstSession(
+		options.typescriptSdkPath
+			? { typescriptSdkPath: options.typescriptSdkPath }
+			: {},
+	)
 	const hasCustomFileSystem =
 		options.fileSystem !== undefined &&
 		Object.keys(options.fileSystem).length > 0
-	const work = await runWorkStealing<LasertagCheckFileResult>({
-		files,
-		forceSerial: hasCustomFileSystem,
-		operation: `check`,
-		processSerial: (task, workerId) =>
-			checkFile(task, workerId, fileSystem, options.typescriptSdkPath),
-		...(options.typescriptSdkPath
-			? { typescriptSdkPath: options.typescriptSdkPath }
-			: {}),
-		...(options.workerCount ? { workerCount: options.workerCount } : {}),
-		...(options.workerModuleUrl
-			? { workerModuleUrl: options.workerModuleUrl }
-			: {}),
-	})
 
-	return summarizeCheck(work.fileResults, work.workerCount, work.stealCount)
+	try {
+		const work = await runWorkStealing<LasertagCheckFileResult>({
+			files,
+			forceSerial: hasCustomFileSystem,
+			operation: `check`,
+			processSerial: (task, workerId) =>
+				checkFile(task, workerId, fileSystem, typescriptSession),
+			...(options.typescriptSdkPath
+				? { typescriptSdkPath: options.typescriptSdkPath }
+				: {}),
+			...(options.workerCount ? { workerCount: options.workerCount } : {}),
+			...(options.workerModuleUrl
+				? { workerModuleUrl: options.workerModuleUrl }
+				: {}),
+		})
+
+		return summarizeCheck(work.fileResults, work.workerCount, work.stealCount)
+	} finally {
+		typescriptSession.close()
+	}
 }

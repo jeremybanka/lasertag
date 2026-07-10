@@ -1,6 +1,17 @@
-import { describe, expect, it } from "vitest"
+import { afterAll, describe, expect, it } from "vitest"
 
-import { validateCssReachability } from "../../src/refractor/validate-css-reachability.ts"
+import { createTypescriptAstSession } from "../../src/refractor/typescript-ast.ts"
+import { validateCssReachability as validateCssReachabilityOnce } from "../../src/refractor/validate-css-reachability.ts"
+
+const typescriptSession = createTypescriptAstSession()
+
+afterAll(() => typescriptSession.close())
+
+function validateCssReachability(
+	options: Parameters<typeof validateCssReachabilityOnce>[0],
+) {
+	return validateCssReachabilityOnce(options, typescriptSession)
+}
 
 function diagnosticCodes(tsxSource: string, cssSource: string): string[] {
 	return validateCssReachability({

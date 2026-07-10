@@ -1,14 +1,18 @@
 import { readdirSync, readFileSync } from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
-import { describe, expect, it } from "vitest"
+import { afterAll, describe, expect, it } from "vitest"
 
 import {
 	analyzeTsxRenderStories,
 	analyzeTsxRenderStory,
 } from "../../src/refractor/analyze-tsx.ts"
+import { createTypescriptAstSession } from "../../src/refractor/typescript-ast.ts"
 
 const fixturesRoot = fileURLToPath(new URL(`fixtures/golden`, import.meta.url))
+const typescriptSession = createTypescriptAstSession()
+
+afterAll(() => typescriptSession.close())
 
 function fixtureNames(): string[] {
 	return readdirSync(fixturesRoot, { withFileTypes: true })
@@ -45,10 +49,13 @@ describe(`golden render story fixtures`, () => {
 
 			expect(
 				stripSourceRanges(
-					analyzeTsxRenderStory({
-						filePath: path.join(fixtureRoot, `component.tsx`),
-						sourceText: tsxSource,
-					}),
+					analyzeTsxRenderStory(
+						{
+							filePath: path.join(fixtureRoot, `component.tsx`),
+							sourceText: tsxSource,
+						},
+						typescriptSession,
+					),
 				),
 			).toEqual(expected)
 		})
@@ -93,10 +100,13 @@ describe(`broad render story extraction`, () => {
 
 		expect(
 			stripSourceRanges(
-				analyzeTsxRenderStories({
-					filePath: `/project/src/ManyThings.tsx`,
-					sourceText,
-				}),
+				analyzeTsxRenderStories(
+					{
+						filePath: `/project/src/ManyThings.tsx`,
+						sourceText,
+					},
+					typescriptSession,
+				),
 			),
 		).toEqual([
 			{
@@ -157,10 +167,13 @@ describe(`broad render story extraction`, () => {
 
 		expect(
 			stripSourceRanges(
-				analyzeTsxRenderStory({
-					filePath: `/project/src/AttributePanel.tsx`,
-					sourceText,
-				}),
+				analyzeTsxRenderStory(
+					{
+						filePath: `/project/src/AttributePanel.tsx`,
+						sourceText,
+					},
+					typescriptSession,
+				),
 			),
 		).toEqual({
 			componentName: `AttributePanel`,

@@ -7,6 +7,7 @@ import {
 } from "node:worker_threads"
 
 const LASERTAG_WORKER_KIND = `lasertag-cli-worker`
+const WORKER_STOP_GRACE_PERIOD_MS = 5_000
 
 export type LasertagWorkerOperation = `check` | `fix`
 
@@ -200,23 +201,53 @@ async function runParallel<TResult extends LasertagWorkResult>(
 	const deques = createWorkDeques(options.files, workerCount, options.operation)
 	const fileResults: TResult[] = []
 	const workers: Worker[] = []
+	const workerStopTimers = new Map<Worker, ReturnType<typeof setTimeout>>()
 	let exitedWorkers = 0
+	let failureError: unknown
 	let settled = false
 	let stealCount = 0
+	let stopping = false
 
 	return new Promise<WorkStealingRunResult<TResult>>((resolve, reject) => {
-		const stopWorkers = () => {
-			for (const worker of workers) void worker.terminate()
-		}
-		const fail = (error: unknown) => {
-			if (settled) return
+		const maybeReject = () => {
+			if (!stopping || settled || exitedWorkers !== workers.length) {
+				return
+			}
 
 			settled = true
+			reject(failureError)
+		}
+		const stopWorkers = () => {
+			for (const worker of workers) {
+				if (worker.threadId === -1) continue
+
+				// Let the worker's finally blocks close native parser processes. Keep
+				// termination only as a bounded fallback for an unresponsive task.
+				try {
+					worker.postMessage({ type: `stop` } satisfies CoordinatorMessage)
+				} catch {
+					// An exiting worker may already have closed its message port. Its exit
+					// handler still clears the fallback below.
+				}
+
+				const stopTimer = setTimeout(() => {
+					void worker.terminate()
+				}, WORKER_STOP_GRACE_PERIOD_MS)
+
+				stopTimer.unref()
+				workerStopTimers.set(worker, stopTimer)
+			}
+		}
+		const fail = (error: unknown) => {
+			if (settled || stopping) return
+
+			failureError = error
+			stopping = true
 			stopWorkers()
-			reject(error)
+			maybeReject()
 		}
 		const maybeResolve = () => {
-			if (settled || exitedWorkers !== workerCount) return
+			if (settled || stopping || exitedWorkers !== workerCount) return
 
 			if (fileResults.length !== options.files.length) {
 				fail(
@@ -274,6 +305,20 @@ async function runParallel<TResult extends LasertagWorkResult>(
 			workers.push(worker)
 			worker.on(`error`, fail)
 			worker.on(`exit`, (code) => {
+				const stopTimer = workerStopTimers.get(worker)
+
+				if (stopTimer) {
+					clearTimeout(stopTimer)
+					workerStopTimers.delete(worker)
+				}
+
+				exitedWorkers += 1
+
+				if (stopping) {
+					maybeReject()
+					return
+				}
+
 				if (code !== 0) {
 					fail(
 						new Error(
@@ -283,11 +328,10 @@ async function runParallel<TResult extends LasertagWorkResult>(
 					return
 				}
 
-				exitedWorkers += 1
 				maybeResolve()
 			})
 			worker.on(`message`, (message: WorkerMessage) => {
-				if (settled) return
+				if (settled || stopping) return
 
 				if (message.type === `ready`) {
 					assignWork(worker, workerId)
