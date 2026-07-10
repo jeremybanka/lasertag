@@ -38,7 +38,7 @@ import "lasertag/react-jsx"
 
 Use `lasertag/preact-jsx` or `lasertag/solid-jsx` instead for Preact or Solid.
 
-Check every component-owned CSS Module for unreachable selectors:
+Check component-owned CSS Modules for unreachable selectors in parallel:
 
 ```sh
 pnpm lasertag check

@@ -17,14 +17,15 @@ import { Logger } from "takua"
 import { globSync } from "tinyglobby"
 import { z } from "zod/v4"
 
+import type { CssReachabilityDiagnostic } from "../refractor/index.ts"
 import {
-	validateCssReachability,
-	type CssReachabilityDiagnostic,
-} from "../refractor/index.ts"
+	processLasertagCheckTask,
+	runLasertagCheck,
+	type LasertagCheckFileSystem,
+} from "./check.ts"
 import {
-	isLasertagFixWorkerData,
+	processLasertagFixTask,
 	runLasertagFix,
-	runLasertagFixWorker,
 	type LasertagFixFileSystem,
 	type LasertagFixProgress,
 	type LasertagFixResult,
@@ -38,6 +39,7 @@ import {
 	type LasertagVsixBuildOptions,
 	type LasertagVsixBuildResult,
 } from "./vsix.ts"
+import { isLasertagWorkerData, runLasertagWorker } from "./work-stealing.ts"
 
 const DEFAULT_TARGET_PATTERNS = [`**/*.module.css`]
 const DEFAULT_IGNORE_PATTERNS = [
@@ -108,6 +110,7 @@ export type LasertagCliEnvironment = {
 	buildVsix?: (
 		options: LasertagVsixBuildOptions,
 	) => Promise<LasertagVsixBuildResult>
+	checkWorkerCount?: number
 	cwd?: string
 	fileExists?: (filePath: string) => boolean
 	fixWorkerCount?: number
@@ -206,16 +209,6 @@ const lasertagCli = cli({
 
 function isCssModulePath(filePath: string): boolean {
 	return filePath.endsWith(`.module.css`)
-}
-
-function findSiblingTsxPath(
-	cssPath: string,
-	fileExists: (filePath: string) => boolean,
-): string | undefined {
-	const stemPath = cssPath.slice(0, -`.module.css`.length)
-	const candidate = `${stemPath}.tsx`
-
-	return fileExists(candidate) ? candidate : undefined
 }
 
 function resolvePath(cwd: string, filePath: string): string {
@@ -428,50 +421,25 @@ function createDiagnostic(
 	}
 }
 
-function validateCssModuleFiles(
-	files: string[],
-	environment: LasertagCliEnvironment,
-): LasertagCliDiagnostic[] {
-	const fileExists = environment.fileExists ?? existsSync
-	const readFile =
-		environment.readFile ?? ((filePath) => readFileSync(filePath, `utf-8`))
-	const diagnostics: LasertagCliDiagnostic[] = []
-
-	for (const cssPath of files) {
-		const tsxPath = findSiblingTsxPath(cssPath, fileExists)
-
-		if (!tsxPath) continue
-
-		const cssSource = readFile(cssPath)
-		const result = validateCssReachability({
-			cssPath,
-			cssSource,
-			...(environment.typescriptSdkPath
-				? { typescriptSdkPath: environment.typescriptSdkPath }
-				: {}),
-			tsxPath,
-			tsxSource: readFile(tsxPath),
-		})
-
-		diagnostics.push(
-			...result.diagnostics.map((diagnostic) =>
-				createDiagnostic(diagnostic, cssPath, cssSource, tsxPath),
-			),
-		)
-	}
-
-	return diagnostics
-}
-
-function runCheck(
+async function runCheck(
 	targets: string[],
 	options: CheckOptions,
 	io: LasertagCliIO,
 	environment: LasertagCliEnvironment,
-): LasertagCliResult {
+): Promise<LasertagCliResult> {
 	const cwd = environment.cwd ?? process.cwd()
 	const files = discoverCssModuleFiles(targets, environment)
-	const diagnostics = validateCssModuleFiles(files, environment)
+	const fileSystem = checkFileSystemFromEnvironment(environment)
+	const checkResult = await runLasertagCheck(files, {
+		...(environment.checkWorkerCount
+			? { workerCount: environment.checkWorkerCount }
+			: {}),
+		...(fileSystem ? { fileSystem } : {}),
+		...(environment.typescriptSdkPath
+			? { typescriptSdkPath: environment.typescriptSdkPath }
+			: {}),
+		workerModuleUrl: new URL(import.meta.url),
+	})
 	const readFile =
 		environment.readFile ??
 		((filePath: string) => readFileSync(filePath, `utf-8`))
@@ -486,6 +454,16 @@ function runCheck(
 		cssSources.set(cssPath, sourceText)
 		return sourceText
 	}
+	const diagnostics = checkResult.diagnostics.map(
+		({ cssPath, diagnostic, tsxPath }) =>
+			createDiagnostic(diagnostic, cssPath, readCssSource(cssPath), tsxPath),
+	)
+
+	for (const failure of checkResult.failures) {
+		io.error(
+			`lasertag check: ${displayPath(cwd, failure.cssPath)}: ${failure.error ?? `unknown failure`}`,
+		)
+	}
 
 	io.log(
 		formatDiagnostics(diagnostics, options.format, files, cwd, readCssSource),
@@ -493,11 +471,13 @@ function runCheck(
 
 	return {
 		diagnostics,
-		exitCode: diagnostics.length > 0 ? 1 : 0,
+		exitCode: checkResult.failures.length > 0 || diagnostics.length > 0 ? 1 : 0,
 		files,
 		mode: `check`,
 		options,
+		stealCount: checkResult.stealCount,
 		targets,
+		workerCount: checkResult.workerCount,
 	}
 }
 
@@ -569,6 +549,17 @@ function displayPath(cwd: string, filePath: string): string {
 	return relativePath && !relativePath.startsWith(`..`)
 		? relativePath
 		: filePath
+}
+
+function checkFileSystemFromEnvironment(
+	environment: LasertagCliEnvironment,
+): Partial<LasertagCheckFileSystem> | undefined {
+	const fileSystem: Partial<LasertagCheckFileSystem> = {
+		...(environment.fileExists ? { fileExists: environment.fileExists } : {}),
+		...(environment.readFile ? { readFile: environment.readFile } : {}),
+	}
+
+	return Object.keys(fileSystem).length > 0 ? fileSystem : undefined
 }
 
 function fixFileSystemFromEnvironment(
@@ -837,8 +828,23 @@ export async function runLasertagCli(
 	}
 }
 
-if (!isMainThread && isLasertagFixWorkerData(workerData)) {
-	await runLasertagFixWorker(workerData)
+if (!isMainThread && isLasertagWorkerData(workerData)) {
+	await runLasertagWorker(workerData, (task, workerId) => {
+		switch (task.operation) {
+			case `check`:
+				return processLasertagCheckTask(
+					task,
+					workerId,
+					workerData.typescriptSdkPath,
+				)
+			case `fix`:
+				return processLasertagFixTask(
+					task,
+					workerId,
+					workerData.typescriptSdkPath,
+				)
+		}
+	})
 } else if (isMainThread && import.meta.url === `file://${process.argv[1]}`) {
 	try {
 		const result = await runLasertagCli()

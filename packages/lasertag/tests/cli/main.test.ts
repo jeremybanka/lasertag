@@ -357,7 +357,10 @@ describe(`lasertag cli`, () => {
 		const result = await runLasertagCli(
 			[`lasertag`, `check`, `course/**/*.module.css`],
 			output.io,
-			{ cwd: fixture.root },
+			{
+				checkWorkerCount: 2,
+				cwd: fixture.root,
+			},
 		)
 		const warningBlocks = (output.logs[0] ?? ``).split(/\n\n+/).filter(Boolean)
 
@@ -365,6 +368,11 @@ describe(`lasertag cli`, () => {
 		expect(result.mode).toBe(`check`)
 		expect(result.exitCode).toBe(1)
 		expect(result.diagnostics).toHaveLength(expectedWarningCount)
+		expect(result.workerCount).toBe(2)
+		expect(result.stealCount).toBeGreaterThanOrEqual(0)
+		expect(result.diagnostics.map((diagnostic) => diagnostic.cssPath)).toEqual(
+			result.diagnostics.map((diagnostic) => diagnostic.cssPath).toSorted(),
+		)
 		expect(warningBlocks).toHaveLength(result.diagnostics.length)
 
 		for (const [index, diagnostic] of result.diagnostics.entries()) {
