@@ -1,5 +1,15 @@
 # lasertag
 
+## 0.4.0
+
+### Minor Changes
+
+- 2471aae: Implement `lasertag fix` with parallel dead-selector cleanup and Takua Chronicle
+  progress output. Run both `check` and `fix` through a shared work-stealing
+  scheduler, and make check warnings easier to scan with compact, colocated CSS
+  source regions. Reuse one native TypeScript analysis session per worker to avoid
+  restarting the parser for every component.
+
 ## 0.3.2
 
 ### Patch Changes
