@@ -1,5 +1,13 @@
 # lasertag
 
+## 0.4.2
+
+### Patch Changes
+
+- 6b3f126: Document how to use Refractor, the CLI, the LSP, and the bundled VS Code extension, and clarify component tag-name guidance for exported and local components.
+- b21a9aa: Build working VSCode extensions from installed Lasertag packages and resolve VSIX
+  output directories from the directory where the CLI was invoked.
+
 ## 0.4.1
 
 ### Patch Changes
