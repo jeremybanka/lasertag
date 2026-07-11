@@ -32,6 +32,80 @@ function diagnosticSelectors(tsxSource: string, cssSource: string): string[] {
 }
 
 describe(`render story css reachability`, () => {
+	it(`suppresses diagnostics on the line after a lasertag expect-error directive`, () => {
+		expect(
+			diagnosticSelectors(
+				`export function AppPanel() { return <app-panel><header /></app-panel> }`,
+				`app-panel.class {
+	/* @lasertag-expect-error: gets appended via useEffect */
+	> canvas {}
+	> footer {}
+}`,
+			),
+		).toEqual([`app-panel.class > footer`])
+	})
+
+	it(`reports an unused lasertag expect-error directive`, () => {
+		const cssSource = `app-panel.class {
+	/* @lasertag-expect-error: header is conditionally rendered */
+	> header {}
+}`
+		const result = validateCssReachability({
+			cssPath: `/project/src/AppPanel.module.css`,
+			cssSource,
+			tsxPath: `/project/src/AppPanel.tsx`,
+			tsxSource: `export function AppPanel() { return <app-panel><header /></app-panel> }`,
+		})
+
+		expect(result.diagnostics).toMatchObject([
+			{
+				code: `unused-expect-error`,
+				selector: `/* @lasertag-expect-error: header is conditionally rendered */`,
+			},
+		])
+		expect(
+			cssSource.slice(
+				result.diagnostics[0]?.range?.start,
+				result.diagnostics[0]?.range?.end,
+			),
+		).toBe(`/* @lasertag-expect-error: header is conditionally rendered */`)
+	})
+
+	it(`requires a lasertag expect-error explanation of at least three characters`, () => {
+		expect(
+			diagnosticCodes(
+				`export function AppPanel() { return <app-panel /> }`,
+				`app-panel.class {
+	/* @lasertag-expect-error: no */
+	> footer {}
+}`,
+			),
+		).toEqual([`expect-error-explanation-too-short`])
+
+		expect(
+			diagnosticCodes(
+				`export function AppPanel() { return <app-panel /> }`,
+				`app-panel.class {
+	/* @lasertag-expect-error: yep */
+	> footer {}
+}`,
+			),
+		).toEqual([])
+	})
+
+	it(`targets only the immediately following line`, () => {
+		expect(
+			diagnosticCodes(
+				`export function AppPanel() { return <app-panel /> }`,
+				`app-panel.class {
+	/* @lasertag-expect-error: rendered by a portal */
+
+	> footer {}
+}`,
+			),
+		).toEqual([`unused-expect-error`, `dead-selector`])
+	})
+
 	it(`allows selectors that match direct rendered tag paths`, () => {
 		const result = validateCssReachability({
 			tsxPath: `/project/src/AppPanel.tsx`,

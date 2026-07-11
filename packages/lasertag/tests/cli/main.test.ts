@@ -467,9 +467,7 @@ export function AppPanel() {
 		expect(logs.some((message) => message.includes(`discovered 1`))).toBe(true)
 		expect(logs.some((message) => message.includes(`1/1`))).toBe(true)
 		expect(logs.some((message) => message.includes(`TOTAL TIME`))).toBe(true)
-		expect(logs.at(-1)).toBe(
-			`lasertag fix: removed 1 dead selector from 1 file.`,
-		)
+		expect(logs.at(-1)).toBe(`lasertag fix: cleaned up 1 diagnostic in 1 file.`)
 	})
 
 	it(`runs the generated fix course through real workers with readable chronicle progress`, async () => {
@@ -532,10 +530,12 @@ export function AppPanel() {
 			firstRun.logs.some((message) => message.includes(`skipped no TSX`)),
 		).toBe(true)
 		expect(
-			firstRun.logs.some((message) => message.includes(`removed 1 selector`)),
+			firstRun.logs.some((message) =>
+				message.includes(`cleaned up 1 diagnostic`),
+			),
 		).toBe(true)
 		expect(firstRun.logs.at(-1)).toBe(
-			`lasertag fix: removed ${expectedFixedCount} dead selectors from ${changedPaths.length} files.`,
+			`lasertag fix: cleaned up ${expectedFixedCount} diagnostics in ${changedPaths.length} files.`,
 		)
 
 		const secondRun = createTestIO({ echo: SHOW_TRAINING_COURSE_OUTPUT })
@@ -562,7 +562,7 @@ export function AppPanel() {
 			secondRun.logs.filter((message) => message.includes(` clean `)),
 		).toHaveLength(course.lessons.length - 1)
 		expect(secondRun.logs.at(-1)).toBe(
-			`lasertag fix: no dead CSS found in ${course.lessons.length} files.`,
+			`lasertag fix: no fixable diagnostics found in ${course.lessons.length} files.`,
 		)
 
 		for (const [filePath, expectedCss] of Object.entries(course.expectedCss)) {

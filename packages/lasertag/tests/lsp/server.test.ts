@@ -218,6 +218,14 @@ describe(`lasertag lsp`, () => {
 		})
 	})
 
+	it(`advertises block-comment completion trigger characters`, () => {
+		expect(
+			createInitializeResult().capabilities.completionProvider,
+		).toMatchObject({
+			triggerCharacters: expect.arrayContaining([`/`, `*`, `@`]),
+		})
+	})
+
 	it(`finds a sibling tsx file for a css module`, () => {
 		expect(
 			findSiblingTsxPath(
@@ -290,6 +298,40 @@ describe(`lasertag lsp`, () => {
 			title: LASERTAG_CLEAN_UP_DEAD_SELECTORS_TITLE,
 		})
 		expect(action.edit?.changes?.[document.uri]).toEqual([])
+	})
+
+	it(`creates a cleanup edit for an unused expect-error directive`, () => {
+		const comment = `/* @lasertag-expect-error: header used to be conditional */`
+		const sourceText = `app-panel.class {
+	${comment}
+	> header {}
+}
+`
+		const document = TextDocument.create(fileUri(cssPath), `css`, 1, sourceText)
+		const commentStart = sourceText.indexOf(comment)
+		const action = createCleanUpDeadSelectorsCodeAction(document, [
+			{
+				code: `unused-expect-error`,
+				message: `Unused directive.`,
+				range: {
+					end: document.positionAt(commentStart + comment.length),
+					start: document.positionAt(commentStart),
+				},
+				severity: DiagnosticSeverity.Warning,
+				source: `lasertag`,
+			},
+		])
+
+		expect(action.diagnostics).toMatchObject([{ code: `unused-expect-error` }])
+		expect(action.edit?.changes?.[document.uri]).toEqual([
+			{
+				newText: ``,
+				range: {
+					end: { character: 0, line: 2 },
+					start: { character: 0, line: 1 },
+				},
+			},
+		])
 	})
 })
 

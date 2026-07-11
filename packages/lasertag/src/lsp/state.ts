@@ -348,6 +348,7 @@ const refractorDiagnosticSelectors = selectorFamily<
 			if (renderStoryAnalysis.kind !== `ready`) return []
 
 			return createCssReachabilityDiagnostics({
+				cssSource: get(fileTextSelectors, cssPath) ?? ``,
 				renderStory: renderStoryAnalysis.renderStory,
 				selectorAnalyses: selectorAnalysis.selectorAnalyses,
 			})

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import {
 	createDeadSelectorCleanupRanges,
+	createExpectErrorCleanupRanges,
 	type OffsetRange,
 } from "../../src/lsp/code-actions.ts"
 
@@ -23,6 +24,35 @@ function rangeFor(sourceText: string, selector: string): OffsetRange {
 }
 
 describe(`lasertag lsp code actions`, () => {
+	it(`removes an unused expect-error comment without removing its selector`, () => {
+		const sourceText = `app-root.class {
+	/* @lasertag-expect-error: used to be conditional */
+	> header {}
+}
+`
+		const comment = `/* @lasertag-expect-error: used to be conditional */`
+		const ranges = createExpectErrorCleanupRanges(sourceText, [
+			rangeFor(sourceText, comment),
+		])
+
+		expect(applyRanges(sourceText, ranges)).toBe(`app-root.class {
+	> header {}
+}
+`)
+	})
+
+	it(`removes only the comment when an unused directive is inline`, () => {
+		const comment = `/* @lasertag-expect-error: stale */`
+		const sourceText = `app-root.class { ${comment} color: red; }`
+		const ranges = createExpectErrorCleanupRanges(sourceText, [
+			rangeFor(sourceText, comment),
+		])
+
+		expect(applyRanges(sourceText, ranges)).toBe(
+			`app-root.class {  color: red; }`,
+		)
+	})
+
 	it(`removes a whole dead nested selector rule`, () => {
 		const sourceText = `app-root.class {
 \t> p {

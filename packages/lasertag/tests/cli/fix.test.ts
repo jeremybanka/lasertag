@@ -3,6 +3,40 @@ import { describe, expect, it } from "vitest"
 import { runLasertagFix } from "../../src/cli/fix.ts"
 
 describe(`lasertag fix engine`, () => {
+	it(`removes an unused lasertag expect-error directive`, async () => {
+		const cssPath = `/virtual/AppPanel.module.css`
+		const sources = new Map<string, string>([
+			[
+				cssPath,
+				`app-panel.class {
+	/* @lasertag-expect-error: header used to be conditional */
+	> header {}
+}
+`,
+			],
+			[
+				`/virtual/AppPanel.tsx`,
+				`export function AppPanel() { return <app-panel><header /></app-panel> }
+`,
+			],
+		])
+		const result = await runLasertagFix([cssPath], {
+			fileSystem: {
+				fileExists: (filePath) => sources.has(filePath),
+				readFile: (filePath) => sources.get(filePath) ?? ``,
+				writeFile: (filePath, sourceText) => sources.set(filePath, sourceText),
+			},
+			workerCount: 1,
+		})
+
+		expect(result.fixedCount).toBe(1)
+		expect(result.remainingDiagnostics).toEqual([])
+		expect(sources.get(cssPath)).toBe(`app-panel.class {
+	> header {}
+}
+`)
+	})
+
 	it(`isolates a file failure and continues the remaining queue`, async () => {
 		const brokenCssPath = `/virtual/Broken.module.css`
 		const cleanCssPath = `/virtual/Clean.module.css`

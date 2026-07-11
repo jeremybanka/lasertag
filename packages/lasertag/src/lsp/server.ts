@@ -39,6 +39,7 @@ import {
 } from "./logger.ts"
 import {
 	createDeadSelectorCleanupRanges,
+	createExpectErrorCleanupRanges,
 	LASERTAG_CLEAN_UP_DEAD_SELECTORS_KIND,
 	LASERTAG_CLEAN_UP_DEAD_SELECTORS_TITLE,
 	LASERTAG_RESTART_SERVER_COMMAND,
@@ -134,7 +135,7 @@ export function createInitializeResult(
 				],
 			},
 			completionProvider: {
-				triggerCharacters: [`>`, `[`, `=`, `:`, `.`],
+				triggerCharacters: [`>`, `[`, `=`, `:`, `.`, `/`, `*`, `@`],
 			},
 			textDocumentSync: TextDocumentSyncKind.Incremental,
 			workspace: {
@@ -263,11 +264,12 @@ function watchedFileChangeTypeName(type: FileChangeType): string {
 	}
 }
 
-function isLasertagDeadSelectorDiagnostic(diagnostic: Diagnostic): boolean {
+function isLasertagCleanableDiagnostic(diagnostic: Diagnostic): boolean {
 	return (
 		diagnostic.source === `lasertag` &&
 		(diagnostic.code === `dead-selector` ||
-			diagnostic.code === `impossible-local-class`)
+			diagnostic.code === `impossible-local-class` ||
+			diagnostic.code === `unused-expect-error`)
 	)
 }
 
@@ -342,19 +344,31 @@ export function createCleanUpDeadSelectorsCodeAction(
 	diagnostics: Diagnostic[],
 	kind: string = CodeActionKind.QuickFix,
 ): CodeAction {
-	const deadSelectorDiagnostics = diagnostics.filter(
-		isLasertagDeadSelectorDiagnostic,
+	const cleanableDiagnostics = diagnostics.filter(isLasertagCleanableDiagnostic)
+	const deadSelectorDiagnostics = cleanableDiagnostics.filter(
+		(diagnostic) => diagnostic.code !== `unused-expect-error`,
+	)
+	const unusedExpectErrorDiagnostics = cleanableDiagnostics.filter(
+		(diagnostic) => diagnostic.code === `unused-expect-error`,
 	)
 	const sourceText = document.getText()
-	const cleanupRanges = createDeadSelectorCleanupRanges(
-		sourceText,
-		deadSelectorDiagnostics.map((diagnostic) =>
-			diagnosticToOffsetRange(document, diagnostic),
+	const cleanupRanges = [
+		...createDeadSelectorCleanupRanges(
+			sourceText,
+			deadSelectorDiagnostics.map((diagnostic) =>
+				diagnosticToOffsetRange(document, diagnostic),
+			),
 		),
-	)
+		...createExpectErrorCleanupRanges(
+			sourceText,
+			unusedExpectErrorDiagnostics.map((diagnostic) =>
+				diagnosticToOffsetRange(document, diagnostic),
+			),
+		),
+	]
 
 	return {
-		diagnostics: deadSelectorDiagnostics,
+		diagnostics: cleanableDiagnostics,
 		edit: {
 			changes: {
 				[document.uri]: cleanupRanges.map((range) =>

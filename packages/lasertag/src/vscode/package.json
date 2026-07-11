@@ -37,7 +37,7 @@
 		"commands": [
 			{
 				"command": "lasertag.cleanUpDeadSelectors",
-				"title": "Lasertag: Clean up Dead Selectors"
+				"title": "Lasertag: Clean up Diagnostics"
 			},
 			{
 				"command": "lasertag.restartServer",

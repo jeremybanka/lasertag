@@ -117,6 +117,21 @@ Never use `<div>`. Use a semantic HTML element, form control, or highly local cu
 
 Avoid single-child wrapper tags unless the wrapper distinguishes a meaningful thing, such as a form control, image, SVG, layout boundary, or independently styled repeated item.
 
+## Expected Reachability Errors
+
+When runtime behavior adds an element that Lasertag cannot see in the component's render story, suppress the diagnostic on the immediately following line with an explained `@lasertag-expect-error` comment:
+
+```css
+app-canvas.class {
+	/* @lasertag-expect-error: gets appended via useEffect */
+	> canvas {
+		display: block;
+	}
+}
+```
+
+The explanation after the colon must contain at least three characters. Lasertag reports the directive when the following line has no reachability error, so `lasertag fix` and the editor cleanup action can remove stale comments.
+
 ## Type Support
 
 The `lasertag/css-modules` type export constrains CSS Modules to a single exported `class` member:

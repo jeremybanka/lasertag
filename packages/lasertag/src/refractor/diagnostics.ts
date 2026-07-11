@@ -54,7 +54,11 @@ export type SelectorPath = SelectorPathSegment[]
 export type Reachability = `reachable` | `unreachable` | `unknown`
 
 export type CssReachabilityDiagnostic = {
-	code: `dead-selector` | `impossible-local-class`
+	code:
+		| `dead-selector`
+		| `expect-error-explanation-too-short`
+		| `impossible-local-class`
+		| `unused-expect-error`
 	message: string
 	selector: string
 	range?: SourceRange

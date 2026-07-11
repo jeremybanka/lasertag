@@ -32,6 +32,8 @@ type SelectorPathContext = {
 }
 
 const MODULE_CLASS_NAME = `class`
+const EXPECT_ERROR_DIRECTIVE = `@lasertag-expect-error`
+const EXPECT_ERROR_COMMENT_START = `/* ${EXPECT_ERROR_DIRECTIVE}: `
 const REFINEMENT_COMPLETIONS = [
 	`:hover`,
 	`:focus-visible`,
@@ -71,6 +73,55 @@ export type CssModuleCompletionOptions = {
 	offset: number
 	renderStory: RenderStory
 	sourceText: string
+}
+
+function offsetToPosition(sourceText: string, offset: number) {
+	let character = 0
+	let line = 0
+
+	for (let index = 0; index < offset; index += 1) {
+		if (sourceText[index] === `\n`) {
+			character = 0
+			line += 1
+		} else {
+			character += 1
+		}
+	}
+
+	return { character, line }
+}
+
+function expectErrorCompletionItem(
+	sourceText: string,
+	offset: number,
+): CompletionItem | undefined {
+	const lineStart = sourceText.lastIndexOf(`\n`, offset - 1) + 1
+	const linePrefix = sourceText.slice(lineStart, offset)
+	const indentationLength = linePrefix.length - linePrefix.trimStart().length
+	const typedComment = linePrefix.slice(indentationLength)
+
+	if (
+		typedComment.length === 0 ||
+		!EXPECT_ERROR_COMMENT_START.startsWith(typedComment)
+	) {
+		return
+	}
+
+	const replacementStart = lineStart + indentationLength
+
+	return {
+		filterText: EXPECT_ERROR_COMMENT_START,
+		insertTextFormat: InsertTextFormat.Snippet,
+		kind: CompletionItemKind.Snippet,
+		label: EXPECT_ERROR_DIRECTIVE,
+		textEdit: {
+			newText: `${EXPECT_ERROR_COMMENT_START}$1 */`,
+			range: {
+				end: offsetToPosition(sourceText, offset),
+				start: offsetToPosition(sourceText, replacementStart),
+			},
+		},
+	}
 }
 
 function isWhitespace(character: string): boolean {
@@ -752,6 +803,10 @@ export function createCssModuleCompletionItems({
 	renderStory,
 	sourceText,
 }: CssModuleCompletionOptions): CompletionItem[] {
+	const expectErrorItem = expectErrorCompletionItem(sourceText, offset)
+
+	if (expectErrorItem) return [expectErrorItem]
+
 	const context = completionContext(sourceText, offset)
 
 	switch (context.kind) {
