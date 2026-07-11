@@ -73,6 +73,9 @@ importers:
       typescript:
         specifier: 7.0.2
         version: 7.0.2
+      vscode-languageclient:
+        specifier: 10.1.0
+        version: 10.1.0
       vscode-languageserver:
         specifier: 10.1.0
         version: 10.1.0
@@ -107,9 +110,6 @@ importers:
       vitest:
         specifier: npm:@voidzero-dev/vite-plus-test@0.1.24
         version: '@voidzero-dev/vite-plus-test@0.1.24(@types/node@26.1.1)(typescript@7.0.2)(vite@8.0.16(@types/node@26.1.1)(yaml@2.9.0))(yaml@2.9.0)'
-      vscode-languageclient:
-        specifier: 10.1.0
-        version: 10.1.0
 
 packages:
 

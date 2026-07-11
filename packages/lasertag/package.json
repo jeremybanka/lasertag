@@ -61,6 +61,7 @@
 		"takua": "0.2.2",
 		"tinyglobby": "0.2.17",
 		"typescript": "7.0.2",
+		"vscode-languageclient": "10.1.0",
 		"vscode-languageserver": "10.1.0",
 		"vscode-languageserver-textdocument": "1.0.12",
 		"zod": "4.4.3"
@@ -73,8 +74,7 @@
 		"eslint": "10.6.0",
 		"preact": "10.29.7",
 		"solid-js": "1.9.14",
-		"vitest": "npm:@voidzero-dev/vite-plus-test@0.1.24",
-		"vscode-languageclient": "10.1.0"
+		"vitest": "npm:@voidzero-dev/vite-plus-test@0.1.24"
 	},
 	"peerDependencies": {
 		"@types/react": "^19.2",

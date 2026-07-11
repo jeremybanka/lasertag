@@ -224,6 +224,9 @@ async function bundleEntry(options: {
 	const bundle = await rolldown({
 		external: options.external,
 		input: options.input,
+		onLog(level, log, defaultHandler) {
+			defaultHandler(log.code === `UNRESOLVED_IMPORT` ? `error` : level, log)
+		},
 		platform: "node",
 	})
 

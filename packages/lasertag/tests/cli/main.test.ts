@@ -605,6 +605,7 @@ export function AppPanel() {
 			"package.json": JSON.stringify({ version: `1.0.0` }),
 		})
 		const { io, logs } = createTestIO()
+		const packageRoot = fixture.path(`node_modules/lasertag`)
 		const buildRequests: Array<{ outdir: string; packageRoot: string }> = []
 		const installRequests: Array<{
 			editorCommand: string
@@ -630,7 +631,7 @@ export function AppPanel() {
 				})
 				return { exitCode: 0 }
 			},
-			packageRoot: fixture.root,
+			packageRoot,
 		})
 
 		expect(result.mode).toBe(`vsix`)
@@ -638,7 +639,7 @@ export function AppPanel() {
 		expect(buildRequests).toEqual([
 			{
 				outdir: fixture.path(`dist`),
-				packageRoot: fixture.root,
+				packageRoot,
 			},
 		])
 		expect(installRequests).toEqual([
@@ -671,6 +672,7 @@ export function AppPanel() {
 						vsixPath: fixture.path(`tmp/vsix/Lasertag.vsix`),
 					}
 				},
+				cwd: fixture.root,
 				installVscodeExtension: (request) => {
 					installRequests.push({ editorCommand: request.editorCommand })
 					return { exitCode: 0 }
@@ -688,35 +690,50 @@ export function AppPanel() {
 		expect(installRequests).toEqual([{ editorCommand: `code-insiders` }])
 	})
 
-	it(`builds a VSIX without installing when --build-only is passed`, async () => {
+	it(`resolves a build-only VSIX outdir from the caller's working directory`, async () => {
 		const fixture = createFixture({
-			"package.json": JSON.stringify({ version: `1.0.0` }),
+			"consumer/package.json": JSON.stringify({ private: true }),
+			"node_modules/lasertag/package.json": JSON.stringify({
+				version: `1.0.0`,
+			}),
 		})
 		const { io, logs } = createTestIO()
+		const cwd = fixture.path(`consumer`)
+		const packageRoot = fixture.path(`node_modules/lasertag`)
+		const buildRequests: Array<{ outdir: string; packageRoot?: string }> = []
 		let installed = false
 		const result = await runLasertagCli(
-			[`lasertag`, `vsix`, `--build-only`, `--outdir`, `tmp/vsix`],
+			[`lasertag`, `vsix`, `-o`, `.`, `--build-only`],
 			io,
 			{
-				buildVsix: async () => ({
-					buildRoot: fixture.path(`tmp/vsix/.lasertag-vsix`),
-					vscodeTarget: `linux-x64`,
-					vsixPath: fixture.path(`tmp/vsix/Lasertag.vsix`),
-				}),
+				buildVsix: async (request) => {
+					buildRequests.push(request)
+
+					return {
+						buildRoot: fixture.path(`consumer/.lasertag-vsix`),
+						vscodeTarget: `linux-x64`,
+						vsixPath: fixture.path(`consumer/Lasertag.vsix`),
+					}
+				},
+				cwd,
 				installVscodeExtension: () => {
 					installed = true
 					return { exitCode: 0 }
 				},
-				packageRoot: fixture.root,
+				packageRoot,
 			},
 		)
 
 		expect(result.mode).toBe(`vsix`)
 		expect(result.exitCode).toBe(0)
-		expect(result.options).toMatchObject({ "build-only": true })
+		expect(result.options).toMatchObject({
+			"build-only": true,
+			outdir: `.`,
+		})
+		expect(buildRequests).toEqual([{ outdir: cwd, packageRoot }])
 		expect(installed).toBe(false)
 		expect(logs).toEqual([
-			`lasertag vsix: built ${fixture.path(`tmp/vsix/Lasertag.vsix`)}.`,
+			`lasertag vsix: built ${fixture.path(`consumer/Lasertag.vsix`)}.`,
 		])
 	})
 
