@@ -1,5 +1,12 @@
 # lasertag
 
+## 0.4.1
+
+### Patch Changes
+
+- 7bdd982: Run the CLI and language server when package managers launch their binaries
+  through symlinked package paths.
+
 ## 0.4.0
 
 ### Minor Changes
