@@ -1,0 +1,185 @@
+# Lasertag Tooling
+
+Lasertag's tooling shares one analysis engine: **Refractor** turns a component's
+TSX into a render story, compares that story with its CSS Module, and reports
+selectors that cannot match. The CLI, language server, and VS Code extension are
+different surfaces over that same conservative analysis.
+
+For the authoring conventions these tools expect, see the
+[Lasertag guide](./lasertag-guide.md).
+
+## Choose a Surface
+
+| Need                                                     | Surface                      |
+| -------------------------------------------------------- | ---------------------------- |
+| Embed analysis in another tool or inspect a render story | `lasertag/refractor`         |
+| Check a repository or CI job without changing files      | `lasertag check`             |
+| Deliberately remove diagnosed selectors                  | `lasertag fix`               |
+| Add diagnostics and completions to another editor        | `lasertag-lsp`               |
+| Use the bundled editor experience                        | Lasertag's VS Code extension |
+
+## The Analysis Contract
+
+Filesystem-facing tools use exact sibling pairs with the same stem:
+
+```text
+StatusCard.tsx
+StatusCard.module.css
+```
+
+They do not search for `.jsx` files, directory entrypoints, or differently named
+components. The CLI skips a CSS Module without its exact TSX sibling, and editor
+analysis has no render story to use until both files are available.
+
+Refractor does not execute application code. It expands supported JSX branches
+and local components into a render story. `children` render slots, imported
+components, and render expressions it cannot resolve become opaque paths.
+Unsupported selector shapes are unknown too.
+
+That uncertainty is intentional: a selector is reported as dead only when every
+supported path is provably unreachable. An unknown path prevents that report.
+Refractor also reports a local class other than `.class` as
+`impossible-local-class`, because Lasertag CSS Modules expose only `css.class`.
+Use `renderStory.warnings` and its opaque nodes when investigating why analysis
+was conservative.
+
+## Refractor API
+
+Use `validateCssReachability` when a tool already has the two source texts:
+
+```ts
+import { validateCssReachability } from "lasertag/refractor"
+
+const { diagnostics, renderStory } = validateCssReachability({
+	cssPath: "src/StatusCard.module.css",
+	cssSource: `
+		status-card.class {
+			> footer {}
+		}
+	`,
+	tsxPath: "src/StatusCard.tsx",
+	tsxSource: `
+		import css from "./StatusCard.module.css"
+
+		export const StatusCard = () => (
+			<status-card className={css.class}>
+				<strong>Ready</strong>
+			</status-card>
+		)
+	`,
+})
+
+for (const warning of renderStory.warnings) console.warn(warning)
+for (const diagnostic of diagnostics) console.error(diagnostic)
+```
+
+The result contains the render story plus `dead-selector` and
+`impossible-local-class` diagnostics with source ranges when available. Pass
+`componentName` when a file contains multiple exported components and the main
+component cannot be selected by convention. Reusing
+`createTypescriptAstSession()` avoids starting a TypeScript AST session for every
+file in a larger integration. Pass the session as the second argument to
+`validateCssReachability`, then close it after the batch.
+
+## CLI Workflows
+
+`check` scans `**/*.module.css` by default and leaves files untouched:
+
+```sh
+pnpm lasertag check
+pnpm lasertag check --format=json "src/**/*.module.css"
+pnpm lasertag check "src/**/*.module.css,examples/**/*.module.css"
+```
+
+The target may also be a direct `.module.css` path. There is one positional target;
+put multiple globs in one quoted, comma-separated value. By default Lasertag
+ignores `node_modules`, `dist`, `build`, and `coverage`. A diagnostic or file
+failure produces a nonzero exit code, which makes `check` suitable for CI. Use
+`pnpm lasertag --help` for the current command syntax.
+
+`fix` mutates matched stylesheets, removing selectors reported as
+`dead-selector` or `impossible-local-class`:
+
+```sh
+pnpm lasertag fix "src/**/*.module.css"
+pnpm lasertag check "src/**/*.module.css"
+```
+
+Run it only when deletion is intended. Review the diff, then rerun `check`; a
+nonzero result means a file failed or a diagnostic remained after cleanup.
+
+The same CLI builds and installs the extension for the current platform:
+
+```sh
+pnpm lasertag vsix
+pnpm lasertag vsix --target code-insiders
+pnpm lasertag vsix --build-only
+```
+
+The default target is `code`. `--build-only` creates `Lasertag.vsix` without
+calling an editor command.
+
+## Standalone Language Server
+
+`lasertag-lsp` is a stdio language server. An editor client can launch it with:
+
+```sh
+pnpm exec lasertag-lsp --stdio
+```
+
+Configure the client to send `.module.css` and `.tsx` documents, provide the
+workspace folder, and synchronize create, change, and delete events for
+`**/*.module.css` and `**/*.tsx`. The server registers those watchers dynamically
+when the client supports it; otherwise the client should forward watched-file
+notifications.
+
+The server provides:
+
+- `dead-selector` and `impossible-local-class` diagnostics in CSS Modules
+- render-aware selector, attribute, and refinement completions
+- a cleanup code action whose edits remove reported selectors
+- incremental updates when either side of a sibling pair changes
+
+Two environment variables configure a standalone process:
+
+| Variable                       | Purpose                                                         |
+| ------------------------------ | --------------------------------------------------------------- |
+| `LASERTAG_TYPESCRIPT_SDK_PATH` | Path to the TypeScript 7 native executable used for TSX parsing |
+| `LASERTAG_LSP_LOG_LEVEL`       | `off`, `error`, `warn`, `info`, or `debug`; defaults to `info`  |
+
+The restart action uses the `lasertag.restartServer` command. Clients other than
+the bundled VS Code extension must implement that client-side command if they
+want to expose it.
+
+## VS Code Extension
+
+Install the extension shipped in the npm package with `pnpm lasertag vsix`. It
+bundles `lasertag-lsp` and its TypeScript runtime, so the default installation
+needs no path configuration. In addition to diagnostics and completions, the
+Command Palette provides **Lasertag: Clean up Dead Selectors** and **Lasertag:
+Restart Lasertag Server**.
+
+| Setting                        | Purpose                                                                                          |
+| ------------------------------ | ------------------------------------------------------------------------------------------------ |
+| `lasertag.lsp.path`            | Use another `lasertag-lsp` executable; relative paths resolve from the first workspace root      |
+| `lasertag.server.path`         | Use another server module; ignored when `lasertag.lsp.path` is set                               |
+| `lasertag.typescript.sdk.path` | Use another TypeScript 7 native executable; relative paths resolve from the first workspace root |
+| `lasertag.log.level`           | Operational logging: `off`, `error`, `warn`, `info`, or `debug`                                  |
+| `lasertag.trace.server`        | Protocol tracing: `off`, `messages`, or `verbose`                                                |
+
+## Troubleshooting
+
+- If a CSS Module has no diagnostics or completions, first verify the exact
+  `.module.css`/`.tsx` sibling names and that both files are inside the workspace.
+- The main component is selected from a matching file-stem export, then a default
+  export, then a single exported component. Resolve ambiguous exports or use
+  `componentName` through the refractor API.
+- No diagnostic can mean “unknown,” not “reachable.” Inspect the API's render
+  story when dynamic or imported render branches are involved.
+- In VS Code, open the **Lasertag** output channel, set
+  `lasertag.log.level` to `debug`, and use `lasertag.trace.server` only when
+  protocol messages are needed. Run **Developer: Reload Window** after changing
+  any extension setting; the restart command does not rebuild the client's
+  configuration.
+- A custom TypeScript SDK path points to the TypeScript 7 native executable, not
+  its containing package directory.
