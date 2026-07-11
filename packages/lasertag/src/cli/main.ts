@@ -699,7 +699,7 @@ async function runVsix(
 ): Promise<LasertagCliResult> {
 	const cwd = environment.cwd ?? process.cwd()
 	const packageRoot = environment.packageRoot ?? defaultLasertagPackageRoot()
-	const outdir = path.resolve(packageRoot, options.outdir ?? `dist`)
+	const outdir = path.resolve(cwd, options.outdir ?? `dist`)
 	const build = environment.buildVsix ?? buildLasertagVsix
 	const install =
 		environment.installVscodeExtension ?? installVscodeExtensionWithEditor

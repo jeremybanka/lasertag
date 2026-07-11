@@ -59,6 +59,47 @@ describe(`lasertag vsix builder`, () => {
 		)
 	})
 
+	it(`ships the VSCode language client needed to build the extension`, () => {
+		const packageJson = JSON.parse(
+			readFileSync(
+				path.resolve(import.meta.dirname, `../../package.json`),
+				`utf-8`,
+			),
+		) as {
+			dependencies?: Record<string, string>
+			devDependencies?: Record<string, string>
+		}
+
+		expect(packageJson.dependencies).toHaveProperty(`vscode-languageclient`)
+		expect(packageJson.devDependencies).not.toHaveProperty(
+			`vscode-languageclient`,
+		)
+	})
+
+	it(`fails rather than externalizing unresolved VSIX runtime imports`, async () => {
+		const fixture = createFixture({
+			"package.json": JSON.stringify({ version: `9.8.7-test` }),
+			"src/lsp/server.ts": ``,
+			"src/vscode/extension.ts": `import "missing-vsix-runtime"`,
+			"src/vscode/LasertagIcon.png": ``,
+			"src/vscode/README.md": `# Lasertag`,
+		})
+		let packaged = false
+
+		await expect(
+			buildLasertagVsix({
+				outdir: fixture.path(`out`),
+				packageRoot: fixture.root,
+				runCommand: async () => {
+					packaged = true
+
+					return { exitCode: 0 }
+				},
+			}),
+		).rejects.toThrow(`Could not resolve 'missing-vsix-runtime'`)
+		expect(packaged).toBe(false)
+	})
+
 	it(`writes the VSCode manifest and copies the TypeScript native runtime package`, async () => {
 		const fixture = createFixture({
 			"package.json": JSON.stringify({ version: `9.8.7-test` }),
