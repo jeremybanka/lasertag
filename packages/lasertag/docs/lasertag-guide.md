@@ -7,11 +7,11 @@ lasertag is a small, structural CSS Modules convention for JSX components: each 
 Name the component and its stylesheet together:
 
 ```text
-Checkbox.tsx
-Checkbox.module.css
+CheckboxField.tsx
+CheckboxField.module.css
 ```
 
-Import CSS modules as `css`, then apply only the root class with your JSX runtime's class attribute, such as `className={css.class}` or `class={css.class}`. The root wrapper should be a hyphenated custom element matching the component name:
+Import CSS modules as `css`, then apply only the root class with your JSX runtime's class attribute, such as `className={css.class}` or `class={css.class}`. Exported component names must contain multiple words so the matching kebab-case root is a hyphenated custom element:
 
 ```tsx
 import css from "./AppHeaderBar.module.css"
@@ -37,25 +37,37 @@ app-header-bar.class {
 
 A component module should export the component it is named for, and should avoid exporting unrelated values. Component files should import only their own sibling CSS module, and should import it as `css`.
 
-Only make root tag exceptions when a native form or control element is the component's meaningful outer element, such as `button`, `label`, `input`, `select`, `textarea`, `fieldset`, or `form`:
+Exported components do not get root-tag exceptions. Their root must be the
+component-named custom element so ownership stays visible in JSX, the DOM, and
+CSS. Put semantic and interactive elements inside that root:
 
 ```tsx
-import css from "./Checkbox.module.css"
+import css from "./CheckboxField.module.css"
 
-export const Checkbox = (inputProps) => (
-	<label className={css.class}>
-		<input {...inputProps} type="checkbox" />
-		<span>Enabled</span>
-	</label>
+export const CheckboxField = (inputProps) => (
+	<checkbox-field className={css.class}>
+		<label>
+			<input {...inputProps} type="checkbox" />
+			<span>Enabled</span>
+		</label>
+	</checkbox-field>
 )
 ```
 
 ```css
-label.class {
-	> input {}
-	> span {}
+checkbox-field.class {
+	> label {
+		> input {}
+		> span {}
+	}
 }
 ```
+
+Local, non-exported components may use a native or semantic root when that is
+the clearest structure. The `render-tag-with-own-name` ESLint rule checks
+directly exported named declarations by default. Set
+`checkAllComponentFunctions: true` to apply the component-named root convention
+to every PascalCase component function, including local components.
 
 ## Nest the Rendered Structure
 

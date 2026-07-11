@@ -56,13 +56,13 @@ Both commands accept one quoted glob or a comma-separated set of globs:
 pnpm lasertag fix "src/**/*.module.css,examples/**/*.module.css"
 ```
 
-Install the VSCode extension from the same npm package:
+Install the VS Code extension from the same npm package:
 
 ```sh
 pnpm lasertag vsix
 ```
 
-Pass an editor command when you want to target another VSCode-compatible binary:
+Pass an editor command when you want to target another VS Code-compatible binary:
 
 ```sh
 pnpm lasertag vsix --target code-insiders
@@ -79,5 +79,9 @@ pnpm lasertag vsix --build-only
 - CSS Module typing for a single exported `class`
 - JSX intrinsic types for hyphenated custom elements
 - an optional ESLint plugin at `lasertag/eslint-plugin`
+- the Refractor analysis library at `lasertag/refractor`
+- the `lasertag` CLI and standalone `lasertag-lsp` language server
+- a bundled VS Code extension with live diagnostics, completions, and cleanup actions
 - a small global CSS starter at `lasertag/templates/globals.css`
-- short guides in `lasertag/docs`
+- [authoring](docs/lasertag-guide.md) and [tooling](docs/tooling-guide.md)
+  guides in `lasertag/docs`
