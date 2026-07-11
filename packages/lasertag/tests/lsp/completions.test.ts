@@ -1,4 +1,8 @@
 import { describe, expect, it } from "vitest"
+import {
+	CompletionItemKind,
+	InsertTextFormat,
+} from "vscode-languageserver/node"
 
 import type { RenderStory } from "../../src/refractor/index.ts"
 import { createCssModuleCompletionItems } from "../../src/lsp/completions.ts"
@@ -64,6 +68,43 @@ function completion(sourceText: string, label: string) {
 }
 
 describe(`lasertag lsp selector completions`, () => {
+	it.each([
+		`/`,
+		`/*`,
+		`/* `,
+		`/* @`,
+		`/* @lasertag-exp`,
+		`/* @lasertag-expect-error: `,
+	])(`suggests an expect-error snippet after typing %s`, (typedComment) => {
+		expect(labels(`app-panel.class {\n\t${typedComment}`)).toEqual([
+			`@lasertag-expect-error`,
+		])
+	})
+
+	it(`replaces the partial comment and places the cursor in the explanation`, () => {
+		const sourceText = `app-panel.class {\n\t/* @laser`
+		const item = completion(sourceText, `@lasertag-expect-error`)
+
+		expect(item).toMatchObject({
+			filterText: `/* @lasertag-expect-error: `,
+			insertTextFormat: InsertTextFormat.Snippet,
+			kind: CompletionItemKind.Snippet,
+			textEdit: {
+				newText: `/* @lasertag-expect-error: $1 */`,
+				range: {
+					end: { character: 10, line: 1 },
+					start: { character: 1, line: 1 },
+				},
+			},
+		})
+	})
+
+	it(`does not suggest the expect-error snippet for unrelated comment text`, () => {
+		expect(labels(`app-panel.class {\n\t/* regular`)).not.toContain(
+			`@lasertag-expect-error`,
+		)
+	})
+
 	it(`suggests root selectors and the module root class`, () => {
 		expect(labels(``)).toEqual(
 			expect.arrayContaining([`app-panel.class`, `.class`]),

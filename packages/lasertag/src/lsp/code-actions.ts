@@ -1,7 +1,7 @@
 export const LASERTAG_RESTART_SERVER_COMMAND = `lasertag.restartServer`
 export const LASERTAG_RESTART_SERVER_TITLE = `Lasertag: Restart Lasertag Server`
 export const LASERTAG_CLEAN_UP_DEAD_SELECTORS_COMMAND = `lasertag.cleanUpDeadSelectors`
-export const LASERTAG_CLEAN_UP_DEAD_SELECTORS_TITLE = `Lasertag: Clean up Dead Selectors`
+export const LASERTAG_CLEAN_UP_DEAD_SELECTORS_TITLE = `Lasertag: Clean up Diagnostics`
 export const LASERTAG_CLEAN_UP_DEAD_SELECTORS_KIND = `source.fixAll.lasertag`
 
 export type OffsetRange = {
@@ -457,6 +457,29 @@ function mergeRanges(ranges: OffsetRange[]): OffsetRange[] {
 	}
 
 	return mergedRanges
+}
+
+export function createExpectErrorCleanupRanges(
+	sourceText: string,
+	commentRanges: OffsetRange[],
+): OffsetRange[] {
+	return mergeRanges(
+		commentRanges.map((range) => {
+			const lineStart = sourceText.lastIndexOf(`\n`, range.start - 1) + 1
+			const nextLineBreak = sourceText.indexOf(`\n`, range.end)
+			const lineEnd = nextLineBreak === -1 ? sourceText.length : nextLineBreak
+			const commentIsOnlyContent =
+				sourceText.slice(lineStart, range.start).trim().length === 0 &&
+				sourceText.slice(range.end, lineEnd).trim().length === 0
+
+			if (!commentIsOnlyContent) return range
+
+			return {
+				end: nextLineBreak === -1 ? lineEnd : nextLineBreak + 1,
+				start: lineStart,
+			}
+		}),
+	)
 }
 
 export function createDeadSelectorCleanupRanges(

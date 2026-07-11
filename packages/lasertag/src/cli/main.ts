@@ -152,7 +152,7 @@ const checkRouteOptions = options(
 )
 
 const fixRouteOptions = noOptions(
-	`Remove dead CSS from component-owned CSS modules.`,
+	`Clean up fixable diagnostics in component-owned CSS modules.`,
 )
 
 const lasertagCli = cli({
@@ -513,7 +513,7 @@ function fixProgressMark({
 	const outcome = (() => {
 		switch (file.status) {
 			case `changed`:
-				return `removed ${file.fixedCount} ${plural(file.fixedCount, `selector`)}`
+				return `cleaned up ${file.fixedCount} ${plural(file.fixedCount, `diagnostic`)}`
 			case `failed`:
 				return `FAILED`
 			case `skipped`:
@@ -659,11 +659,11 @@ async function runFix(
 		diagnostics.length === 0
 	) {
 		io.log(
-			`lasertag fix: no dead CSS found in ${files.length} ${plural(files.length, `file`)}.`,
+			`lasertag fix: no fixable diagnostics found in ${files.length} ${plural(files.length, `file`)}.`,
 		)
 	} else {
 		io.log(
-			`lasertag fix: removed ${fixResult.fixedCount} dead ${plural(fixResult.fixedCount, `selector`)} from ${fixResult.changedFiles.length} ${plural(fixResult.changedFiles.length, `file`)}.`,
+			`lasertag fix: cleaned up ${fixResult.fixedCount} ${plural(fixResult.fixedCount, `diagnostic`)} in ${fixResult.changedFiles.length} ${plural(fixResult.changedFiles.length, `file`)}.`,
 		)
 	}
 

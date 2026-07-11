@@ -2,6 +2,7 @@ import { analyzeCssModuleSelectors } from "./analyze-css-module.ts"
 import type { CssSelectorAnalysis } from "./analyze-css-module.ts"
 import { analyzeTsxRenderStory } from "./analyze-tsx.ts"
 import type { CssReachabilityDiagnostic, RenderStory } from "./diagnostics.ts"
+import { applyLasertagExpectErrorDirectives } from "./expect-error.ts"
 import { canReachSelectorPath } from "./reachability.ts"
 import type { TypescriptAstSession } from "./typescript-ast.ts"
 
@@ -20,6 +21,7 @@ export type ValidateCssReachabilityResult = {
 }
 
 export type CreateCssReachabilityDiagnosticsOptions = {
+	cssSource?: string
 	renderStory: RenderStory
 	selectorAnalyses: CssSelectorAnalysis[]
 }
@@ -33,6 +35,7 @@ function impossibleLocalClassMessage(className: string): string {
 }
 
 export function createCssReachabilityDiagnostics({
+	cssSource,
 	renderStory,
 	selectorAnalyses,
 }: CreateCssReachabilityDiagnosticsOptions): CssReachabilityDiagnostic[] {
@@ -67,7 +70,9 @@ export function createCssReachabilityDiagnostics({
 		}
 	}
 
-	return diagnostics
+	return cssSource === undefined
+		? diagnostics
+		: applyLasertagExpectErrorDirectives(cssSource, diagnostics)
 }
 
 export function validateCssReachability(
@@ -85,6 +90,7 @@ export function validateCssReachability(
 	const renderStory = analyzeTsxRenderStory(tsxOptions, typescriptSession)
 	const selectorAnalyses = analyzeCssModuleSelectors(options.cssSource)
 	const diagnostics = createCssReachabilityDiagnostics({
+		cssSource: options.cssSource,
 		renderStory,
 		selectorAnalyses,
 	})

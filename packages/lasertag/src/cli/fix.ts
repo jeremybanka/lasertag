@@ -2,6 +2,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs"
 
 import {
 	createDeadSelectorCleanupRanges,
+	createExpectErrorCleanupRanges,
 	type OffsetRange,
 } from "../lsp/code-actions.ts"
 import {
@@ -94,9 +95,12 @@ function applyCleanupRanges(sourceText: string, ranges: OffsetRange[]): string {
 
 function diagnosticRanges(
 	diagnostics: CssReachabilityDiagnostic[],
+	codes: CssReachabilityDiagnostic[`code`][],
 ): OffsetRange[] {
 	return diagnostics.flatMap((diagnostic) =>
-		diagnostic.range ? [diagnostic.range] : [],
+		diagnostic.range && codes.includes(diagnostic.code)
+			? [diagnostic.range]
+			: [],
 	)
 }
 
@@ -152,10 +156,19 @@ function fixFile(
 			typescriptSession,
 		)
 		const { diagnostics } = validation
-		const cleanupRanges = createDeadSelectorCleanupRanges(
-			cssSource,
-			diagnosticRanges(diagnostics),
-		)
+		const cleanupRanges = [
+			...createDeadSelectorCleanupRanges(
+				cssSource,
+				diagnosticRanges(diagnostics, [
+					`dead-selector`,
+					`impossible-local-class`,
+				]),
+			),
+			...createExpectErrorCleanupRanges(
+				cssSource,
+				diagnosticRanges(diagnostics, [`unused-expect-error`]),
+			),
+		]
 		const fixedSource = applyCleanupRanges(cssSource, cleanupRanges)
 
 		if (fixedSource === cssSource) {
@@ -173,6 +186,7 @@ function fixFile(
 		}
 
 		const remainingDiagnostics = createCssReachabilityDiagnostics({
+			cssSource: fixedSource,
 			renderStory: validation.renderStory,
 			selectorAnalyses: analyzeCssModuleSelectors(fixedSource),
 		})
