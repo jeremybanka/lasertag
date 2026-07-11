@@ -2,6 +2,7 @@
 	"version": "0.2",
 	"useGitignore": true,
 	"ignorePaths": [
+		"lasertag.ai",
 		"pnpm-lock.yaml"
 	],
 	"words": [
