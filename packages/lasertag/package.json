@@ -71,7 +71,7 @@
 		"@types/estree": "1.0.9",
 		"@types/node": "26.1.1",
 		"@types/react": "19.2.17",
-		"eslint": "10.6.0",
+		"eslint": "10.7.0",
 		"preact": "10.29.7",
 		"solid-js": "1.9.14",
 		"vitest": "npm:@voidzero-dev/vite-plus-test@0.1.24"
