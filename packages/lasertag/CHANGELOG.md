@@ -1,5 +1,11 @@
 # lasertag
 
+## 0.4.3
+
+### Patch Changes
+
+- d1ecdc3: Add explained `@lasertag-expect-error` directives for expected CSS reachability diagnostics, stale-directive cleanup, and CSS comment autocomplete.
+
 ## 0.4.2
 
 ### Patch Changes
