@@ -1,5 +1,11 @@
 # lasertag
 
+## 0.4.4
+
+### Patch Changes
+
+- 9945588: Changed the Lasertag logo to work better at tiny scale. Now the four-pointed 'reticle' or 'light splash' around the central dot is less bulky and prominent.
+
 ## 0.4.3
 
 ### Patch Changes
