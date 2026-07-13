@@ -7,9 +7,11 @@ import {
 } from "../lsp/code-actions.ts"
 import {
 	analyzeCssModuleSelectors,
+	ambiguousRenderSourceMessage,
 	createTypescriptAstSession,
 	createCssReachabilityDiagnostics,
-	validateCssReachability,
+	resolveSiblingRenderSource,
+	validateRenderSourceCssReachability,
 	type CssReachabilityDiagnostic,
 	type TypescriptAstSession,
 	type ValidateCssReachabilityResult,
@@ -80,10 +82,6 @@ function errorMessage(error: unknown): string {
 	return error instanceof Error ? error.message : String(error)
 }
 
-function siblingTsxPath(cssPath: string): string {
-	return `${cssPath.slice(0, -`.module.css`.length)}.tsx`
-}
-
 function applyCleanupRanges(sourceText: string, ranges: OffsetRange[]): string {
 	return [...ranges]
 		.sort((left, right) => right.start - left.start || right.end - left.end)
@@ -107,16 +105,16 @@ function diagnosticRanges(
 function validateSources(
 	cssPath: string,
 	cssSource: string,
-	tsxPath: string,
-	tsxSource: string,
+	sourcePath: string,
+	sourceText: string,
 	typescriptSession: TypescriptAstSession,
 ): ValidateCssReachabilityResult {
-	return validateCssReachability(
+	return validateRenderSourceCssReachability(
 		{
 			cssPath,
 			cssSource,
-			tsxPath,
-			tsxSource,
+			sourcePath,
+			sourceText,
 		},
 		typescriptSession,
 	)
@@ -129,11 +127,16 @@ function fixFile(
 	typescriptSession: TypescriptAstSession,
 ): LasertagFixFileResult {
 	const { cssPath, index, stolenFrom } = task
-	const tsxPath = siblingTsxPath(cssPath)
 	const assignment = stolenFrom === undefined ? {} : { stolenFrom }
+	let sourcePath: string | undefined
 
 	try {
-		if (!fileSystem.fileExists(tsxPath)) {
+		const resolution = resolveSiblingRenderSource(
+			cssPath,
+			fileSystem.fileExists,
+		)
+
+		if (resolution.kind === `missing`) {
 			return {
 				cssPath,
 				diagnostics: [],
@@ -145,14 +148,19 @@ function fixFile(
 				workerId,
 			}
 		}
+		if (resolution.kind === `ambiguous`) {
+			throw new Error(ambiguousRenderSourceMessage(cssPath, resolution.sources))
+		}
+
+		sourcePath = resolution.source.path
 
 		const cssSource = fileSystem.readFile(cssPath)
-		const tsxSource = fileSystem.readFile(tsxPath)
+		const sourceText = fileSystem.readFile(sourcePath)
 		const validation = validateSources(
 			cssPath,
 			cssSource,
-			tsxPath,
-			tsxSource,
+			sourcePath,
+			sourceText,
 			typescriptSession,
 		)
 		const { diagnostics } = validation
@@ -180,7 +188,7 @@ function fixFile(
 				remainingDiagnostics: diagnostics,
 				status: `unchanged`,
 				...assignment,
-				tsxPath,
+				tsxPath: sourcePath,
 				workerId,
 			}
 		}
@@ -201,7 +209,7 @@ function fixFile(
 			remainingDiagnostics,
 			status: `changed`,
 			...assignment,
-			tsxPath,
+			tsxPath: sourcePath,
 			workerId,
 		}
 	} catch (error) {
@@ -214,7 +222,7 @@ function fixFile(
 			remainingDiagnostics: [],
 			status: `failed`,
 			...assignment,
-			tsxPath,
+			...(sourcePath ? { tsxPath: sourcePath } : {}),
 			workerId,
 		}
 	}

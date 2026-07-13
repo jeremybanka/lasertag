@@ -1,9 +1,9 @@
 # Lasertag Tooling
 
 Lasertag's tooling shares one analysis engine: **Refractor** turns a component's
-TSX into a render story, compares that story with its CSS Module, and reports
-selectors that cannot match. The CLI, language server, and VS Code extension are
-different surfaces over that same conservative analysis.
+TSX or Astro template into a render story, compares that story with its CSS
+Module, and reports selectors that cannot match. The CLI, language server, and
+VS Code extension are different surfaces over that same conservative analysis.
 
 For the authoring conventions these tools expect, see the
 [Lasertag guide](./lasertag-guide.md).
@@ -27,14 +27,24 @@ StatusCard.tsx
 StatusCard.module.css
 ```
 
-They do not search for `.jsx` files, directory entrypoints, or differently named
-components. The CLI skips a CSS Module without its exact TSX sibling, and editor
-analysis has no render story to use until both files are available.
+An exact `StatusCard.astro` sibling works in place of `StatusCard.tsx`. They do
+not search for `.jsx` files, directory entrypoints, or differently named
+components. The CLI skips a CSS Module without either exact source sibling, and
+editor analysis has no render story to use until both files are available. If
+both `.tsx` and `.astro` siblings exist, Lasertag reports an ambiguity error; it
+does not silently choose one.
 
 Refractor does not execute application code. It expands supported JSX branches
 and local components into a render story. `children` render slots, imported
 components, and render expressions it cannot resolve become opaque paths.
 Unsupported selector shapes are unknown too.
+
+Render-story ownership starts at the outermost rendered nodes whose `class` or
+`class:list` expression uses `css.class`. Wrappers and unrelated sibling roots
+are excluded before selector reachability runs. When Refractor cannot discover
+an attachment, validation uses an opaque ownership root and makes no
+dead-selector claims; ESLint is responsible for reporting a missing or misplaced
+attachment.
 
 That uncertainty is intentional: a selector is reported as dead only when every
 supported path is provably unreachable. An unknown path prevents that report.
@@ -80,6 +90,24 @@ component cannot be selected by convention. Reusing
 `createTypescriptAstSession()` avoids starting a TypeScript AST session for every
 file in a larger integration. Pass the session as the second argument to
 `validateCssReachability`, then close it after the batch.
+
+For either supported source type, use `validateRenderSourceCssReachability` with
+`sourcePath` and `sourceText`. `analyzeAstroRenderStory` and
+`analyzeTsxRenderStory` expose the individual source adapters, while
+`analyzeRenderStory` dispatches from the source extension. Astro HTML and custom
+elements are structural story nodes. Astro components whose names end in
+`Layout` are transparent slot wrappers, so their explicit children remain in the
+story long enough for attachment discovery. Other PascalCase Astro component
+tags use Lasertag's own-name root convention (`Dz2Orbital` becomes
+`dz2-orbital`) while their implementation stays opaque. Slots, injected HTML,
+dynamic component tags, and expressions that cannot be reduced safely remain
+opaque.
+
+`scopeRenderStoryToCssClassRoots` exposes attachment-based scoping separately
+for integrations that construct render stories themselves. It defaults to
+`css.class`; pass `bindingName` and `exportName` to recognize another CSS Module
+binding and export. Its low-level default preserves a story with no attachment;
+pass `missingAttachment: "opaque"` for validation's conservative behavior.
 
 ## CLI Workflows
 
@@ -127,15 +155,16 @@ calling an editor command.
 pnpm exec lasertag-lsp --stdio
 ```
 
-Configure the client to send `.module.css` and `.tsx` documents, provide the
-workspace folder, and synchronize create, change, and delete events for
-`**/*.module.css` and `**/*.tsx`. The server registers those watchers dynamically
-when the client supports it; otherwise the client should forward watched-file
-notifications.
+Configure the client to send `.module.css`, `.tsx`, and `.astro` documents,
+provide the workspace folder, and synchronize create, change, and delete events
+for `**/*.module.css`, `**/*.tsx`, and `**/*.astro`. The server registers those
+watchers dynamically when the client supports it; otherwise the client should
+forward watched-file notifications.
 
 The server provides:
 
 - `dead-selector` and `impossible-local-class` diagnostics in CSS Modules
+- an `ambiguous-render-source` error when both source siblings exist
 - render-aware selector, attribute, and refinement completions
 - a cleanup code action whose edits remove reported selectors
 - incremental updates when either side of a sibling pair changes
@@ -170,12 +199,17 @@ Restart Lasertag Server**.
 ## Troubleshooting
 
 - If a CSS Module has no diagnostics or completions, first verify the exact
-  `.module.css`/`.tsx` sibling names and that both files are inside the workspace.
+  `.module.css` and `.tsx` or `.astro` sibling names and that both files are
+  inside the workspace.
 - The main component is selected from a matching file-stem export, then a default
   export, then a single exported component. Resolve ambiguous exports or use
   `componentName` through the refractor API.
 - No diagnostic can mean “unknown,” not “reachable.” Inspect the API's render
-  story when dynamic or imported render branches are involved.
+  story when dynamic or imported render branches are involved. The `info` log
+  includes an analysis summary with element, opaque-branch, selector, and
+  reachability counts. At `debug`, Lasertag logs sibling resolution, parsed CSS
+  selectors, the normalized render story, and every selector path's
+  `reachable`, `unknown`, or `unreachable` result.
 - In VS Code, open the **Lasertag** output channel, set
   `lasertag.log.level` to `debug`, and use `lasertag.trace.server` only when
   protocol messages are needed. Run **Developer: Reload Window** after changing

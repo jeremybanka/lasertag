@@ -1,9 +1,17 @@
 import { analyzeCssModuleSelectors } from "./analyze-css-module.ts"
 import type { CssSelectorAnalysis } from "./analyze-css-module.ts"
+import { analyzeRenderStory } from "./analyze-render-source.ts"
 import { analyzeTsxRenderStory } from "./analyze-tsx.ts"
-import type { CssReachabilityDiagnostic, RenderStory } from "./diagnostics.ts"
+import type {
+	CssReachabilityDiagnostic,
+	Reachability,
+	RenderStory,
+	SelectorPath,
+	SourceRange,
+} from "./diagnostics.ts"
 import { applyLasertagExpectErrorDirectives } from "./expect-error.ts"
 import { canReachSelectorPath } from "./reachability.ts"
+import { scopeRenderStoryToCssClassRoots } from "./render-story-root.ts"
 import type { TypescriptAstSession } from "./typescript-ast.ts"
 
 export type ValidateCssReachabilityOptions = {
@@ -20,10 +28,36 @@ export type ValidateCssReachabilityResult = {
 	diagnostics: CssReachabilityDiagnostic[]
 }
 
+export type ValidateRenderSourceCssReachabilityOptions = {
+	sourcePath: string
+	sourceText: string
+	cssSource: string
+	cssPath?: string
+	componentName?: string
+	typescriptSdkPath?: string
+}
+
 export type CreateCssReachabilityDiagnosticsOptions = {
 	cssSource?: string
 	renderStory: RenderStory
 	selectorAnalyses: CssSelectorAnalysis[]
+}
+
+export type CssSelectorReachabilityAnalysis = {
+	paths: Array<{
+		path: SelectorPath
+		reachability: Reachability
+	}>
+	range: SourceRange
+	reachability: Reachability | `not-applicable`
+	reason?: string
+	resultKind: CssSelectorAnalysis[`result`][`kind`]
+	selector: string
+}
+
+export type CssReachabilityAnalysis = {
+	diagnostics: CssReachabilityDiagnostic[]
+	selectorReachability: CssSelectorReachabilityAnalysis[]
 }
 
 function deadSelectorMessage(selector: string): string {
@@ -34,17 +68,35 @@ function impossibleLocalClassMessage(className: string): string {
 	return `Local class ".${className}" is unreachable; lasertag CSS modules expose only "css.class".`
 }
 
-export function createCssReachabilityDiagnostics({
+function combineReachability(results: Reachability[]): Reachability {
+	if (results.includes(`reachable`)) return `reachable`
+	if (results.includes(`unknown`)) return `unknown`
+
+	return `unreachable`
+}
+
+export function analyzeCssReachability({
 	cssSource,
 	renderStory,
 	selectorAnalyses,
-}: CreateCssReachabilityDiagnosticsOptions): CssReachabilityDiagnostic[] {
+}: CreateCssReachabilityDiagnosticsOptions): CssReachabilityAnalysis {
 	const diagnostics: CssReachabilityDiagnostic[] = []
+	const selectorReachability: CssSelectorReachabilityAnalysis[] = []
 
 	for (const selectorAnalysis of selectorAnalyses) {
 		const { result } = selectorAnalysis
 
-		if (result.kind === `unknown`) continue
+		if (result.kind === `unknown`) {
+			selectorReachability.push({
+				paths: [],
+				range: selectorAnalysis.range,
+				reachability: `unknown`,
+				reason: result.reason,
+				resultKind: result.kind,
+				selector: selectorAnalysis.selector,
+			})
+			continue
+		}
 
 		if (result.kind === `impossible-local-class`) {
 			diagnostics.push({
@@ -53,14 +105,34 @@ export function createCssReachabilityDiagnostics({
 				selector: selectorAnalysis.selector,
 				range: selectorAnalysis.range,
 			})
+			selectorReachability.push({
+				paths: [],
+				range: selectorAnalysis.range,
+				reachability: `not-applicable`,
+				reason: `local class .${result.className} is not exposed`,
+				resultKind: result.kind,
+				selector: selectorAnalysis.selector,
+			})
 			continue
 		}
 
-		if (
-			result.paths.every(
-				(path) => canReachSelectorPath(renderStory, path) === `unreachable`,
-			)
-		) {
+		const paths = result.paths.map((selectorPath) => ({
+			path: selectorPath,
+			reachability: canReachSelectorPath(renderStory, selectorPath),
+		}))
+		const reachability = combineReachability(
+			paths.map((path) => path.reachability),
+		)
+
+		selectorReachability.push({
+			paths,
+			range: selectorAnalysis.range,
+			reachability,
+			resultKind: result.kind,
+			selector: selectorAnalysis.selector,
+		})
+
+		if (reachability === `unreachable`) {
 			diagnostics.push({
 				code: `dead-selector`,
 				message: deadSelectorMessage(selectorAnalysis.selector),
@@ -70,9 +142,25 @@ export function createCssReachabilityDiagnostics({
 		}
 	}
 
-	return cssSource === undefined
-		? diagnostics
-		: applyLasertagExpectErrorDirectives(cssSource, diagnostics)
+	return {
+		diagnostics:
+			cssSource === undefined
+				? diagnostics
+				: applyLasertagExpectErrorDirectives(cssSource, diagnostics),
+		selectorReachability,
+	}
+}
+
+export function createCssReachabilityDiagnostics({
+	cssSource,
+	renderStory,
+	selectorAnalyses,
+}: CreateCssReachabilityDiagnosticsOptions): CssReachabilityDiagnostic[] {
+	return analyzeCssReachability({
+		...(cssSource === undefined ? {} : { cssSource }),
+		renderStory,
+		selectorAnalyses,
+	}).diagnostics
 }
 
 export function validateCssReachability(
@@ -87,7 +175,40 @@ export function validateCssReachability(
 			? { typescriptSdkPath: options.typescriptSdkPath }
 			: {}),
 	}
-	const renderStory = analyzeTsxRenderStory(tsxOptions, typescriptSession)
+	const renderStory = scopeRenderStoryToCssClassRoots(
+		analyzeTsxRenderStory(tsxOptions, typescriptSession),
+		{ missingAttachment: `opaque` },
+	)
+	const selectorAnalyses = analyzeCssModuleSelectors(options.cssSource)
+	const diagnostics = createCssReachabilityDiagnostics({
+		cssSource: options.cssSource,
+		renderStory,
+		selectorAnalyses,
+	})
+
+	return { renderStory, diagnostics }
+}
+
+export function validateRenderSourceCssReachability(
+	options: ValidateRenderSourceCssReachabilityOptions,
+	typescriptSession?: TypescriptAstSession,
+): ValidateCssReachabilityResult {
+	const renderStory = scopeRenderStoryToCssClassRoots(
+		analyzeRenderStory(
+			{
+				sourcePath: options.sourcePath,
+				sourceText: options.sourceText,
+				...(options.componentName
+					? { componentName: options.componentName }
+					: {}),
+				...(options.typescriptSdkPath
+					? { typescriptSdkPath: options.typescriptSdkPath }
+					: {}),
+			},
+			typescriptSession,
+		),
+		{ missingAttachment: `opaque` },
+	)
 	const selectorAnalyses = analyzeCssModuleSelectors(options.cssSource)
 	const diagnostics = createCssReachabilityDiagnostics({
 		cssSource: options.cssSource,

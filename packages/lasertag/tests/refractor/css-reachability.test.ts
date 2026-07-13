@@ -35,7 +35,7 @@ describe(`render story css reachability`, () => {
 	it(`suppresses diagnostics on the line after a lasertag expect-error directive`, () => {
 		expect(
 			diagnosticSelectors(
-				`export function AppPanel() { return <app-panel><header /></app-panel> }`,
+				`export function AppPanel() { return <app-panel className={css.class}><header /></app-panel> }`,
 				`app-panel.class {
 	/* @lasertag-expect-error: gets appended via useEffect */
 	> canvas {}
@@ -54,7 +54,7 @@ describe(`render story css reachability`, () => {
 			cssPath: `/project/src/AppPanel.module.css`,
 			cssSource,
 			tsxPath: `/project/src/AppPanel.tsx`,
-			tsxSource: `export function AppPanel() { return <app-panel><header /></app-panel> }`,
+			tsxSource: `export function AppPanel() { return <app-panel className={css.class}><header /></app-panel> }`,
 		})
 
 		expect(result.diagnostics).toMatchObject([
@@ -74,7 +74,7 @@ describe(`render story css reachability`, () => {
 	it(`requires a lasertag expect-error explanation of at least three characters`, () => {
 		expect(
 			diagnosticCodes(
-				`export function AppPanel() { return <app-panel /> }`,
+				`export function AppPanel() { return <app-panel className={css.class} /> }`,
 				`app-panel.class {
 	/* @lasertag-expect-error: no */
 	> footer {}
@@ -84,7 +84,7 @@ describe(`render story css reachability`, () => {
 
 		expect(
 			diagnosticCodes(
-				`export function AppPanel() { return <app-panel /> }`,
+				`export function AppPanel() { return <app-panel className={css.class} /> }`,
 				`app-panel.class {
 	/* @lasertag-expect-error: yep */
 	> footer {}
@@ -96,7 +96,7 @@ describe(`render story css reachability`, () => {
 	it(`targets only the immediately following line`, () => {
 		expect(
 			diagnosticCodes(
-				`export function AppPanel() { return <app-panel /> }`,
+				`export function AppPanel() { return <app-panel className={css.class} /> }`,
 				`app-panel.class {
 	/* @lasertag-expect-error: rendered by a portal */
 
@@ -162,6 +162,42 @@ describe(`render story css reachability`, () => {
 				code: `dead-selector`,
 				selector: `app-panel.class > footer`,
 			},
+		])
+	})
+
+	it(`scopes TSX reachability to the node carrying css.class`, () => {
+		const result = validateCssReachability({
+			cssPath: `/project/src/AppPanel.module.css`,
+			cssSource: `app-panel.class {
+	> footer {}
+}`,
+			tsxPath: `/project/src/AppPanel.tsx`,
+			tsxSource: `
+				import css from "./AppPanel.module.css"
+				import { ExternalIsland } from "./ExternalIsland.tsx"
+
+				export function AppPanel() {
+					return (
+						<>
+							<ExternalIsland />
+							<layout-shell>
+								<app-panel className={css.class}><header /></app-panel>
+							</layout-shell>
+						</>
+					)
+				}
+			`,
+		})
+
+		expect(result.renderStory.roots).toMatchObject([
+			{
+				attributes: [{ expression: `css.class`, name: `class` }],
+				kind: `element`,
+				tagName: `app-panel`,
+			},
+		])
+		expect(result.diagnostics).toMatchObject([
+			{ code: `dead-selector`, selector: `app-panel.class > footer` },
 		])
 	})
 

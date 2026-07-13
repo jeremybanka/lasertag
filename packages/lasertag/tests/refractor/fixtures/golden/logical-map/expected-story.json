@@ -19,6 +19,7 @@
 							"tagName": "a",
 							"attributes": [
 								{
+									"expression": "item.href",
 									"name": "href"
 								}
 							],

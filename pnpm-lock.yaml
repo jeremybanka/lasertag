@@ -52,6 +52,9 @@ importers:
 
   packages/lasertag:
     dependencies:
+      '@astrojs/compiler':
+        specifier: 4.0.0
+        version: 4.0.0
       '@vscode/vsce':
         specifier: 3.9.2
         version: 3.9.2
@@ -112,6 +115,9 @@ importers:
         version: '@voidzero-dev/vite-plus-test@0.1.24(@types/node@26.1.1)(typescript@7.0.2)(vite@8.0.16(@types/node@26.1.1)(yaml@2.9.0))(yaml@2.9.0)'
 
 packages:
+
+  '@astrojs/compiler@4.0.0':
+    resolution: {integrity: sha512-eouss7G8ygdZqHuke033VMcVw5HTZUu+PXd/h06DGDUg/jt5btPYPqh66ENWw/mU78rBrf/oeC4oqoBwMtDMNA==}
 
   '@azu/format-text@1.0.2':
     resolution: {integrity: sha512-Swi4N7Edy1Eqq82GxgEECXSSLyn6GOb5htRFPzBDdUkECGXtlf12ynO5oJSpWKPwCaUssOu7NfhDcCWpIC6Ywg==}
@@ -3541,6 +3547,8 @@ packages:
     resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
 
 snapshots:
+
+  '@astrojs/compiler@4.0.0': {}
 
   '@azu/format-text@1.0.2': {}
 

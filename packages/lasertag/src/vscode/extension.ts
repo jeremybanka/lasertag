@@ -186,12 +186,17 @@ function createClientOptions() {
 				language: "typescriptreact",
 				scheme: "file",
 			},
+			{
+				language: "astro",
+				scheme: "file",
+			},
 		],
 		outputChannelName: "Lasertag",
 		synchronize: {
 			fileEvents: [
 				vscode.workspace.createFileSystemWatcher("**/*.module.css"),
 				vscode.workspace.createFileSystemWatcher("**/*.tsx"),
+				vscode.workspace.createFileSystemWatcher("**/*.astro"),
 			],
 		},
 	}

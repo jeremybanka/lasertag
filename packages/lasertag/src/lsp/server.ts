@@ -26,8 +26,9 @@ import {
 	createLasertagLspState,
 	findSiblingTsxPathFromConvention,
 	isCssModulePath as isCssModuleFilePath,
-	isTsxPath,
+	isRenderSourcePath,
 	offsetToPosition,
+	type LasertagLspAnalysisTrace,
 	type LasertagLspStateEnvironment,
 	type LspDocumentInput,
 } from "./state.ts"
@@ -251,6 +252,34 @@ function durationMs(start: number): number {
 	return Number((performance.now() - start).toFixed(2))
 }
 
+export function logAnalysisTrace(
+	logger: LasertagLspLogger,
+	trace: LasertagLspAnalysisTrace,
+): void {
+	logger.info(`analysis`, `completed`, {
+		cssPath: trace.cssPath,
+		...trace.summary,
+	})
+	logger.debug(`analysis`, `render source resolution`, {
+		cssPath: trace.cssPath,
+		...trace.sourceResolution,
+	})
+	logger.debug(`analysis`, `css selectors`, {
+		cssAnalysis: trace.cssAnalysis,
+		cssPath: trace.cssPath,
+	})
+	logger.debug(`analysis`, `render story`, {
+		cssPath: trace.cssPath,
+		renderStoryAnalysis: trace.renderStoryAnalysis,
+	})
+	logger.debug(`analysis`, `selector reachability`, {
+		cssPath: trace.cssPath,
+		publishedDiagnostics: trace.publishedDiagnostics,
+		reachabilityDiagnostics: trace.reachabilityDiagnostics,
+		selectors: trace.selectorReachability,
+	})
+}
+
 function watchedFileChangeTypeName(type: FileChangeType): string {
 	switch (type) {
 		case FileChangeType.Changed:
@@ -409,6 +438,7 @@ export function createLasertagLspServer(
 
 	function logWorkspaceIndex(event: string, startedAt: number): void {
 		logger.info(`workspace`, event, {
+			astroCount: state.getWatchedAstroPaths().length,
 			cssModuleCount: state.getKnownCssModulePaths().length,
 			durationMs: durationMs(startedAt),
 			tsxCount: state.getWatchedTsxPaths().length,
@@ -430,19 +460,33 @@ export function createLasertagLspServer(
 		if (!isCssModulePath(cssPath)) return
 
 		const startedAt = performance.now()
+		const logLevel = logger.getLevel()
+		const chronicle = logLevel === `debug` ? logger.makeChronicle() : undefined
+
+		chronicle?.mark(`diagnostics started`)
 		const diagnostics = state.getDiagnostics(cssPath)
+		chronicle?.mark(`diagnostics resolved`)
+		const analysisTrace =
+			logLevel === `debug` || logLevel === `info`
+				? state.getAnalysisTrace(cssPath)
+				: undefined
+		chronicle?.mark(`analysis trace resolved`)
 		const uri = state.getDocumentUri(cssPath)
 
 		void connection.sendDiagnostics({
 			diagnostics,
 			uri,
 		})
+		chronicle?.mark(`diagnostics queued`)
 		logger.info(`diagnostics`, `published`, {
 			cssPath,
 			diagnosticCount: diagnostics.length,
 			durationMs: durationMs(startedAt),
 			uri,
 		})
+		if (analysisTrace) logAnalysisTrace(logger, analysisTrace)
+		chronicle?.mark(`analysis logged`)
+		chronicle?.logMarks()
 	}
 
 	function scheduleDiagnostics(cssPath: string): void {
@@ -478,12 +522,13 @@ export function createLasertagLspServer(
 		logger.info(`diagnostics`, `cleared`, { cssPath, uri })
 	}
 
-	function scheduleAffectedCssForTsx(tsxPath: string): void {
-		const affectedCssPaths = state.getAffectedCssPathsForTsx(tsxPath)
+	function scheduleAffectedCssForRenderSource(sourcePath: string): void {
+		const affectedCssPaths =
+			state.getAffectedCssPathsForRenderSource(sourcePath)
 
-		logger.info(`tsx`, `scheduling affected css`, {
+		logger.info(`render-source`, `scheduling affected css`, {
 			affectedCssCount: affectedCssPaths.length,
-			tsxPath,
+			sourcePath,
 		})
 
 		for (const cssPath of affectedCssPaths) {
@@ -506,7 +551,10 @@ export function createLasertagLspServer(
 		const filePath = filePathFromUri(params.textDocument.uri)
 		const requestedKinds = params.context.only
 
-		if (!filePath || (!isCssModulePath(filePath) && !isTsxPath(filePath))) {
+		if (
+			!filePath ||
+			(!isCssModulePath(filePath) && !isRenderSourcePath(filePath))
+		) {
 			return []
 		}
 
@@ -578,7 +626,9 @@ export function createLasertagLspServer(
 			return
 		}
 
-		if (isTsxPath(filePath)) scheduleAffectedCssForTsx(filePath)
+		if (isRenderSourcePath(filePath)) {
+			scheduleAffectedCssForRenderSource(filePath)
+		}
 	}
 
 	function handleWorkspaceFoldersChanged(
@@ -633,7 +683,7 @@ export function createLasertagLspServer(
 	connection.onInitialized(() => {
 		if (clientSupportsDynamicWatchedFiles) {
 			logger.info(`watchers`, `registering dynamic file watchers`, {
-				globPatterns: [`**/*.module.css`, `**/*.tsx`],
+				globPatterns: [`**/*.module.css`, `**/*.tsx`, `**/*.astro`],
 			})
 			void connection.client
 				.register(DidChangeWatchedFilesNotification.type, {
@@ -646,11 +696,15 @@ export function createLasertagLspServer(
 							globPattern: `**/*.tsx`,
 							kind: allWatchedFileChangeKinds(),
 						},
+						{
+							globPattern: `**/*.astro`,
+							kind: allWatchedFileChangeKinds(),
+						},
 					],
 				})
 				.then(() => {
 					logger.info(`watchers`, `registered dynamic file watchers`, {
-						globPatterns: [`**/*.module.css`, `**/*.tsx`],
+						globPatterns: [`**/*.module.css`, `**/*.tsx`, `**/*.astro`],
 					})
 				})
 				.catch((error: unknown) => {
@@ -690,8 +744,8 @@ export function createLasertagLspServer(
 
 			if (!filePath) continue
 
-			const affectedCssBeforeChange = isTsxPath(filePath)
-				? state.getAffectedCssPathsForTsx(filePath)
+			const affectedCssBeforeChange = isRenderSourcePath(filePath)
+				? state.getAffectedCssPathsForRenderSource(filePath)
 				: []
 
 			if (change.type === FileChangeType.Deleted) {
@@ -714,15 +768,15 @@ export function createLasertagLspServer(
 				}
 			}
 
-			if (isTsxPath(filePath)) {
+			if (isRenderSourcePath(filePath)) {
 				const affectedCssPaths = new Set([
 					...affectedCssBeforeChange,
-					...state.getAffectedCssPathsForTsx(filePath),
+					...state.getAffectedCssPathsForRenderSource(filePath),
 				])
 
-				logger.info(`tsx`, `file change affected css`, {
+				logger.info(`render-source`, `file change affected css`, {
 					affectedCssCount: affectedCssPaths.size,
-					tsxPath: filePath,
+					sourcePath: filePath,
 				})
 
 				for (const cssPath of affectedCssPaths) {
@@ -753,7 +807,9 @@ export function createLasertagLspServer(
 			clearDiagnostics(filePath, event.document.uri)
 		}
 
-		if (isTsxPath(filePath)) scheduleAffectedCssForTsx(filePath)
+		if (isRenderSourcePath(filePath)) {
+			scheduleAffectedCssForRenderSource(filePath)
+		}
 	})
 	documents.listen(connection)
 

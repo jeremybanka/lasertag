@@ -12,3 +12,7 @@ packages/lasertag/tests/refractor/corpus/providers/
 packages/lasertag/tests/refractor/corpus/reports/
 packages/lasertag/vscode/package.json
 packages/lasertag-vscode/server/
+
+.lasertag-vsix/
+Lasertag.vsix
+

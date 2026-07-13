@@ -6,6 +6,7 @@ export type SourceRange = {
 export type StoryChild = StoryNode | OpaqueStoryNode
 
 export type StoryAttribute = {
+	expression?: string
 	name: string
 	value?: string
 	range?: SourceRange

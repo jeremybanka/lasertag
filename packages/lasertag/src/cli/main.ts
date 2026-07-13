@@ -517,7 +517,7 @@ function fixProgressMark({
 			case `failed`:
 				return `FAILED`
 			case `skipped`:
-				return `skipped no TSX`
+				return `skipped no render source`
 			case `unchanged`:
 				return file.remainingDiagnostics.length > 0
 					? `${file.remainingDiagnostics.length} unresolved`

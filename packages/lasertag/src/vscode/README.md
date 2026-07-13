@@ -2,7 +2,8 @@
 
 Render-aware diagnostics and CSS completions for component-owned CSS Modules.
 Lasertag compares each `Component.module.css` file with its exact sibling
-`Component.tsx`, then keeps the editor up to date as either file changes.
+`Component.tsx` or `Component.astro`, then keeps the editor up to date as either
+file changes. If both source siblings exist, Lasertag reports an ambiguity error.
 
 ## Features
 
@@ -71,13 +72,16 @@ Operational logs and protocol traces appear in **View: Toggle Output** under
 ## Troubleshooting
 
 - If diagnostics or completions do not appear, check that the files use the
-  exact sibling names `Component.tsx` and `Component.module.css`, then run
+  exact sibling names `Component.tsx` or `Component.astro` and
+  `Component.module.css`, then run
   **Lasertag: Restart Lasertag Server**.
 - If the server does not start, clear custom `lasertag.lsp.path`,
   `lasertag.server.path`, and `lasertag.typescript.sdk.path` values to return to
   the bundled runtimes, then reload the window.
-- For startup or indexing problems, set `lasertag.log.level` to `debug` and
-  reload the window before inspecting the **Lasertag** output. Use
+- For missing diagnostics or discovery problems, inspect the `analysis
+  completed` summary in the **Lasertag** output. Set `lasertag.log.level` to
+  `debug` and reload the window to include sibling source resolution, parsed
+  selectors, the normalized render story, and per-selector reachability. Use
   `lasertag.trace.server: "verbose"` only when protocol-level detail is useful.
 - Missing warnings can be intentional: Lasertag does not call a selector dead
   when an unsupported or dynamic render path could still reach it.

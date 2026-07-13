@@ -111,6 +111,7 @@ function createVscodeManifest(version: string) {
 		},
 		categories: ["Linters", "Programming Languages"],
 		activationEvents: [
+			"onLanguage:astro",
 			"onLanguage:css",
 			"onLanguage:typescriptreact",
 			"workspaceContains:**/*.module.css",
@@ -202,7 +203,6 @@ async function copyTypescriptNativeRuntime(destinationNodeModules: string) {
 		requireFromTypescript,
 	)
 
-	await rm(destinationNodeModules, { force: true, recursive: true })
 	await mkdir(path.join(destinationNodeModules, "@typescript"), {
 		recursive: true,
 	})
@@ -214,6 +214,24 @@ async function copyTypescriptNativeRuntime(destinationNodeModules: string) {
 			nativePackageName.slice(12),
 		),
 	)
+}
+
+async function copyAstroCompilerRuntime(destinationNodeModules: string) {
+	const compilerRoot = resolvePackageRoot("@astrojs/compiler")
+
+	await mkdir(path.join(destinationNodeModules, "@astrojs"), {
+		recursive: true,
+	})
+	await copyPackageRoot(
+		compilerRoot,
+		path.join(destinationNodeModules, "@astrojs", "compiler"),
+	)
+}
+
+async function copyVscodeRuntimeDependencies(destinationNodeModules: string) {
+	await rm(destinationNodeModules, { force: true, recursive: true })
+	await copyTypescriptNativeRuntime(destinationNodeModules)
+	await copyAstroCompilerRuntime(destinationNodeModules)
 }
 
 async function bundleEntry(options: {
@@ -248,7 +266,8 @@ async function bundleVscodeRuntime(packageRoot: string, distRoot: string) {
 		outfile: path.join(distRoot, "extension.mjs"),
 	})
 	await bundleEntry({
-		external: (id) => id.startsWith("@typescript/"),
+		external: (id) =>
+			id.startsWith("@typescript/") || id.startsWith("@astrojs/compiler"),
 		input: path.join(packageRoot, "src", "lsp", "server.ts"),
 		outfile: path.join(distRoot, "server.mjs"),
 	})
@@ -306,7 +325,7 @@ export async function buildLasertagVsix(
 		path.join(packageRoot, "src", "vscode", "README.md"),
 		path.join(buildRoot, "README.md"),
 	)
-	await copyTypescriptNativeRuntime(path.join(packageDist, "node_modules"))
+	await copyVscodeRuntimeDependencies(path.join(packageDist, "node_modules"))
 	await writeFile(
 		path.join(buildRoot, "package.json"),
 		`${JSON.stringify(createVscodeManifest(lasertagPackageJson.version), null, "\t")}\n`,

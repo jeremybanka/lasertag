@@ -3,6 +3,55 @@ import { describe, expect, it } from "vitest"
 import { runLasertagCheck } from "../../src/cli/check.ts"
 
 describe(`lasertag check engine`, () => {
+	it(`uses a same-named Astro file as the render story neighbor`, async () => {
+		const cssPath = `/virtual/AppPanel.module.css`
+		const astroPath = `/virtual/AppPanel.astro`
+		const sources = new Map<string, string>([
+			[
+				cssPath,
+				`app-panel.class {
+	> footer {}
+}`,
+			],
+			[astroPath, `<app-panel class={css.class}><header /></app-panel>`],
+		])
+		const result = await runLasertagCheck([cssPath], {
+			fileSystem: {
+				fileExists: (filePath) => sources.has(filePath),
+				readFile: (filePath) => sources.get(filePath) ?? ``,
+			},
+		})
+
+		expect(result.failures).toEqual([])
+		expect(result.fileResults).toMatchObject([
+			{ status: `checked`, tsxPath: astroPath },
+		])
+		expect(result.diagnostics).toMatchObject([
+			{ diagnostic: { code: `dead-selector` }, tsxPath: astroPath },
+		])
+	})
+
+	it(`fails loudly when both Astro and TSX neighbors exist`, async () => {
+		const cssPath = `/virtual/AppPanel.module.css`
+		const sources = new Map<string, string>([
+			[cssPath, `app-panel.class {}`],
+			[`/virtual/AppPanel.astro`, `<app-panel />`],
+			[`/virtual/AppPanel.tsx`, `export const AppPanel = () => <app-panel />`],
+		])
+		const result = await runLasertagCheck([cssPath], {
+			fileSystem: {
+				fileExists: (filePath) => sources.has(filePath),
+				readFile: (filePath) => sources.get(filePath) ?? ``,
+			},
+		})
+
+		expect(result.failures).toHaveLength(1)
+		expect(result.failures[0]).toMatchObject({ status: `failed` })
+		expect(result.failures[0]?.error).toContain(`Ambiguous render story`)
+		expect(result.failures[0]?.error).toContain(`/virtual/AppPanel.tsx`)
+		expect(result.failures[0]?.error).toContain(`/virtual/AppPanel.astro`)
+	})
+
 	it(`uses the serial fallback for an injected file system`, async () => {
 		const warningCssPath = `/virtual/Warning.module.css`
 		const cleanCssPath = `/virtual/Clean.module.css`

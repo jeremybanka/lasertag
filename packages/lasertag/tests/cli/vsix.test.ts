@@ -100,7 +100,7 @@ describe(`lasertag vsix builder`, () => {
 		expect(packaged).toBe(false)
 	})
 
-	it(`writes the VSCode manifest and copies the TypeScript native runtime package`, async () => {
+	it(`writes the VSCode manifest and copies its analysis runtimes`, async () => {
 		const fixture = createFixture({
 			"package.json": JSON.stringify({ version: `9.8.7-test` }),
 			"src/vscode/extension.ts": `
@@ -132,6 +132,10 @@ describe(`lasertag vsix builder`, () => {
 			result.buildRoot,
 			`dist/node_modules/@typescript/typescript-${process.platform}-${process.arch}`,
 		)
+		const astroCompilerPath = path.join(
+			result.buildRoot,
+			`dist/node_modules/@astrojs/compiler`,
+		)
 
 		expect(result.vsixPath).toBe(fixture.path(`out/Lasertag.vsix`))
 		expect(result.vscodeTarget).toBe(
@@ -153,6 +157,9 @@ describe(`lasertag vsix builder`, () => {
 		expect(
 			existsSync(path.join(result.buildRoot, `dist/extension.mjs.map`)),
 		).toBe(true)
+		expect(existsSync(path.join(astroCompilerPath, `dist/astro.wasm`))).toBe(
+			true,
+		)
 		expect(existsSync(path.join(result.buildRoot, `dist/server.mjs`))).toBe(
 			true,
 		)

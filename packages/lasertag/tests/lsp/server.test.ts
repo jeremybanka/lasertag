@@ -24,6 +24,7 @@ import {
 	createInitializeResult,
 	createRefractorDiagnostics,
 	findSiblingTsxPath,
+	logAnalysisTrace,
 } from "../../src/lsp/server.ts"
 import {
 	LASERTAG_CLEAN_UP_DEAD_SELECTORS_KIND,
@@ -32,6 +33,7 @@ import {
 
 const cssPath = `/project/src/AppPanel.module.css`
 const tsxPath = `/project/src/AppPanel.tsx`
+const astroPath = `/project/src/AppPanel.astro`
 
 function fileUri(filePath: string): string {
 	return pathToFileURL(filePath).href
@@ -74,6 +76,10 @@ function createTsxSource(childTagName: string): string {
 	`
 }
 
+function createAstroSource(childTagName: string): string {
+	return `<app-panel class={css.class}><${childTagName} /></app-panel>`
+}
+
 function createMemoryFileSystem(files: Record<string, string>) {
 	const memory = new Map(Object.entries(files))
 	type TestGlobOptions = {
@@ -107,6 +113,7 @@ function createMemoryFileSystem(files: Record<string, string>) {
 					}
 
 					if (pattern === `**/*.tsx`) return filePath.endsWith(`.tsx`)
+					if (pattern === `**/*.astro`) return filePath.endsWith(`.astro`)
 
 					return false
 				}),
@@ -360,6 +367,31 @@ describe(`lasertag lsp logging`, () => {
 		expect(messages.info[0]).toContain(cssPath)
 	})
 
+	it(`logs an analysis summary and the full discovery trace at debug level`, () => {
+		const fileSystem = createMemoryFileSystem({
+			[astroPath]: `<app-panel class={css.class}>{content}</app-panel>`,
+		})
+		const state = createLasertagLspState(fileSystem.environment)
+		const { messages, sink } = createMemoryLogSink()
+		const logger = createLasertagLspLogger(sink, `debug`)
+
+		state.openDocument(createDocumentInput(cssPath, createCssSource(`footer`)))
+		logAnalysisTrace(logger, state.getAnalysisTrace(cssPath))
+
+		expect(messages.info).toHaveLength(1)
+		expect(messages.info[0]).toContain(`analysis completed`)
+		expect(messages.info[0]).toContain(`unknownSelectorCount: 1`)
+		expect(messages.debug).toHaveLength(4)
+		expect(messages.debug[0]).toContain(`render source resolution`)
+		expect(messages.debug[1]).toContain(`css selectors`)
+		expect(messages.debug[2]).toContain(`render story`)
+		expect(messages.debug[2]).toContain(
+			`unknown Astro expression render branch`,
+		)
+		expect(messages.debug[3]).toContain(`selector reachability`)
+		expect(messages.debug[3]).toContain(`"reachability":"unknown"`)
+	})
+
 	it(`binds sink methods before handing them to takua`, () => {
 		type ReceiverSensitiveLogSink = LasertagLspLogSink & {
 			messages: string[]
@@ -415,6 +447,184 @@ describe(`lasertag lsp logging`, () => {
 })
 
 describe(`lasertag lsp state`, () => {
+	it(`does not guess reachability when css.class is not attached`, () => {
+		const fileSystem = createMemoryFileSystem({
+			[astroPath]: `<app-panel><header /></app-panel>`,
+		})
+		const state = createLasertagLspState(fileSystem.environment)
+
+		state.openDocument(createDocumentInput(cssPath, createCssSource(`footer`)))
+
+		expect(state.getDiagnostics(cssPath)).toEqual([])
+		expect(state.getAnalysisTrace(cssPath).summary).toMatchObject({
+			cssClassRootCount: 0,
+			opaqueCount: 1,
+			rootDiscoveryKind: `missing-css-class-attachment`,
+			unknownSelectorCount: 2,
+			unreachableSelectorCount: 0,
+		})
+	})
+
+	it(`validates explicit children passed through an Astro layout`, () => {
+		const fileSystem = createMemoryFileSystem({
+			[astroPath]: `---
+import Layout from "../layouts/Layout.astro"
+import { Dz2Orbital } from "../components/Dz2Orbital"
+import css from "./AppPanel.module.css"
+---
+<Layout>
+	<Dz2Orbital client:only />
+	<app-panel class={css.class}><header /></app-panel>
+</Layout>`,
+		})
+		const state = createLasertagLspState(fileSystem.environment)
+
+		state.openDocument(createDocumentInput(cssPath, createCssSource(`footer`)))
+
+		expect(state.getDiagnostics(cssPath)).toMatchObject([
+			{
+				code: `dead-selector`,
+				severity: DiagnosticSeverity.Warning,
+			},
+		])
+		expect(state.getAnalysisTrace(cssPath).summary).toMatchObject({
+			cssClassRootCount: 1,
+			elementCount: 2,
+			opaqueCount: 0,
+			rootCount: 1,
+			rootDiscoveryKind: `css-class-attachment`,
+			unknownSelectorCount: 0,
+			unreachableSelectorCount: 1,
+		})
+	})
+
+	it(`traces opaque Astro branches that make a selector inconclusive`, () => {
+		const fileSystem = createMemoryFileSystem({
+			[astroPath]: `<app-panel class={css.class}>{content}</app-panel>`,
+		})
+		const state = createLasertagLspState(fileSystem.environment)
+
+		state.openDocument(createDocumentInput(cssPath, createCssSource(`footer`)))
+
+		expect(state.getDiagnostics(cssPath)).toEqual([])
+		const trace = state.getAnalysisTrace(cssPath)
+
+		expect(trace).toMatchObject({
+			renderStoryAnalysis: {
+				kind: `ready`,
+				renderStory: {
+					roots: [
+						{
+							children: [
+								{
+									kind: `opaque`,
+									reason: `unknown Astro expression render branch`,
+								},
+							],
+							kind: `element`,
+							tagName: `app-panel`,
+						},
+					],
+				},
+			},
+			sourceResolution: {
+				kind: `ready`,
+				sourcePath: astroPath,
+			},
+			summary: {
+				diagnosticCount: 0,
+				elementCount: 1,
+				opaqueCount: 1,
+				unknownSelectorCount: 1,
+			},
+		})
+		expect(trace.selectorReachability).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					diagnosticCodes: [],
+					reachability: `unknown`,
+					resultKind: `path`,
+					selector: `app-panel.class > footer`,
+				}),
+			]),
+		)
+	})
+
+	it(`validates open CSS against the sibling Astro file on disk`, () => {
+		const fileSystem = createMemoryFileSystem({
+			[astroPath]: createAstroSource(`header`),
+		})
+		const state = createLasertagLspState(fileSystem.environment)
+
+		state.openDocument(createDocumentInput(cssPath, createCssSource(`footer`)))
+
+		expect(state.getDiagnostics(cssPath)).toMatchObject([
+			{
+				code: `dead-selector`,
+				severity: DiagnosticSeverity.Warning,
+				source: `lasertag`,
+			},
+		])
+	})
+
+	it(`reuses an unchanged disk render source across analysis views`, () => {
+		const fileSystem = createMemoryFileSystem({
+			[astroPath]: createAstroSource(`header`),
+		})
+		const readFile = fileSystem.environment.readFile
+		let readCount = 0
+		const state = createLasertagLspState({
+			...fileSystem.environment,
+			readFile: (filePath) => {
+				readCount += 1
+
+				return readFile?.(filePath) ?? ``
+			},
+		})
+
+		state.openDocument(createDocumentInput(cssPath, createCssSource(`footer`)))
+		state.getDiagnostics(cssPath)
+		state.getAnalysisTrace(cssPath)
+
+		expect(readCount).toBe(1)
+	})
+
+	it(`reports an error when both Astro and TSX neighbors exist`, () => {
+		const fileSystem = createMemoryFileSystem({
+			[astroPath]: createAstroSource(`header`),
+			[tsxPath]: createTsxSource(`header`),
+		})
+		const state = createLasertagLspState(fileSystem.environment)
+
+		state.openDocument(createDocumentInput(cssPath, createCssSource(`header`)))
+
+		expect(state.getDiagnostics(cssPath)).toMatchObject([
+			{
+				code: `ambiguous-render-source`,
+				severity: DiagnosticSeverity.Error,
+				source: `lasertag`,
+			},
+		])
+		expect(state.getDiagnostics(cssPath)[0]?.message).toContain(astroPath)
+		expect(state.getDiagnostics(cssPath)[0]?.message).toContain(tsxPath)
+	})
+
+	it(`updates diagnostics when an open Astro render story changes`, () => {
+		const fileSystem = createMemoryFileSystem({
+			[astroPath]: createAstroSource(`header`),
+		})
+		const state = createLasertagLspState(fileSystem.environment)
+
+		state.openDocument(createDocumentInput(cssPath, createCssSource(`footer`)))
+		expect(state.getDiagnostics(cssPath)).toHaveLength(1)
+
+		state.openDocument(
+			createDocumentInput(astroPath, createAstroSource(`footer`), 1, `astro`),
+		)
+
+		expect(state.getDiagnostics(cssPath)).toEqual([])
+	})
+
 	it(`validates open CSS against the sibling TSX file on disk`, () => {
 		const fileSystem = createMemoryFileSystem({
 			[tsxPath]: createTsxSource(`header`),
@@ -518,10 +728,10 @@ describe(`lasertag lsp state`, () => {
 		expect(state.getDiagnostics(cssPath)).toEqual([])
 	})
 
-	it(`indexes workspace CSS modules and TSX files for affected-path lookups`, () => {
+	it(`indexes workspace CSS modules and render source files for affected-path lookups`, () => {
 		const fileSystem = createMemoryFileSystem({
+			[astroPath]: createAstroSource(`header`),
 			[cssPath]: createCssSource(`footer`),
-			[tsxPath]: createTsxSource(`header`),
 			"/project/src/not-a-module.css": `body { margin: 0; }`,
 		})
 		const state = createLasertagLspState(fileSystem.environment)
@@ -529,7 +739,10 @@ describe(`lasertag lsp state`, () => {
 		state.indexWorkspaceFolders([`/project`])
 
 		expect(state.getKnownCssModulePaths()).toEqual([cssPath])
-		expect(state.getWatchedTsxPaths()).toEqual([tsxPath])
-		expect(state.getAffectedCssPathsForTsx(tsxPath)).toEqual([cssPath])
+		expect(state.getWatchedAstroPaths()).toEqual([astroPath])
+		expect(state.getWatchedTsxPaths()).toEqual([])
+		expect(state.getAffectedCssPathsForRenderSource(astroPath)).toEqual([
+			cssPath,
+		])
 	})
 })
