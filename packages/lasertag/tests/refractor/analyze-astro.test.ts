@@ -31,8 +31,14 @@ import Card from "./Card.astro"
 							tagName: `enabled-state`,
 						},
 						{
-							kind: `opaque`,
-							reason: `imported or external Astro component`,
+							children: [
+								{
+									kind: `opaque`,
+									reason: `Astro component "Card" implementation`,
+								},
+							],
+							kind: `element`,
+							tagName: `card`,
 						},
 					],
 					kind: `element`,
@@ -41,6 +47,62 @@ import Card from "./Card.astro"
 			],
 			warnings: [],
 		})
+	})
+
+	it(`preserves layout children and scopes component uncertainty to inferred roots`, () => {
+		const sourceText = `---
+import Layout from "../layouts/Layout.astro"
+import { Dz2Orbital } from "../components/Dz2Orbital"
+import css from "./index.module.css"
+---
+
+<Layout>
+	<Dz2Orbital data-variant="splash" client:only />
+	<home-splash class={css.class}>
+		<title-lockup><h1>Atom</h1></title-lockup>
+	</home-splash>
+</Layout>`
+		const story = analyzeAstroRenderStory({ sourceText })
+
+		expect(story.roots).toMatchObject([
+			{
+				children: [
+					{
+						kind: `opaque`,
+						reason: `Astro component "Dz2Orbital" implementation`,
+					},
+				],
+				kind: `element`,
+				tagName: `dz2-orbital`,
+			},
+			{
+				children: [
+					{
+						children: [{ kind: `element`, tagName: `h1` }],
+						kind: `element`,
+						tagName: `title-lockup`,
+					},
+				],
+				kind: `element`,
+				tagName: `home-splash`,
+			},
+		])
+
+		const result = validateRenderSourceCssReachability({
+			cssSource: `home-splash.class {
+	> title-lockup {}
+	> definitely-bogus {}
+}`,
+			sourcePath: `/project/src/pages/index.astro`,
+			sourceText,
+		})
+
+		expect(result.diagnostics).toMatchObject([
+			{
+				code: `dead-selector`,
+				selector: `home-splash.class > definitely-bogus`,
+			},
+		])
 	})
 
 	it(`validates CSS reachability against an Astro source`, () => {

@@ -88,8 +88,12 @@ For either supported source type, use `validateRenderSourceCssReachability` with
 `sourcePath` and `sourceText`. `analyzeAstroRenderStory` and
 `analyzeTsxRenderStory` expose the individual source adapters, while
 `analyzeRenderStory` dispatches from the source extension. Astro HTML and custom
-elements are structural story nodes; imported components, slots, injected HTML,
-and expressions that cannot be reduced safely remain opaque.
+elements are structural story nodes. Astro components whose names end in
+`Layout` are transparent slot wrappers, so their explicit children remain in the
+story. Other PascalCase Astro component tags use Lasertag's own-name root
+convention (`Dz2Orbital` becomes `dz2-orbital`) while their implementation stays
+opaque. Slots, injected HTML, dynamic component tags, and expressions that
+cannot be reduced safely remain opaque.
 
 ## CLI Workflows
 

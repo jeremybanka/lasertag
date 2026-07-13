@@ -31,11 +31,22 @@ function storyAttribute(attribute: AttributeNode): StoryAttribute {
 	}
 }
 
+function toKebabCase(name: string): string {
+	return name
+		.replace(/([a-z0-9])([A-Z])/g, `$1-$2`)
+		.replace(/([A-Z])([A-Z][a-z])/g, `$1-$2`)
+		.toLowerCase()
+}
+
+function storyAttributes(attributes: AttributeNode[]): StoryAttribute[] {
+	return attributes.map(storyAttribute)
+}
+
 function storyElement(
 	node: Extract<AstroNode, { type: `element` | `custom-element` }>,
 ): StoryNode {
 	const children = node.children.flatMap(analyzeNode)
-	const attributes = node.attributes.map(storyAttribute)
+	const attributes = storyAttributes(node.attributes)
 	const hasInjectedHtml = node.attributes.some(
 		(attribute) => attribute.name === `set:html`,
 	)
@@ -48,6 +59,33 @@ function storyElement(
 		tagName: node.name,
 		...(attributes.length > 0 ? { attributes } : {}),
 	}
+}
+
+function isLayoutComponent(name: string): boolean {
+	return name.endsWith(`Layout`)
+}
+
+function analyzeComponent(
+	node: Extract<AstroNode, { type: `component` }>,
+): StoryChild[] {
+	if (isLayoutComponent(node.name)) {
+		return node.children.flatMap(analyzeNode)
+	}
+
+	if (!/^[A-Z][A-Za-z0-9]*$/.test(node.name)) {
+		return [opaque(`dynamic Astro component`)]
+	}
+
+	const attributes = storyAttributes(node.attributes)
+
+	return [
+		{
+			attributes,
+			children: [opaque(`Astro component "${node.name}" implementation`)],
+			kind: `element`,
+			tagName: toKebabCase(node.name),
+		},
+	]
 }
 
 function analyzeExpression(
@@ -78,7 +116,7 @@ function analyzeNode(node: AstroNode): StoryChild[] {
 		case `custom-element`:
 			return [storyElement(node)]
 		case `component`:
-			return [opaque(`imported or external Astro component`)]
+			return analyzeComponent(node)
 		case `expression`:
 			return analyzeExpression(node)
 		case `comment`:

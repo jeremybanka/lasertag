@@ -447,6 +447,36 @@ describe(`lasertag lsp logging`, () => {
 })
 
 describe(`lasertag lsp state`, () => {
+	it(`validates explicit children passed through an Astro layout`, () => {
+		const fileSystem = createMemoryFileSystem({
+			[astroPath]: `---
+import Layout from "../layouts/Layout.astro"
+import { Dz2Orbital } from "../components/Dz2Orbital"
+import css from "./AppPanel.module.css"
+---
+<Layout>
+	<Dz2Orbital client:only />
+	<app-panel class={css.class}><header /></app-panel>
+</Layout>`,
+		})
+		const state = createLasertagLspState(fileSystem.environment)
+
+		state.openDocument(createDocumentInput(cssPath, createCssSource(`footer`)))
+
+		expect(state.getDiagnostics(cssPath)).toMatchObject([
+			{
+				code: `dead-selector`,
+				severity: DiagnosticSeverity.Warning,
+			},
+		])
+		expect(state.getAnalysisTrace(cssPath).summary).toMatchObject({
+			elementCount: 3,
+			opaqueCount: 1,
+			unknownSelectorCount: 0,
+			unreachableSelectorCount: 1,
+		})
+	})
+
 	it(`traces opaque Astro branches that make a selector inconclusive`, () => {
 		const fileSystem = createMemoryFileSystem({
 			[astroPath]: `<app-panel class={css.class}>{content}</app-panel>`,
