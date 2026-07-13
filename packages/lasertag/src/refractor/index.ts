@@ -1,7 +1,10 @@
 export * from "./analyze-css-module.ts"
+export * from "./analyze-astro.ts"
+export * from "./analyze-render-source.ts"
 export * from "./analyze-tsx.ts"
 export * from "./diagnostics.ts"
 export * from "./reachability.ts"
+export * from "./render-source.ts"
 export {
 	createTypescriptAstSession,
 	type TypescriptAstSession,

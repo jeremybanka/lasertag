@@ -1,8 +1,10 @@
 import { existsSync, readFileSync } from "node:fs"
 
 import {
+	ambiguousRenderSourceMessage,
 	createTypescriptAstSession,
-	validateCssReachability,
+	resolveSiblingRenderSource,
+	validateRenderSourceCssReachability,
 	type CssReachabilityDiagnostic,
 	type TypescriptAstSession,
 } from "../refractor/index.ts"
@@ -54,10 +56,6 @@ function errorMessage(error: unknown): string {
 	return error instanceof Error ? error.message : String(error)
 }
 
-function siblingTsxPath(cssPath: string): string {
-	return `${cssPath.slice(0, -`.module.css`.length)}.tsx`
-}
-
 function checkFile(
 	task: LasertagWorkTask,
 	workerId: number,
@@ -65,11 +63,16 @@ function checkFile(
 	typescriptSession: TypescriptAstSession,
 ): LasertagCheckFileResult {
 	const { cssPath, index, stolenFrom } = task
-	const tsxPath = siblingTsxPath(cssPath)
 	const assignment = stolenFrom === undefined ? {} : { stolenFrom }
+	let sourcePath: string | undefined
 
 	try {
-		if (!fileSystem.fileExists(tsxPath)) {
+		const resolution = resolveSiblingRenderSource(
+			cssPath,
+			fileSystem.fileExists,
+		)
+
+		if (resolution.kind === `missing`) {
 			return {
 				cssPath,
 				diagnostics: [],
@@ -79,14 +82,19 @@ function checkFile(
 				workerId,
 			}
 		}
+		if (resolution.kind === `ambiguous`) {
+			throw new Error(ambiguousRenderSourceMessage(cssPath, resolution.sources))
+		}
+
+		sourcePath = resolution.source.path
 
 		const cssSource = fileSystem.readFile(cssPath)
-		const diagnostics = validateCssReachability(
+		const diagnostics = validateRenderSourceCssReachability(
 			{
 				cssPath,
 				cssSource,
-				tsxPath,
-				tsxSource: fileSystem.readFile(tsxPath),
+				sourcePath,
+				sourceText: fileSystem.readFile(sourcePath),
 			},
 			typescriptSession,
 		).diagnostics
@@ -97,7 +105,7 @@ function checkFile(
 			index,
 			status: `checked`,
 			...assignment,
-			tsxPath,
+			tsxPath: sourcePath,
 			workerId,
 		}
 	} catch (error) {
@@ -108,7 +116,7 @@ function checkFile(
 			index,
 			status: `failed`,
 			...assignment,
-			tsxPath,
+			...(sourcePath ? { tsxPath: sourcePath } : {}),
 			workerId,
 		}
 	}

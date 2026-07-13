@@ -3,6 +3,39 @@ import { describe, expect, it } from "vitest"
 import { runLasertagFix } from "../../src/cli/fix.ts"
 
 describe(`lasertag fix engine`, () => {
+	it(`removes dead CSS using an Astro render story`, async () => {
+		const cssPath = `/virtual/AppPanel.module.css`
+		const sources = new Map<string, string>([
+			[
+				cssPath,
+				`app-panel.class {
+	> header {}
+	> footer {}
+}
+`,
+			],
+			[
+				`/virtual/AppPanel.astro`,
+				`<app-panel class={css.class}><header /></app-panel>`,
+			],
+		])
+		const result = await runLasertagFix([cssPath], {
+			fileSystem: {
+				fileExists: (filePath) => sources.has(filePath),
+				readFile: (filePath) => sources.get(filePath) ?? ``,
+				writeFile: (filePath, sourceText) => sources.set(filePath, sourceText),
+			},
+		})
+
+		expect(result.fixedCount).toBe(1)
+		expect(result.changedFiles).toEqual([cssPath])
+		expect(sources.get(cssPath)).toBe(`app-panel.class {
+	> header {}
+
+}
+`)
+	})
+
 	it(`removes an unused lasertag expect-error directive`, async () => {
 		const cssPath = `/virtual/AppPanel.module.css`
 		const sources = new Map<string, string>([

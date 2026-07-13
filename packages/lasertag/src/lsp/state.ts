@@ -19,17 +19,34 @@ import {
 
 import {
 	analyzeCssModuleSelectors,
-	analyzeTsxRenderStory,
+	ambiguousRenderSourceMessage,
+	analyzeRenderStory,
+	ASTRO_SUFFIX,
+	canReachSelectorPath,
+	CSS_MODULE_SUFFIX,
 	createCssReachabilityDiagnostics,
+	isAstroPath,
+	isTsxPath,
+	siblingRenderSourceCandidates,
+	sourcePathToSiblingCssModulePath,
+	TSX_SUFFIX,
 	type CssReachabilityDiagnostic,
 	type CssSelectorAnalysis,
+	type Reachability,
 	type RenderStory,
+	type SelectorPath,
+	type StoryChild,
 } from "../refractor/index.ts"
 
-const CSS_MODULE_SUFFIX = `.module.css`
-const TSX_SUFFIX = `.tsx`
+export {
+	isAstroPath,
+	isRenderSourcePath,
+	isTsxPath,
+} from "../refractor/index.ts"
+
 const WATCHED_CSS_PATTERN = `**/*.module.css`
 const WATCHED_TSX_PATTERN = `**/*.tsx`
+const WATCHED_ASTRO_PATTERN = `**/*.astro`
 const DEFAULT_IGNORE_PATTERNS = [
 	`**/node_modules/**`,
 	`**/dist/**`,
@@ -54,7 +71,7 @@ export type LspDocumentInput = {
 
 type OpenDocument = Omit<LspDocumentInput, "path">
 
-type RenderStoryAnalysis =
+export type RenderStoryAnalysis =
 	| {
 			kind: `ready`
 			renderStory: RenderStory
@@ -64,7 +81,7 @@ type RenderStoryAnalysis =
 			message?: string
 	  }
 
-type CssSelectorAnalysisState =
+export type CssSelectorAnalysisState =
 	| {
 			kind: `ready`
 			selectorAnalyses: CssSelectorAnalysis[]
@@ -82,6 +99,7 @@ export type LasertagLspStateEnvironment = {
 }
 
 type WorkspaceIndexInput = {
+	astroPaths: string[]
 	cssPaths: string[]
 	tsxPaths: string[]
 	workspaceFolderPaths: string[]
@@ -102,10 +120,6 @@ export function isCssModulePath(filePath: string): boolean {
 	return filePath.endsWith(CSS_MODULE_SUFFIX)
 }
 
-export function isTsxPath(filePath: string): boolean {
-	return filePath.endsWith(TSX_SUFFIX)
-}
-
 export function findSiblingTsxPathFromConvention(
 	cssPath: string,
 ): string | undefined {
@@ -114,12 +128,18 @@ export function findSiblingTsxPathFromConvention(
 	return `${cssPath.slice(0, -CSS_MODULE_SUFFIX.length)}${TSX_SUFFIX}`
 }
 
-export function findSiblingCssModulePathFromConvention(
-	tsxPath: string,
+export function findSiblingAstroPathFromConvention(
+	cssPath: string,
 ): string | undefined {
-	if (!isTsxPath(tsxPath)) return
+	if (!isCssModulePath(cssPath)) return
 
-	return `${tsxPath.slice(0, -TSX_SUFFIX.length)}${CSS_MODULE_SUFFIX}`
+	return `${cssPath.slice(0, -CSS_MODULE_SUFFIX.length)}${ASTRO_SUFFIX}`
+}
+
+export function findSiblingCssModulePathFromConvention(
+	sourcePath: string,
+): string | undefined {
+	return sourcePathToSiblingCssModulePath(sourcePath)
 }
 
 function messageFromError(error: unknown): string {
@@ -193,6 +213,11 @@ const watchedTsxPathsAtom = atom<string[]>({
 	key: `lasertag/lsp/watched-tsx-paths`,
 })
 
+const watchedAstroPathsAtom = atom<string[]>({
+	default: [],
+	key: `lasertag/lsp/watched-astro-paths`,
+})
+
 const openDocumentPathsAtom = atom<string[]>({
 	default: [],
 	key: `lasertag/lsp/open-document-paths`,
@@ -259,35 +284,206 @@ const documentUriSelectors = selectorFamily<string, string>({
 	key: `lasertag/lsp/document-uri`,
 })
 
-const siblingTsxPathSelectors = selectorFamily<string | null, string>({
+export type SiblingRenderSourceAnalysis =
+	| { kind: `missing`; candidates: RenderSourceCandidateTrace[] }
+	| {
+			kind: `ready`
+			candidates: RenderSourceCandidateTrace[]
+			sourcePath: string
+	  }
+	| {
+			kind: `ambiguous`
+			candidates: RenderSourceCandidateTrace[]
+			message: string
+	  }
+
+export type RenderSourceCandidateTrace = {
+	exists: boolean
+	path: string
+}
+
+export type SelectorReachabilityTrace = {
+	diagnosticCodes: Array<CssReachabilityDiagnostic[`code`]>
+	paths: Array<{
+		path: SelectorPath
+		reachability: Reachability
+	}>
+	reachability: Reachability | `not-applicable`
+	reason?: string
+	resultKind: CssSelectorAnalysis[`result`][`kind`]
+	selector: string
+}
+
+export type LasertagLspAnalysisTrace = {
+	cssAnalysis: CssSelectorAnalysisState
+	cssPath: string
+	publishedDiagnostics: Diagnostic[]
+	reachabilityDiagnostics: CssReachabilityDiagnostic[]
+	renderStoryAnalysis: RenderStoryAnalysis
+	selectorReachability: SelectorReachabilityTrace[]
+	sourceResolution: SiblingRenderSourceAnalysis
+	summary: {
+		diagnosticCount: number
+		elementCount: number
+		opaqueCount: number
+		renderStoryKind: RenderStoryAnalysis[`kind`]
+		rootCount: number
+		selectorCount: number
+		sourceKind: SiblingRenderSourceAnalysis[`kind`]
+		sourcePath?: string
+		unknownSelectorCount: number
+		unreachableSelectorCount: number
+	}
+}
+
+function combineReachability(results: Reachability[]): Reachability {
+	if (results.includes(`reachable`)) return `reachable`
+	if (results.includes(`unknown`)) return `unknown`
+
+	return `unreachable`
+}
+
+function countRenderStoryNodes(children: StoryChild[]): {
+	elementCount: number
+	opaqueCount: number
+} {
+	let elementCount = 0
+	let opaqueCount = 0
+
+	for (const child of children) {
+		if (child.kind === `opaque`) {
+			opaqueCount += 1
+			continue
+		}
+
+		elementCount += 1
+		const descendants = countRenderStoryNodes(child.children)
+		elementCount += descendants.elementCount
+		opaqueCount += descendants.opaqueCount
+	}
+
+	return { elementCount, opaqueCount }
+}
+
+function selectorReachabilityTrace(
+	selectorAnalyses: CssSelectorAnalysis[],
+	renderStory: RenderStory,
+	diagnostics: readonly CssReachabilityDiagnostic[],
+): SelectorReachabilityTrace[] {
+	return selectorAnalyses.map((analysis): SelectorReachabilityTrace => {
+		const diagnosticCodes = diagnostics
+			.filter(
+				(diagnostic) =>
+					diagnostic.selector === analysis.selector &&
+					diagnostic.range?.start === analysis.range.start &&
+					diagnostic.range?.end === analysis.range.end,
+			)
+			.map((diagnostic) => diagnostic.code)
+
+		if (analysis.result.kind === `unknown`) {
+			return {
+				diagnosticCodes,
+				paths: [],
+				reachability: `unknown`,
+				reason: analysis.result.reason,
+				resultKind: analysis.result.kind,
+				selector: analysis.selector,
+			}
+		}
+
+		if (analysis.result.kind === `impossible-local-class`) {
+			return {
+				diagnosticCodes,
+				paths: [],
+				reachability: `not-applicable`,
+				reason: `local class .${analysis.result.className} is not exposed`,
+				resultKind: analysis.result.kind,
+				selector: analysis.selector,
+			}
+		}
+
+		const paths = analysis.result.paths.map((selectorPath) => ({
+			path: selectorPath,
+			reachability: canReachSelectorPath(renderStory, selectorPath),
+		}))
+
+		return {
+			diagnosticCodes,
+			paths,
+			reachability: combineReachability(
+				paths.map(({ reachability }) => reachability),
+			),
+			resultKind: analysis.result.kind,
+			selector: analysis.selector,
+		}
+	})
+}
+
+function createAnalysisErrorDiagnostic(
+	code: string,
+	message: string,
+): Diagnostic {
+	return {
+		code,
+		message,
+		range: {
+			end: { character: 0, line: 0 },
+			start: { character: 0, line: 0 },
+		},
+		severity: DiagnosticSeverity.Error,
+		source: `lasertag`,
+	}
+}
+
+const siblingRenderSourceSelectors = selectorFamily<
+	SiblingRenderSourceAnalysis,
+	string
+>({
 	get:
 		(cssPath) =>
 		({ get }) => {
-			const candidate = findSiblingTsxPathFromConvention(cssPath)
+			const candidates = siblingRenderSourceCandidates(cssPath).map(
+				(candidate): RenderSourceCandidateTrace => ({
+					exists: get(fileSnapshotSelectors, candidate.path).exists,
+					path: candidate.path,
+				}),
+			)
+			const sources = candidates.filter((candidate) => candidate.exists)
 
-			if (!candidate) return null
+			if (sources.length === 0) return { candidates, kind: `missing` }
+			if (sources.length === 1 && sources[0]) {
+				return { candidates, kind: `ready`, sourcePath: sources[0].path }
+			}
 
-			const snapshot = get(fileSnapshotSelectors, candidate)
-
-			return snapshot.exists ? candidate : null
+			return {
+				candidates,
+				kind: `ambiguous`,
+				message: ambiguousRenderSourceMessage(
+					cssPath,
+					sources.map((source) => ({
+						kind: source.path.endsWith(ASTRO_SUFFIX) ? `astro` : `tsx`,
+						path: source.path,
+					})),
+				),
+			}
 		},
-	key: `lasertag/lsp/sibling-tsx-path`,
+	key: `lasertag/lsp/sibling-render-source`,
 })
 
 const renderStorySelectors = selectorFamily<RenderStoryAnalysis, string>({
 	get:
-		(tsxPath) =>
+		(sourcePath) =>
 		({ get }) => {
-			const tsxSource = get(fileTextSelectors, tsxPath)
+			const sourceText = get(fileTextSelectors, sourcePath)
 
-			if (tsxSource === null) return { kind: `missing` }
+			if (sourceText === null) return { kind: `missing` }
 
 			try {
 				return {
 					kind: `ready`,
-					renderStory: analyzeTsxRenderStory({
-						filePath: tsxPath,
-						sourceText: tsxSource,
+					renderStory: analyzeRenderStory({
+						sourcePath,
+						sourceText,
 					}),
 				}
 			} catch (error) {
@@ -339,11 +535,11 @@ const refractorDiagnosticSelectors = selectorFamily<
 
 			if (selectorAnalysis.kind !== `ready`) return []
 
-			const tsxPath = get(siblingTsxPathSelectors, cssPath)
+			const source = get(siblingRenderSourceSelectors, cssPath)
 
-			if (tsxPath === null) return []
+			if (source.kind !== `ready`) return []
 
-			const renderStoryAnalysis = get(renderStorySelectors, tsxPath)
+			const renderStoryAnalysis = get(renderStorySelectors, source.sourcePath)
 
 			if (renderStoryAnalysis.kind !== `ready`) return []
 
@@ -361,6 +557,41 @@ const lspDiagnosticSelectors = selectorFamily<Diagnostic[], string>({
 		(cssPath) =>
 		({ get }) => {
 			const cssSource = get(fileTextSelectors, cssPath) ?? ``
+			const source = get(siblingRenderSourceSelectors, cssPath)
+
+			if (source.kind === `ambiguous`) {
+				return [
+					createAnalysisErrorDiagnostic(
+						`ambiguous-render-source`,
+						source.message,
+					),
+				]
+			}
+
+			const cssAnalysis = get(cssSelectorAnalysisSelectors, cssPath)
+
+			if (cssAnalysis.kind === `error`) {
+				return [
+					createAnalysisErrorDiagnostic(
+						`css-analysis-error`,
+						`Could not analyze CSS selectors: ${cssAnalysis.message ?? `unknown error`}`,
+					),
+				]
+			}
+
+			if (source.kind === `ready`) {
+				const renderStoryAnalysis = get(renderStorySelectors, source.sourcePath)
+
+				if (renderStoryAnalysis.kind === `error`) {
+					return [
+						createAnalysisErrorDiagnostic(
+							`render-story-analysis-error`,
+							`Could not analyze render source "${source.sourcePath}": ${renderStoryAnalysis.message ?? `unknown error`}`,
+						),
+					]
+				}
+			}
+
 			const diagnostics = get(refractorDiagnosticSelectors, cssPath)
 
 			return diagnostics.map((diagnostic) =>
@@ -370,11 +601,14 @@ const lspDiagnosticSelectors = selectorFamily<Diagnostic[], string>({
 	key: `lasertag/lsp/lsp-diagnostics`,
 })
 
-const affectedCssPathsByTsxPathSelectors = selectorFamily<string[], string>({
+const affectedCssPathsByRenderSourceSelectors = selectorFamily<
+	string[],
+	string
+>({
 	get:
-		(tsxPath) =>
+		(sourcePath) =>
 		({ get }) => {
-			const candidate = findSiblingCssModulePathFromConvention(tsxPath)
+			const candidate = findSiblingCssModulePathFromConvention(sourcePath)
 
 			if (!candidate) return []
 
@@ -382,17 +616,23 @@ const affectedCssPathsByTsxPathSelectors = selectorFamily<string[], string>({
 				(cssPath) => cssPath === candidate,
 			)
 		},
-	key: `lasertag/lsp/affected-css-paths-by-tsx-path`,
+	key: `lasertag/lsp/affected-css-paths-by-render-source`,
 })
 
 const indexWorkspaceFilesTransaction = transaction({
 	do: (
 		{ set },
-		{ cssPaths, tsxPaths, workspaceFolderPaths }: WorkspaceIndexInput,
+		{
+			astroPaths,
+			cssPaths,
+			tsxPaths,
+			workspaceFolderPaths,
+		}: WorkspaceIndexInput,
 	) => {
 		set(workspaceFolderPathsAtom, uniqueSorted(workspaceFolderPaths))
 		set(watchedCssModulePathsAtom, uniqueSorted(cssPaths))
 		set(watchedTsxPathsAtom, uniqueSorted(tsxPaths))
+		set(watchedAstroPathsAtom, uniqueSorted(astroPaths))
 	},
 	key: `lasertag/lsp/index-workspace-files`,
 })
@@ -419,6 +659,10 @@ const upsertOpenDocumentTransaction = transaction({
 
 		if (isTsxPath(filePath)) {
 			set(watchedTsxPathsAtom, addPath(get(watchedTsxPathsAtom), filePath))
+		}
+
+		if (isAstroPath(filePath)) {
+			set(watchedAstroPathsAtom, addPath(get(watchedAstroPathsAtom), filePath))
 		}
 	},
 	key: `lasertag/lsp/upsert-open-document`,
@@ -455,6 +699,16 @@ const refreshDiskFileTransaction = transaction({
 					: removePath(currentPaths, filePath),
 			)
 		}
+
+		if (isAstroPath(filePath)) {
+			const currentPaths = get(watchedAstroPathsAtom)
+			set(
+				watchedAstroPathsAtom,
+				snapshot.exists
+					? addPath(currentPaths, filePath)
+					: removePath(currentPaths, filePath),
+			)
+		}
 	},
 	key: `lasertag/lsp/refresh-disk-file`,
 })
@@ -470,6 +724,7 @@ function createSilo(): Silo {
 		workspaceFolderPathsAtom,
 		watchedCssModulePathsAtom,
 		watchedTsxPathsAtom,
+		watchedAstroPathsAtom,
 		openDocumentPathsAtom,
 		openDocumentAtoms,
 		diskFileSnapshotAtoms,
@@ -477,12 +732,12 @@ function createSilo(): Silo {
 		fileSnapshotSelectors,
 		fileTextSelectors,
 		documentUriSelectors,
-		siblingTsxPathSelectors,
+		siblingRenderSourceSelectors,
 		renderStorySelectors,
 		cssSelectorAnalysisSelectors,
 		refractorDiagnosticSelectors,
 		lspDiagnosticSelectors,
-		affectedCssPathsByTsxPathSelectors,
+		affectedCssPathsByRenderSourceSelectors,
 		indexWorkspaceFilesTransaction,
 		upsertOpenDocumentTransaction,
 		closeDocumentTransaction,
@@ -574,18 +829,27 @@ export function createLasertagLspState(
 
 		ensureFileSnapshot(normalizedCssPath)
 
-		const tsxPath = findSiblingTsxPathFromConvention(normalizedCssPath)
-
-		if (tsxPath) ensureFileSnapshot(tsxPath)
+		for (const candidate of siblingRenderSourceCandidates(normalizedCssPath)) {
+			ensureFileSnapshot(candidate.path)
+		}
 	}
 
 	function discoverWorkspaceFiles(workspaceFolderPaths: string[]) {
+		const astroPaths: string[] = []
 		const cssPaths: string[] = []
 		const tsxPaths: string[] = []
 
 		for (const workspaceFolderPath of workspaceFolderPaths) {
 			const normalizedWorkspacePath = normalizeFilePath(workspaceFolderPath)
 
+			astroPaths.push(
+				...glob(WATCHED_ASTRO_PATTERN, {
+					absolute: true,
+					cwd: normalizedWorkspacePath,
+					ignore: DEFAULT_IGNORE_PATTERNS,
+					onlyFiles: true,
+				}).map(normalizeFilePath),
+			)
 			cssPaths.push(
 				...glob(WATCHED_CSS_PATTERN, {
 					absolute: true,
@@ -605,6 +869,7 @@ export function createLasertagLspState(
 		}
 
 		return {
+			astroPaths: uniqueSorted(astroPaths),
 			cssPaths: uniqueSorted(cssPaths),
 			tsxPaths: uniqueSorted(tsxPaths),
 		}
@@ -612,15 +877,89 @@ export function createLasertagLspState(
 
 	function indexWorkspaceFolders(workspaceFolderPaths: string[]): void {
 		const normalizedWorkspaceFolderPaths = normalizePaths(workspaceFolderPaths)
-		const { cssPaths, tsxPaths } = discoverWorkspaceFiles(
+		const { astroPaths, cssPaths, tsxPaths } = discoverWorkspaceFiles(
 			normalizedWorkspaceFolderPaths,
 		)
 
 		runIndexWorkspaceFiles({
+			astroPaths,
 			cssPaths,
 			tsxPaths,
 			workspaceFolderPaths: normalizedWorkspaceFolderPaths,
 		})
+	}
+
+	function getAnalysisTrace(cssPath: string): LasertagLspAnalysisTrace {
+		const normalizedPath = normalizeFilePath(cssPath)
+
+		ensureCssDependencies(normalizedPath)
+
+		const sourceResolution = silo.getState(
+			siblingRenderSourceSelectors,
+			normalizedPath,
+		)
+		const cssAnalysis = silo.getState(
+			cssSelectorAnalysisSelectors,
+			normalizedPath,
+		)
+		const renderStoryAnalysis =
+			sourceResolution.kind === `ready`
+				? silo.getState(renderStorySelectors, sourceResolution.sourcePath)
+				: ({ kind: `missing` } as const)
+		const reachabilityDiagnostics = silo.getState(
+			refractorDiagnosticSelectors,
+			normalizedPath,
+		)
+		const publishedDiagnostics = silo.getState(
+			lspDiagnosticSelectors,
+			normalizedPath,
+		)
+		const selectorReachability =
+			cssAnalysis.kind === `ready` && renderStoryAnalysis.kind === `ready`
+				? selectorReachabilityTrace(
+						cssAnalysis.selectorAnalyses,
+						renderStoryAnalysis.renderStory,
+						reachabilityDiagnostics,
+					)
+				: []
+		const storyCounts =
+			renderStoryAnalysis.kind === `ready`
+				? countRenderStoryNodes(renderStoryAnalysis.renderStory.roots)
+				: { elementCount: 0, opaqueCount: 0 }
+
+		return {
+			cssAnalysis,
+			cssPath: normalizedPath,
+			publishedDiagnostics: [...publishedDiagnostics],
+			reachabilityDiagnostics: [...reachabilityDiagnostics],
+			renderStoryAnalysis,
+			selectorReachability,
+			sourceResolution,
+			summary: {
+				diagnosticCount: publishedDiagnostics.length,
+				elementCount: storyCounts.elementCount,
+				opaqueCount: storyCounts.opaqueCount,
+				renderStoryKind: renderStoryAnalysis.kind,
+				rootCount:
+					renderStoryAnalysis.kind === `ready`
+						? renderStoryAnalysis.renderStory.roots.length
+						: 0,
+				selectorCount:
+					cssAnalysis.kind === `ready`
+						? cssAnalysis.selectorAnalyses.length
+						: 0,
+				sourceKind: sourceResolution.kind,
+				...(sourceResolution.kind === `ready`
+					? { sourcePath: sourceResolution.sourcePath }
+					: {}),
+				unknownSelectorCount: selectorReachability.filter(
+					({ reachability }) => reachability === `unknown`,
+				).length,
+				unreachableSelectorCount: selectorReachability.filter(
+					({ reachability }) => reachability === `unreachable`,
+				).length,
+			},
+		}
 	}
 
 	return {
@@ -646,14 +985,23 @@ export function createLasertagLspState(
 				},
 			})
 		},
+		getAffectedCssPathsForRenderSource(sourcePath: string): string[] {
+			return [
+				...silo.getState(
+					affectedCssPathsByRenderSourceSelectors,
+					normalizeFilePath(sourcePath),
+				),
+			]
+		},
 		getAffectedCssPathsForTsx(tsxPath: string): string[] {
 			return [
 				...silo.getState(
-					affectedCssPathsByTsxPathSelectors,
+					affectedCssPathsByRenderSourceSelectors,
 					normalizeFilePath(tsxPath),
 				),
 			]
 		},
+		getAnalysisTrace,
 		getDiagnostics(cssPath: string): Diagnostic[] {
 			const normalizedPath = normalizeFilePath(cssPath)
 
@@ -675,11 +1023,14 @@ export function createLasertagLspState(
 
 			ensureCssDependencies(normalizedPath)
 
-			const tsxPath = silo.getState(siblingTsxPathSelectors, normalizedPath)
+			const source = silo.getState(siblingRenderSourceSelectors, normalizedPath)
 
-			if (tsxPath === null) return
+			if (source.kind !== `ready`) return
 
-			const renderStoryAnalysis = silo.getState(renderStorySelectors, tsxPath)
+			const renderStoryAnalysis = silo.getState(
+				renderStorySelectors,
+				source.sourcePath,
+			)
 
 			return renderStoryAnalysis.kind === `ready`
 				? renderStoryAnalysis.renderStory
@@ -687,6 +1038,9 @@ export function createLasertagLspState(
 		},
 		getWatchedTsxPaths(): string[] {
 			return [...silo.getState(watchedTsxPathsAtom)]
+		},
+		getWatchedAstroPaths(): string[] {
+			return [...silo.getState(watchedAstroPathsAtom)]
 		},
 		indexWorkspaceFolders,
 		openDocument(input: LspDocumentInput): void {

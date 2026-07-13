@@ -199,6 +199,24 @@ describe(`lasertag cli`, () => {
 		expect(logs).toEqual([`lasertag check: no dead CSS found in 1 file.`])
 	})
 
+	it(`reports ambiguous Astro and TSX neighbors as a CLI failure`, async () => {
+		const fixture = createFixture({
+			"src/AppPanel.astro": `<app-panel />`,
+			"src/AppPanel.module.css": `app-panel.class {}`,
+			"src/AppPanel.tsx": `export const AppPanel = () => <app-panel />`,
+		})
+		const { errors, io } = createTestIO()
+		const result = await runLasertagCli([`lasertag`, `check`], io, {
+			cwd: fixture.root,
+		})
+
+		expect(result.exitCode).toBe(1)
+		expect(errors).toHaveLength(1)
+		expect(errors[0]).toContain(`Ambiguous render story`)
+		expect(errors[0]).toContain(`AppPanel.astro`)
+		expect(errors[0]).toContain(`AppPanel.tsx`)
+	})
+
 	it(`reports diagnostics for a single positional check glob`, async () => {
 		const fixture = createFixture({
 			"src/AppPanel.module.css": `
@@ -527,7 +545,9 @@ export function AppPanel() {
 			firstRun.logs.some((message) => message.includes(`started 2 workers`)),
 		).toBe(true)
 		expect(
-			firstRun.logs.some((message) => message.includes(`skipped no TSX`)),
+			firstRun.logs.some((message) =>
+				message.includes(`skipped no render source`),
+			),
 		).toBe(true)
 		expect(
 			firstRun.logs.some((message) =>

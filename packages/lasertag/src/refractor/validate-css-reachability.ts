@@ -1,5 +1,6 @@
 import { analyzeCssModuleSelectors } from "./analyze-css-module.ts"
 import type { CssSelectorAnalysis } from "./analyze-css-module.ts"
+import { analyzeRenderStory } from "./analyze-render-source.ts"
 import { analyzeTsxRenderStory } from "./analyze-tsx.ts"
 import type { CssReachabilityDiagnostic, RenderStory } from "./diagnostics.ts"
 import { applyLasertagExpectErrorDirectives } from "./expect-error.ts"
@@ -18,6 +19,15 @@ export type ValidateCssReachabilityOptions = {
 export type ValidateCssReachabilityResult = {
 	renderStory: RenderStory
 	diagnostics: CssReachabilityDiagnostic[]
+}
+
+export type ValidateRenderSourceCssReachabilityOptions = {
+	sourcePath: string
+	sourceText: string
+	cssSource: string
+	cssPath?: string
+	componentName?: string
+	typescriptSdkPath?: string
 }
 
 export type CreateCssReachabilityDiagnosticsOptions = {
@@ -88,6 +98,33 @@ export function validateCssReachability(
 			: {}),
 	}
 	const renderStory = analyzeTsxRenderStory(tsxOptions, typescriptSession)
+	const selectorAnalyses = analyzeCssModuleSelectors(options.cssSource)
+	const diagnostics = createCssReachabilityDiagnostics({
+		cssSource: options.cssSource,
+		renderStory,
+		selectorAnalyses,
+	})
+
+	return { renderStory, diagnostics }
+}
+
+export function validateRenderSourceCssReachability(
+	options: ValidateRenderSourceCssReachabilityOptions,
+	typescriptSession?: TypescriptAstSession,
+): ValidateCssReachabilityResult {
+	const renderStory = analyzeRenderStory(
+		{
+			sourcePath: options.sourcePath,
+			sourceText: options.sourceText,
+			...(options.componentName
+				? { componentName: options.componentName }
+				: {}),
+			...(options.typescriptSdkPath
+				? { typescriptSdkPath: options.typescriptSdkPath }
+				: {}),
+		},
+		typescriptSession,
+	)
 	const selectorAnalyses = analyzeCssModuleSelectors(options.cssSource)
 	const diagnostics = createCssReachabilityDiagnostics({
 		cssSource: options.cssSource,
