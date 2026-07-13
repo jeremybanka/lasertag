@@ -10,6 +10,7 @@ import type {
 	StoryChild,
 	StoryNode,
 } from "./diagnostics.ts"
+import { scopeRenderStoryToCssClassRoots } from "./render-story-root.ts"
 
 export type AnalyzeAstroOptions = {
 	sourceText: string
@@ -28,6 +29,9 @@ function storyAttribute(attribute: AttributeNode): StoryAttribute {
 	return {
 		name: attribute.name,
 		...(attribute.kind === `quoted` ? { value: attribute.value } : {}),
+		...(attribute.kind === `expression` || attribute.kind === `template-literal`
+			? { expression: attribute.value }
+			: {}),
 	}
 }
 
@@ -80,10 +84,10 @@ function analyzeComponent(
 
 	return [
 		{
-			attributes,
 			children: [opaque(`Astro component "${node.name}" implementation`)],
 			kind: `element`,
 			tagName: toKebabCase(node.name),
+			...(attributes.length > 0 ? { attributes } : {}),
 		},
 	]
 }
@@ -153,9 +157,9 @@ export function analyzeAstroRenderStory(
 		throw new Error(`Could not parse Astro render story: ${detail}`)
 	}
 
-	return {
+	return scopeRenderStoryToCssClassRoots({
 		componentName: componentNameFromOptions(options),
 		roots: result.ast.children.flatMap(analyzeNode),
 		warnings: [],
-	}
+	})
 }

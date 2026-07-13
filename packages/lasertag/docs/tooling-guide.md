@@ -39,6 +39,13 @@ and local components into a render story. `children` render slots, imported
 components, and render expressions it cannot resolve become opaque paths.
 Unsupported selector shapes are unknown too.
 
+Render-story ownership starts at the outermost rendered nodes whose `class` or
+`class:list` expression uses `css.class`. Wrappers and unrelated sibling roots
+are excluded before selector reachability runs. When Refractor cannot discover
+an attachment, validation uses an opaque ownership root and makes no
+dead-selector claims; ESLint is responsible for reporting a missing or misplaced
+attachment.
+
 That uncertainty is intentional: a selector is reported as dead only when every
 supported path is provably unreachable. An unknown path prevents that report.
 Refractor also reports a local class other than `.class` as
@@ -90,10 +97,17 @@ For either supported source type, use `validateRenderSourceCssReachability` with
 `analyzeRenderStory` dispatches from the source extension. Astro HTML and custom
 elements are structural story nodes. Astro components whose names end in
 `Layout` are transparent slot wrappers, so their explicit children remain in the
-story. Other PascalCase Astro component tags use Lasertag's own-name root
-convention (`Dz2Orbital` becomes `dz2-orbital`) while their implementation stays
-opaque. Slots, injected HTML, dynamic component tags, and expressions that
-cannot be reduced safely remain opaque.
+story long enough for attachment discovery. Other PascalCase Astro component
+tags use Lasertag's own-name root convention (`Dz2Orbital` becomes
+`dz2-orbital`) while their implementation stays opaque. Slots, injected HTML,
+dynamic component tags, and expressions that cannot be reduced safely remain
+opaque.
+
+`scopeRenderStoryToCssClassRoots` exposes attachment-based scoping separately
+for integrations that construct render stories themselves. It defaults to
+`css.class`; pass `bindingName` and `exportName` to recognize another CSS Module
+binding and export. Its low-level default preserves a story with no attachment;
+pass `missingAttachment: "opaque"` for validation's conservative behavior.
 
 ## CLI Workflows
 

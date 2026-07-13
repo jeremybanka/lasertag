@@ -447,6 +447,24 @@ describe(`lasertag lsp logging`, () => {
 })
 
 describe(`lasertag lsp state`, () => {
+	it(`does not guess reachability when css.class is not attached`, () => {
+		const fileSystem = createMemoryFileSystem({
+			[astroPath]: `<app-panel><header /></app-panel>`,
+		})
+		const state = createLasertagLspState(fileSystem.environment)
+
+		state.openDocument(createDocumentInput(cssPath, createCssSource(`footer`)))
+
+		expect(state.getDiagnostics(cssPath)).toEqual([])
+		expect(state.getAnalysisTrace(cssPath).summary).toMatchObject({
+			cssClassRootCount: 0,
+			opaqueCount: 1,
+			rootDiscoveryKind: `missing-css-class-attachment`,
+			unknownSelectorCount: 2,
+			unreachableSelectorCount: 0,
+		})
+	})
+
 	it(`validates explicit children passed through an Astro layout`, () => {
 		const fileSystem = createMemoryFileSystem({
 			[astroPath]: `---
@@ -470,8 +488,11 @@ import css from "./AppPanel.module.css"
 			},
 		])
 		expect(state.getAnalysisTrace(cssPath).summary).toMatchObject({
-			elementCount: 3,
-			opaqueCount: 1,
+			cssClassRootCount: 1,
+			elementCount: 2,
+			opaqueCount: 0,
+			rootCount: 1,
+			rootDiscoveryKind: `css-class-attachment`,
 			unknownSelectorCount: 0,
 			unreachableSelectorCount: 1,
 		})

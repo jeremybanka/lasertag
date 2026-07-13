@@ -25,9 +25,11 @@ import {
 	canReachSelectorPath,
 	CSS_MODULE_SUFFIX,
 	createCssReachabilityDiagnostics,
+	findCssClassRenderRoots,
 	isAstroPath,
 	isTsxPath,
 	siblingRenderSourceCandidates,
+	scopeRenderStoryToCssClassRoots,
 	sourcePathToSiblingCssModulePath,
 	TSX_SUFFIX,
 	type CssReachabilityDiagnostic,
@@ -323,11 +325,16 @@ export type LasertagLspAnalysisTrace = {
 	selectorReachability: SelectorReachabilityTrace[]
 	sourceResolution: SiblingRenderSourceAnalysis
 	summary: {
+		cssClassRootCount: number
 		diagnosticCount: number
 		elementCount: number
 		opaqueCount: number
 		renderStoryKind: RenderStoryAnalysis[`kind`]
 		rootCount: number
+		rootDiscoveryKind:
+			| `css-class-attachment`
+			| `missing-css-class-attachment`
+			| `unavailable`
 		selectorCount: number
 		sourceKind: SiblingRenderSourceAnalysis[`kind`]
 		sourcePath?: string
@@ -481,10 +488,13 @@ const renderStorySelectors = selectorFamily<RenderStoryAnalysis, string>({
 			try {
 				return {
 					kind: `ready`,
-					renderStory: analyzeRenderStory({
-						sourcePath,
-						sourceText,
-					}),
+					renderStory: scopeRenderStoryToCssClassRoots(
+						analyzeRenderStory({
+							sourcePath,
+							sourceText,
+						}),
+						{ missingAttachment: `opaque` },
+					),
 				}
 			} catch (error) {
 				return {
@@ -926,6 +936,10 @@ export function createLasertagLspState(
 			renderStoryAnalysis.kind === `ready`
 				? countRenderStoryNodes(renderStoryAnalysis.renderStory.roots)
 				: { elementCount: 0, opaqueCount: 0 }
+		const cssClassRootCount =
+			renderStoryAnalysis.kind === `ready`
+				? findCssClassRenderRoots(renderStoryAnalysis.renderStory.roots).length
+				: 0
 
 		return {
 			cssAnalysis,
@@ -936,6 +950,7 @@ export function createLasertagLspState(
 			selectorReachability,
 			sourceResolution,
 			summary: {
+				cssClassRootCount,
 				diagnosticCount: publishedDiagnostics.length,
 				elementCount: storyCounts.elementCount,
 				opaqueCount: storyCounts.opaqueCount,
@@ -944,6 +959,12 @@ export function createLasertagLspState(
 					renderStoryAnalysis.kind === `ready`
 						? renderStoryAnalysis.renderStory.roots.length
 						: 0,
+				rootDiscoveryKind:
+					renderStoryAnalysis.kind !== `ready`
+						? `unavailable`
+						: cssClassRootCount > 0
+							? `css-class-attachment`
+							: `missing-css-class-attachment`,
 				selectorCount:
 					cssAnalysis.kind === `ready`
 						? cssAnalysis.selectorAnalyses.length

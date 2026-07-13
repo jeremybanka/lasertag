@@ -10,6 +10,7 @@ import type {
 	StoryChild,
 	StoryNode,
 } from "./diagnostics.ts"
+import { scopeRenderStoryToCssClassRoots } from "./render-story-root.ts"
 import {
 	createTypescriptAstSession,
 	type TypescriptAstSession,
@@ -440,10 +441,10 @@ function normalizeJsxAttributeName(name: string): string {
 	}
 }
 
-function stringLiteralAttributeValue(
+function analyzeJsxAttributeValue(
 	sourceFile: ts.SourceFile,
 	initializer: ts.JsxAttribute[`initializer`],
-): Pick<StoryAttribute, `value` | `valueRange`> {
+): Pick<StoryAttribute, `expression` | `value` | `valueRange`> {
 	if (!initializer) return {}
 
 	if (ts.isStringLiteral(initializer)) {
@@ -460,6 +461,13 @@ function stringLiteralAttributeValue(
 	) {
 		return {
 			value: initializer.expression.text,
+			valueRange: rangeOf(sourceFile, initializer.expression),
+		}
+	}
+
+	if (ts.isJsxExpression(initializer) && initializer.expression) {
+		return {
+			expression: initializer.expression.getText(sourceFile),
 			valueRange: rangeOf(sourceFile, initializer.expression),
 		}
 	}
@@ -484,10 +492,7 @@ function analyzeJsxAttributes(
 			{
 				name,
 				range: rangeOf(context.sourceFile, attribute),
-				...stringLiteralAttributeValue(
-					context.sourceFile,
-					attribute.initializer,
-				),
+				...analyzeJsxAttributeValue(context.sourceFile, attribute.initializer),
 			},
 		]
 	})
@@ -802,11 +807,11 @@ function analyzeIndexedComponent(
 	const warnings: RenderStoryWarning[] = []
 	const context = createAnalyzeContext(sourceFile, index, warnings, options)
 
-	return {
+	return scopeRenderStoryToCssClassRoots({
 		componentName,
 		roots: analyzeComponent(context, componentName, []),
 		warnings,
-	}
+	})
 }
 
 export function analyzeTsxRenderStory(
@@ -828,11 +833,11 @@ export function analyzeTsxRenderStory(
 
 		const context = createAnalyzeContext(sourceFile, index, warnings, options)
 
-		return {
+		return scopeRenderStoryToCssClassRoots({
 			componentName,
 			roots: analyzeComponent(context, componentName, []),
 			warnings,
-		}
+		})
 	})
 }
 

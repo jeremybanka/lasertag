@@ -5,6 +5,7 @@ export * from "./analyze-tsx.ts"
 export * from "./diagnostics.ts"
 export * from "./reachability.ts"
 export * from "./render-source.ts"
+export * from "./render-story-root.ts"
 export {
 	createTypescriptAstSession,
 	type TypescriptAstSession,

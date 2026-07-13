@@ -49,7 +49,7 @@ import Card from "./Card.astro"
 		})
 	})
 
-	it(`preserves layout children and scopes component uncertainty to inferred roots`, () => {
+	it(`selects the CSS attachment beneath a transparent layout as the root`, () => {
 		const sourceText = `---
 import Layout from "../layouts/Layout.astro"
 import { Dz2Orbital } from "../components/Dz2Orbital"
@@ -66,16 +66,7 @@ import css from "./index.module.css"
 
 		expect(story.roots).toMatchObject([
 			{
-				children: [
-					{
-						kind: `opaque`,
-						reason: `Astro component "Dz2Orbital" implementation`,
-					},
-				],
-				kind: `element`,
-				tagName: `dz2-orbital`,
-			},
-			{
+				attributes: [{ expression: `css.class`, name: `class` }],
 				children: [
 					{
 						children: [{ kind: `element`, tagName: `h1` }],

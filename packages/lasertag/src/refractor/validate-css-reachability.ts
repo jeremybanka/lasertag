@@ -5,6 +5,7 @@ import { analyzeTsxRenderStory } from "./analyze-tsx.ts"
 import type { CssReachabilityDiagnostic, RenderStory } from "./diagnostics.ts"
 import { applyLasertagExpectErrorDirectives } from "./expect-error.ts"
 import { canReachSelectorPath } from "./reachability.ts"
+import { scopeRenderStoryToCssClassRoots } from "./render-story-root.ts"
 import type { TypescriptAstSession } from "./typescript-ast.ts"
 
 export type ValidateCssReachabilityOptions = {
@@ -97,7 +98,10 @@ export function validateCssReachability(
 			? { typescriptSdkPath: options.typescriptSdkPath }
 			: {}),
 	}
-	const renderStory = analyzeTsxRenderStory(tsxOptions, typescriptSession)
+	const renderStory = scopeRenderStoryToCssClassRoots(
+		analyzeTsxRenderStory(tsxOptions, typescriptSession),
+		{ missingAttachment: `opaque` },
+	)
 	const selectorAnalyses = analyzeCssModuleSelectors(options.cssSource)
 	const diagnostics = createCssReachabilityDiagnostics({
 		cssSource: options.cssSource,
@@ -112,18 +116,21 @@ export function validateRenderSourceCssReachability(
 	options: ValidateRenderSourceCssReachabilityOptions,
 	typescriptSession?: TypescriptAstSession,
 ): ValidateCssReachabilityResult {
-	const renderStory = analyzeRenderStory(
-		{
-			sourcePath: options.sourcePath,
-			sourceText: options.sourceText,
-			...(options.componentName
-				? { componentName: options.componentName }
-				: {}),
-			...(options.typescriptSdkPath
-				? { typescriptSdkPath: options.typescriptSdkPath }
-				: {}),
-		},
-		typescriptSession,
+	const renderStory = scopeRenderStoryToCssClassRoots(
+		analyzeRenderStory(
+			{
+				sourcePath: options.sourcePath,
+				sourceText: options.sourceText,
+				...(options.componentName
+					? { componentName: options.componentName }
+					: {}),
+				...(options.typescriptSdkPath
+					? { typescriptSdkPath: options.typescriptSdkPath }
+					: {}),
+			},
+			typescriptSession,
+		),
+		{ missingAttachment: `opaque` },
 	)
 	const selectorAnalyses = analyzeCssModuleSelectors(options.cssSource)
 	const diagnostics = createCssReachabilityDiagnostics({
