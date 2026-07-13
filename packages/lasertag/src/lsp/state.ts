@@ -19,12 +19,11 @@ import {
 
 import {
 	analyzeCssModuleSelectors,
+	analyzeCssReachability,
 	ambiguousRenderSourceMessage,
 	analyzeRenderStory,
 	ASTRO_SUFFIX,
-	canReachSelectorPath,
 	CSS_MODULE_SUFFIX,
-	createCssReachabilityDiagnostics,
 	findCssClassRenderRoots,
 	isAstroPath,
 	isTsxPath,
@@ -33,7 +32,9 @@ import {
 	sourcePathToSiblingCssModulePath,
 	TSX_SUFFIX,
 	type CssReachabilityDiagnostic,
+	type CssReachabilityAnalysis,
 	type CssSelectorAnalysis,
+	type CssSelectorReachabilityAnalysis,
 	type Reachability,
 	type RenderStory,
 	type SelectorPath,
@@ -343,13 +344,6 @@ export type LasertagLspAnalysisTrace = {
 	}
 }
 
-function combineReachability(results: Reachability[]): Reachability {
-	if (results.includes(`reachable`)) return `reachable`
-	if (results.includes(`unknown`)) return `unknown`
-
-	return `unreachable`
-}
-
 function countRenderStoryNodes(children: StoryChild[]): {
 	elementCount: number
 	opaqueCount: number
@@ -373,8 +367,7 @@ function countRenderStoryNodes(children: StoryChild[]): {
 }
 
 function selectorReachabilityTrace(
-	selectorAnalyses: CssSelectorAnalysis[],
-	renderStory: RenderStory,
+	selectorAnalyses: readonly CssSelectorReachabilityAnalysis[],
 	diagnostics: readonly CssReachabilityDiagnostic[],
 ): SelectorReachabilityTrace[] {
 	return selectorAnalyses.map((analysis): SelectorReachabilityTrace => {
@@ -387,41 +380,11 @@ function selectorReachabilityTrace(
 			)
 			.map((diagnostic) => diagnostic.code)
 
-		if (analysis.result.kind === `unknown`) {
-			return {
-				diagnosticCodes,
-				paths: [],
-				reachability: `unknown`,
-				reason: analysis.result.reason,
-				resultKind: analysis.result.kind,
-				selector: analysis.selector,
-			}
-		}
-
-		if (analysis.result.kind === `impossible-local-class`) {
-			return {
-				diagnosticCodes,
-				paths: [],
-				reachability: `not-applicable`,
-				reason: `local class .${analysis.result.className} is not exposed`,
-				resultKind: analysis.result.kind,
-				selector: analysis.selector,
-			}
-		}
-
-		const paths = analysis.result.paths.map((selectorPath) => ({
-			path: selectorPath,
-			reachability: canReachSelectorPath(renderStory, selectorPath),
-		}))
+		const { range: _range, ...trace } = analysis
 
 		return {
+			...trace,
 			diagnosticCodes,
-			paths,
-			reachability: combineReachability(
-				paths.map(({ reachability }) => reachability),
-			),
-			resultKind: analysis.result.kind,
-			selector: analysis.selector,
 		}
 	})
 }
@@ -532,6 +495,36 @@ const cssSelectorAnalysisSelectors = selectorFamily<
 	key: `lasertag/lsp/css-selector-analysis`,
 })
 
+const cssReachabilityAnalysisSelectors = selectorFamily<
+	CssReachabilityAnalysis | null,
+	string
+>({
+	get:
+		(cssPath) =>
+		({ get }) => {
+			if (!isCssModulePath(cssPath)) return null
+
+			const selectorAnalysis = get(cssSelectorAnalysisSelectors, cssPath)
+
+			if (selectorAnalysis.kind !== `ready`) return null
+
+			const source = get(siblingRenderSourceSelectors, cssPath)
+
+			if (source.kind !== `ready`) return null
+
+			const renderStoryAnalysis = get(renderStorySelectors, source.sourcePath)
+
+			if (renderStoryAnalysis.kind !== `ready`) return null
+
+			return analyzeCssReachability({
+				cssSource: get(fileTextSelectors, cssPath) ?? ``,
+				renderStory: renderStoryAnalysis.renderStory,
+				selectorAnalyses: selectorAnalysis.selectorAnalyses,
+			})
+		},
+	key: `lasertag/lsp/css-reachability-analysis`,
+})
+
 const refractorDiagnosticSelectors = selectorFamily<
 	CssReachabilityDiagnostic[],
 	string
@@ -539,25 +532,7 @@ const refractorDiagnosticSelectors = selectorFamily<
 	get:
 		(cssPath) =>
 		({ get }) => {
-			if (!isCssModulePath(cssPath)) return []
-
-			const selectorAnalysis = get(cssSelectorAnalysisSelectors, cssPath)
-
-			if (selectorAnalysis.kind !== `ready`) return []
-
-			const source = get(siblingRenderSourceSelectors, cssPath)
-
-			if (source.kind !== `ready`) return []
-
-			const renderStoryAnalysis = get(renderStorySelectors, source.sourcePath)
-
-			if (renderStoryAnalysis.kind !== `ready`) return []
-
-			return createCssReachabilityDiagnostics({
-				cssSource: get(fileTextSelectors, cssPath) ?? ``,
-				renderStory: renderStoryAnalysis.renderStory,
-				selectorAnalyses: selectorAnalysis.selectorAnalyses,
-			})
+			return get(cssReachabilityAnalysisSelectors, cssPath)?.diagnostics ?? []
 		},
 	key: `lasertag/lsp/refractor-diagnostics`,
 })
@@ -745,6 +720,7 @@ function createSilo(): Silo {
 		siblingRenderSourceSelectors,
 		renderStorySelectors,
 		cssSelectorAnalysisSelectors,
+		cssReachabilityAnalysisSelectors,
 		refractorDiagnosticSelectors,
 		lspDiagnosticSelectors,
 		affectedCssPathsByRenderSourceSelectors,
@@ -829,7 +805,12 @@ export function createLasertagLspState(
 	function ensureFileSnapshot(filePath: string): void {
 		const normalizedPath = normalizeFilePath(filePath)
 
-		if (!isOpen(normalizedPath)) refreshDiskFile(normalizedPath)
+		if (
+			!isOpen(normalizedPath) &&
+			silo.getState(diskFileSnapshotAtoms, normalizedPath).revision === 0
+		) {
+			refreshDiskFile(normalizedPath)
+		}
 	}
 
 	function ensureCssDependencies(cssPath: string): void {
@@ -920,18 +901,20 @@ export function createLasertagLspState(
 			refractorDiagnosticSelectors,
 			normalizedPath,
 		)
+		const reachabilityAnalysis = silo.getState(
+			cssReachabilityAnalysisSelectors,
+			normalizedPath,
+		)
 		const publishedDiagnostics = silo.getState(
 			lspDiagnosticSelectors,
 			normalizedPath,
 		)
-		const selectorReachability =
-			cssAnalysis.kind === `ready` && renderStoryAnalysis.kind === `ready`
-				? selectorReachabilityTrace(
-						cssAnalysis.selectorAnalyses,
-						renderStoryAnalysis.renderStory,
-						reachabilityDiagnostics,
-					)
-				: []
+		const selectorReachability = reachabilityAnalysis
+			? selectorReachabilityTrace(
+					reachabilityAnalysis.selectorReachability,
+					reachabilityDiagnostics,
+				)
+			: []
 		const storyCounts =
 			renderStoryAnalysis.kind === `ready`
 				? countRenderStoryNodes(renderStoryAnalysis.renderStory.roots)

@@ -50,6 +50,7 @@
 		"lasertag-lsp": "./dist/lsp.mjs"
 	},
 	"scripts": {
+		"benchmark:lsp": "node benchmarks/lsp-analysis.ts",
 		"build": "vp pack",
 		"test": "vp test"
 	},

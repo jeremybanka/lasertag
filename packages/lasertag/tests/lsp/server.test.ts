@@ -567,6 +567,28 @@ import css from "./AppPanel.module.css"
 		])
 	})
 
+	it(`reuses an unchanged disk render source across analysis views`, () => {
+		const fileSystem = createMemoryFileSystem({
+			[astroPath]: createAstroSource(`header`),
+		})
+		const readFile = fileSystem.environment.readFile
+		let readCount = 0
+		const state = createLasertagLspState({
+			...fileSystem.environment,
+			readFile: (filePath) => {
+				readCount += 1
+
+				return readFile?.(filePath) ?? ``
+			},
+		})
+
+		state.openDocument(createDocumentInput(cssPath, createCssSource(`footer`)))
+		state.getDiagnostics(cssPath)
+		state.getAnalysisTrace(cssPath)
+
+		expect(readCount).toBe(1)
+	})
+
 	it(`reports an error when both Astro and TSX neighbors exist`, () => {
 		const fileSystem = createMemoryFileSystem({
 			[astroPath]: createAstroSource(`header`),

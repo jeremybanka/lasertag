@@ -460,21 +460,33 @@ export function createLasertagLspServer(
 		if (!isCssModulePath(cssPath)) return
 
 		const startedAt = performance.now()
+		const logLevel = logger.getLevel()
+		const chronicle = logLevel === `debug` ? logger.makeChronicle() : undefined
+
+		chronicle?.mark(`diagnostics started`)
 		const diagnostics = state.getDiagnostics(cssPath)
-		const analysisTrace = state.getAnalysisTrace(cssPath)
+		chronicle?.mark(`diagnostics resolved`)
+		const analysisTrace =
+			logLevel === `debug` || logLevel === `info`
+				? state.getAnalysisTrace(cssPath)
+				: undefined
+		chronicle?.mark(`analysis trace resolved`)
 		const uri = state.getDocumentUri(cssPath)
 
 		void connection.sendDiagnostics({
 			diagnostics,
 			uri,
 		})
+		chronicle?.mark(`diagnostics queued`)
 		logger.info(`diagnostics`, `published`, {
 			cssPath,
 			diagnosticCount: diagnostics.length,
 			durationMs: durationMs(startedAt),
 			uri,
 		})
-		logAnalysisTrace(logger, analysisTrace)
+		if (analysisTrace) logAnalysisTrace(logger, analysisTrace)
+		chronicle?.mark(`analysis logged`)
+		chronicle?.logMarks()
 	}
 
 	function scheduleDiagnostics(cssPath: string): void {
