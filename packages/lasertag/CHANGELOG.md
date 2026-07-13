@@ -1,5 +1,26 @@
 # lasertag
 
+## 0.5.0
+
+### Minor Changes
+
+- c48851c: Add Astro render story extraction and recognize same-named `.astro` files as CSS
+  Module neighbors in the CLI, LSP, and VS Code extension. Report an error when
+  both `.astro` and `.tsx` neighbors exist. Add LSP analysis summaries and debug
+  traces for render-source resolution, normalized render stories, and selector
+  reachability, and surface render-story analysis failures as editor errors.
+  Preserve explicit children passed through Astro layout components and scope
+  PascalCase component uncertainty beneath their Lasertag-conventional custom
+  roots.
+- c48851c: Discover render-story ownership roots from `css.class` attachments in TSX and
+  Astro sources, excluding wrappers and unrelated sibling branches before CSS
+  selector reachability analysis. Keep reachability unknown when no attachment is
+  discoverable, leaving attachment convention errors to ESLint.
+
+  Reuse unchanged render-source snapshots and selector reachability results across
+  LSP diagnostics and analysis tracing, avoiding duplicate Astro/TSX parsing while
+  retaining the detailed discovery trace.
+
 ## 0.4.4
 
 ### Patch Changes
