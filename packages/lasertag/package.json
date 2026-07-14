@@ -52,6 +52,7 @@
 	"scripts": {
 		"benchmark:lsp": "node benchmarks/lsp-analysis.ts",
 		"build": "vp pack",
+		"check:eslint": "eslint",
 		"test": "vp test"
 	},
 	"dependencies": {
@@ -70,10 +71,13 @@
 	},
 	"devDependencies": {
 		"@eslint/core": "1.2.1",
+		"@typescript-eslint/parser": "8.64.0",
+		"@typescript-eslint/utils": "8.64.0",
 		"@types/estree": "1.0.9",
 		"@types/node": "26.1.1",
 		"@types/react": "19.2.17",
 		"eslint": "10.7.0",
+		"jiti": "2.7.0",
 		"preact": "10.29.7",
 		"solid-js": "1.9.14",
 		"vitest": "npm:@voidzero-dev/vite-plus-test@0.1.24"

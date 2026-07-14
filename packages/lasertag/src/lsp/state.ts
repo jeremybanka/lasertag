@@ -203,37 +203,37 @@ export function mapRefractorDiagnosticToLsp(
 
 const workspaceFolderPathsAtom = atom<string[]>({
 	default: [],
-	key: `lasertag/lsp/workspace-folder-paths`,
+	key: `workspaceFolderPaths`,
 })
 
 const watchedCssModulePathsAtom = atom<string[]>({
 	default: [],
-	key: `lasertag/lsp/watched-css-module-paths`,
+	key: `watchedCssModulePaths`,
 })
 
 const watchedTsxPathsAtom = atom<string[]>({
 	default: [],
-	key: `lasertag/lsp/watched-tsx-paths`,
+	key: `watchedTsxPaths`,
 })
 
 const watchedAstroPathsAtom = atom<string[]>({
 	default: [],
-	key: `lasertag/lsp/watched-astro-paths`,
+	key: `watchedAstroPaths`,
 })
 
 const openDocumentPathsAtom = atom<string[]>({
 	default: [],
-	key: `lasertag/lsp/open-document-paths`,
+	key: `openDocumentPaths`,
 })
 
 const openDocumentAtoms = atomFamily<OpenDocument | null, string>({
 	default: null,
-	key: `lasertag/lsp/open-document`,
+	key: `openDocument`,
 })
 
 const diskFileSnapshotAtoms = atomFamily<FileSnapshot, string>({
 	default: missingSnapshot,
-	key: `lasertag/lsp/disk-file-snapshot`,
+	key: `diskFileSnapshot`,
 })
 
 const knownCssModulePathsSelector = selector<string[]>({
@@ -243,7 +243,7 @@ const knownCssModulePathsSelector = selector<string[]>({
 
 		return uniqueSorted([...watchedCssPaths, ...openCssPaths])
 	},
-	key: `lasertag/lsp/known-css-module-paths`,
+	key: `knownCssModulePaths`,
 })
 
 const fileSnapshotSelectors = selectorFamily<FileSnapshot, string>({
@@ -262,7 +262,7 @@ const fileSnapshotSelectors = selectorFamily<FileSnapshot, string>({
 
 			return get(diskFileSnapshotAtoms, filePath)
 		},
-	key: `lasertag/lsp/file-snapshot`,
+	key: `fileSnapshot`,
 })
 
 const fileTextSelectors = selectorFamily<string | null, string>({
@@ -273,7 +273,7 @@ const fileTextSelectors = selectorFamily<string | null, string>({
 
 			return snapshot.exists ? snapshot.text : null
 		},
-	key: `lasertag/lsp/file-text`,
+	key: `fileText`,
 })
 
 const documentUriSelectors = selectorFamily<string, string>({
@@ -284,7 +284,7 @@ const documentUriSelectors = selectorFamily<string, string>({
 
 			return openDocument?.uri ?? pathToFileURL(filePath).href
 		},
-	key: `lasertag/lsp/document-uri`,
+	key: `documentUri`,
 })
 
 export type SiblingRenderSourceAnalysis =
@@ -437,7 +437,7 @@ const siblingRenderSourceSelectors = selectorFamily<
 				),
 			}
 		},
-	key: `lasertag/lsp/sibling-render-source`,
+	key: `siblingRenderSource`,
 })
 
 const renderStorySelectors = selectorFamily<RenderStoryAnalysis, string>({
@@ -466,7 +466,7 @@ const renderStorySelectors = selectorFamily<RenderStoryAnalysis, string>({
 				}
 			}
 		},
-	key: `lasertag/lsp/render-story`,
+	key: `renderStory`,
 })
 
 const cssSelectorAnalysisSelectors = selectorFamily<
@@ -492,7 +492,7 @@ const cssSelectorAnalysisSelectors = selectorFamily<
 				}
 			}
 		},
-	key: `lasertag/lsp/css-selector-analysis`,
+	key: `cssSelectorAnalysis`,
 })
 
 const cssReachabilityAnalysisSelectors = selectorFamily<
@@ -522,7 +522,7 @@ const cssReachabilityAnalysisSelectors = selectorFamily<
 				selectorAnalyses: selectorAnalysis.selectorAnalyses,
 			})
 		},
-	key: `lasertag/lsp/css-reachability-analysis`,
+	key: `cssReachabilityAnalysis`,
 })
 
 const refractorDiagnosticSelectors = selectorFamily<
@@ -534,7 +534,7 @@ const refractorDiagnosticSelectors = selectorFamily<
 		({ get }) => {
 			return get(cssReachabilityAnalysisSelectors, cssPath)?.diagnostics ?? []
 		},
-	key: `lasertag/lsp/refractor-diagnostics`,
+	key: `refractorDiagnostic`,
 })
 
 const lspDiagnosticSelectors = selectorFamily<Diagnostic[], string>({
@@ -583,7 +583,7 @@ const lspDiagnosticSelectors = selectorFamily<Diagnostic[], string>({
 				mapRefractorDiagnosticToLsp(cssSource, diagnostic),
 			)
 		},
-	key: `lasertag/lsp/lsp-diagnostics`,
+	key: `lspDiagnostic`,
 })
 
 const affectedCssPathsByRenderSourceSelectors = selectorFamily<
@@ -601,10 +601,12 @@ const affectedCssPathsByRenderSourceSelectors = selectorFamily<
 				(cssPath) => cssPath === candidate,
 			)
 		},
-	key: `lasertag/lsp/affected-css-paths-by-render-source`,
+	key: `affectedCssPathsByRenderSource`,
 })
 
-const indexWorkspaceFilesTransaction = transaction({
+const indexWorkspaceFilesTransaction = transaction<
+	(input: WorkspaceIndexInput) => void
+>({
 	do: (
 		{ set },
 		{
@@ -619,10 +621,12 @@ const indexWorkspaceFilesTransaction = transaction({
 		set(watchedTsxPathsAtom, uniqueSorted(tsxPaths))
 		set(watchedAstroPathsAtom, uniqueSorted(astroPaths))
 	},
-	key: `lasertag/lsp/index-workspace-files`,
+	key: `indexWorkspaceFiles`,
 })
 
-const upsertOpenDocumentTransaction = transaction({
+const upsertOpenDocumentTransaction = transaction<
+	(input: LspDocumentInput) => void
+>({
 	do: (
 		{ get, set },
 		{ languageId, path: filePath, text, uri, version }: LspDocumentInput,
@@ -650,18 +654,20 @@ const upsertOpenDocumentTransaction = transaction({
 			set(watchedAstroPathsAtom, addPath(get(watchedAstroPathsAtom), filePath))
 		}
 	},
-	key: `lasertag/lsp/upsert-open-document`,
+	key: `upsertOpenDocument`,
 })
 
-const closeDocumentTransaction = transaction({
+const closeDocumentTransaction = transaction<(filePath: string) => void>({
 	do: ({ get, set }, filePath: string) => {
 		set(openDocumentAtoms, filePath, null)
 		set(openDocumentPathsAtom, removePath(get(openDocumentPathsAtom), filePath))
 	},
-	key: `lasertag/lsp/close-document`,
+	key: `closeDocument`,
 })
 
-const refreshDiskFileTransaction = transaction({
+const refreshDiskFileTransaction = transaction<
+	(input: DiskSnapshotInput) => void
+>({
 	do: ({ get, set }, { path: filePath, snapshot }: DiskSnapshotInput) => {
 		set(diskFileSnapshotAtoms, filePath, snapshot)
 
@@ -695,7 +701,7 @@ const refreshDiskFileTransaction = transaction({
 			)
 		}
 	},
-	key: `lasertag/lsp/refresh-disk-file`,
+	key: `refreshDiskFile`,
 })
 
 function createSilo(): Silo {
