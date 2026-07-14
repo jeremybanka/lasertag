@@ -59,8 +59,8 @@ importers:
         specifier: 3.9.2
         version: 3.9.2
       atom.io:
-        specifier: 0.49.9
-        version: 0.49.9(@typescript-eslint/parser@8.63.0(eslint@10.7.0)(typescript@7.0.2))(eslint@10.7.0)(solid-js@1.9.14)
+        specifier: 0.49.10
+        version: 0.49.10(@typescript-eslint/parser@8.63.0(eslint@10.7.0)(typescript@7.0.2))(eslint@10.7.0)(solid-js@1.9.14)
       comline:
         specifier: 0.5.1
         version: 0.5.1(zod@4.4.3)
@@ -1801,8 +1801,8 @@ packages:
   asynckit@0.4.0:
     resolution: {integrity: sha512-Oei9OH4tRh0YqU3GxhX79dM/mwVgvbZJaSNaRk+bshkj0S5cfHcgYakreBjrHwatXKbz+IoIdYLxrKim2MjW0Q==}
 
-  atom.io@0.49.9:
-    resolution: {integrity: sha512-UW5YH7/KFP9HJa9DjH1F2FLpKqTfVSfB0/E1yFsElFLmZwzQetbPCULtfFgiryWIFZ9IxrEASXq+pNZVI6ovdQ==}
+  atom.io@0.49.10:
+    resolution: {integrity: sha512-jb2gScUVO2uFmnsfINJao0btsMDhejTjr8s3lCXx/cCi+cetWZudC24yI9KJ7GBCTZpB9UMY7yxNMSguCjxiAg==}
     peerDependencies:
       '@floating-ui/react': '>=0.25.0'
       '@floating-ui/react-dom': '>=2.0.0'
@@ -5017,7 +5017,7 @@ snapshots:
 
   asynckit@0.4.0: {}
 
-  atom.io@0.49.9(@typescript-eslint/parser@8.63.0(eslint@10.7.0)(typescript@7.0.2))(eslint@10.7.0)(solid-js@1.9.14):
+  atom.io@0.49.10(@typescript-eslint/parser@8.63.0(eslint@10.7.0)(typescript@7.0.2))(eslint@10.7.0)(solid-js@1.9.14):
     optionalDependencies:
       '@typescript-eslint/parser': 8.63.0(eslint@10.7.0)(typescript@7.0.2)
       eslint: 10.7.0

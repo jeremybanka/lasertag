@@ -57,7 +57,7 @@
 	"dependencies": {
 		"@astrojs/compiler": "4.0.0",
 		"@vscode/vsce": "3.9.2",
-		"atom.io": "0.49.9",
+		"atom.io": "0.49.10",
 		"comline": "0.5.1",
 		"rolldown": "1.1.5",
 		"takua": "0.2.2",
