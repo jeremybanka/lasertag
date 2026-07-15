@@ -2,6 +2,7 @@
 
 import { existsSync, readFileSync } from "node:fs"
 import path from "node:path"
+import { styleText } from "node:util"
 import { isMainThread, workerData } from "node:worker_threads"
 
 import {
@@ -20,6 +21,9 @@ import { z } from "zod/v4"
 import {
 	createTypescriptAstSession,
 	type CssReachabilityDiagnostic,
+	type RenderStoryEvidencePossibility,
+	type SelectorPath,
+	type StoryChild,
 } from "../refractor/index.ts"
 import {
 	processLasertagCheckTask,
@@ -53,6 +57,55 @@ const DEFAULT_IGNORE_PATTERNS = [
 	`**/tests/refractor/corpus/providers/**`,
 ]
 const FORMAT_OPTIONS = [`stylish`, `json`] as const
+const DEFAULT_MAX_DETAIL_FILES = 10
+const CHECK_SUMMARY_WIDTH = 56
+
+type CheckOutputStyler = {
+	bad: (text: string) => string
+	bold: (text: string) => string
+	caret: (text: string) => string
+	code: (text: string) => string
+	dim: (text: string) => string
+	success: (text: string) => string
+	warning: (text: string) => string
+}
+
+const PLAIN_CHECK_OUTPUT_STYLER: CheckOutputStyler = {
+	bad: (text) => text,
+	bold: (text) => text,
+	caret: (text) => text,
+	code: (text) => text,
+	dim: (text) => text,
+	success: (text) => text,
+	warning: (text) => text,
+}
+
+function createCheckOutputStyler(
+	forceColor: boolean | undefined,
+	outputIsConsole: boolean,
+): CheckOutputStyler {
+	if (forceColor === false || (!outputIsConsole && forceColor !== true)) {
+		return PLAIN_CHECK_OUTPUT_STYLER
+	}
+
+	const options = forceColor
+		? { validateStream: false }
+		: { stream: process.stdout }
+	const apply = (
+		format: Parameters<typeof styleText>[0],
+		text: string,
+	): string => styleText(format, text, options)
+
+	return {
+		bad: (text) => apply([`bold`, `red`], text),
+		bold: (text) => apply(`bold`, text),
+		caret: (text) => apply([`bold`, `yellow`], text),
+		code: (text) => apply(`cyan`, text),
+		dim: (text) => apply(`dim`, text),
+		success: (text) => apply([`bold`, `green`], text),
+		warning: (text) => apply([`bold`, `yellow`], text),
+	}
+}
 
 const rootOptionsSchema = z.object({
 	help: z.boolean().default(false),
@@ -61,6 +114,14 @@ const rootOptionsSchema = z.object({
 
 const checkOptionsSchema = z.object({
 	format: z.enum(FORMAT_OPTIONS).default(`stylish`),
+	"max-files": z
+		.string()
+		.refine(
+			(value) => value === `all` || /^[1-9]\d*$/.test(value),
+			`expected "all" or a positive integer`,
+		)
+		.default(String(DEFAULT_MAX_DETAIL_FILES)),
+	"show-story": z.boolean().default(false),
 })
 
 const vsixOptionsSchema = z.object({
@@ -73,7 +134,6 @@ type RootOptions = z.infer<typeof rootOptionsSchema>
 type CheckOptions = z.infer<typeof checkOptionsSchema>
 type FixOptions = Record<never, never>
 type VsixOptions = z.infer<typeof vsixOptionsSchema>
-type LasertagOutputFormat = CheckOptions[`format`]
 
 export type LasertagCliMode = `check` | `fix` | `help` | `version` | `vsix`
 
@@ -117,6 +177,7 @@ export type LasertagCliEnvironment = {
 	cwd?: string
 	fileExists?: (filePath: string) => boolean
 	fixWorkerCount?: number
+	forceColor?: boolean
 	glob?: typeof globSync
 	installVscodeExtension?: (
 		request: LasertagVscodeInstallRequest,
@@ -146,6 +207,18 @@ const checkRouteOptions = options(
 			description: `output format`,
 			flag: `f`,
 			example: `--format json`,
+			required: false,
+		},
+		"max-files": {
+			description: `maximum affected files shown in stylish output`,
+			example: `--max-files all`,
+			parse: parseStringOption,
+			required: false,
+		},
+		"show-story": {
+			description: `show closest render story possibilities for each warning`,
+			example: `--show-story`,
+			parse: parseBooleanOption,
 			required: false,
 		},
 	},
@@ -267,8 +340,11 @@ type WarningRegionLine = {
 	highlightEnd: number
 	highlightStart: number
 	line: number
+	lineStart: number
 	text: string
 }
+
+type WarningContextLine = Pick<WarningRegionLine, `line` | `text`>
 
 const MAX_WARNING_REGION_LINES = 2
 
@@ -295,7 +371,7 @@ function warningRegionLines(
 			text.length,
 		)
 
-		lines.push({ highlightEnd, highlightStart, line, text })
+		lines.push({ highlightEnd, highlightStart, line, lineStart, text })
 
 		if (lineEnd > lastSelectedOffset || newline === -1) break
 
@@ -306,14 +382,54 @@ function warningRegionLines(
 	return lines
 }
 
+function warningContextLineBefore(
+	sourceText: string,
+	firstSelectedLine: WarningRegionLine,
+): WarningContextLine | undefined {
+	if (firstSelectedLine.lineStart === 0) return
+
+	const lineEnd = firstSelectedLine.lineStart - 1
+	const lineStart = sourceText.lastIndexOf(`\n`, lineEnd - 1) + 1
+
+	return {
+		line: firstSelectedLine.line - 1,
+		text: sourceText.slice(lineStart, lineEnd).replace(/\r$/, ``),
+	}
+}
+
+function warningContextLineAfter(
+	sourceText: string,
+	lastSelectedLine: WarningRegionLine,
+): WarningContextLine | undefined {
+	const selectedLineEnd = sourceText.indexOf(`\n`, lastSelectedLine.lineStart)
+
+	if (selectedLineEnd === -1 || selectedLineEnd + 1 >= sourceText.length) return
+
+	const lineStart = selectedLineEnd + 1
+	const nextNewline = sourceText.indexOf(`\n`, lineStart)
+	const lineEnd = nextNewline === -1 ? sourceText.length : nextNewline
+
+	return {
+		line: lastSelectedLine.line + 1,
+		text: sourceText.slice(lineStart, lineEnd).replace(/\r$/, ``),
+	}
+}
+
 function expandTabs(text: string): string {
 	return text.replaceAll(`\t`, `    `)
+}
+
+type FormattedWarningRegion = {
+	lineNumberWidth: number
+	text: string
 }
 
 function formatWarningRegion(
 	diagnostic: LasertagCliDiagnostic,
 	sourceText: string,
-): string | undefined {
+	diagnosedLines: ReadonlySet<number> = new Set(),
+	styler: CheckOutputStyler = PLAIN_CHECK_OUTPUT_STYLER,
+): FormattedWarningRegion | undefined {
 	if (!diagnostic.range) return
 
 	const lines = warningRegionLines(
@@ -324,36 +440,68 @@ function formatWarningRegion(
 
 	if (lines.length === 0) return
 
-	const visibleLines =
+	const visibleSelectedLines =
 		lines.length <= MAX_WARNING_REGION_LINES
 			? lines
 			: [lines[0], undefined, lines.at(-1)]
-	const lineNumberWidth = String(lines.at(-1)?.line ?? diagnostic.line).length
+	const firstSelectedLine = lines[0]
+	const lastSelectedLine = lines.at(-1)
+
+	if (!firstSelectedLine || !lastSelectedLine) return
+
+	const contextBefore = warningContextLineBefore(sourceText, firstSelectedLine)
+	const contextAfter = warningContextLineAfter(sourceText, lastSelectedLine)
+	const visibleLines: Array<
+		WarningContextLine | WarningRegionLine | undefined
+	> = [
+		...(contextBefore && !diagnosedLines.has(contextBefore.line)
+			? [contextBefore]
+			: []),
+		...visibleSelectedLines,
+		...(contextAfter && !diagnosedLines.has(contextAfter.line)
+			? [contextAfter]
+			: []),
+	]
+	const lineNumberWidth = Math.max(
+		...visibleLines.map((line) => String(line?.line ?? diagnostic.line).length),
+	)
 	const output: string[] = []
 
 	for (const line of visibleLines) {
 		if (!line) {
-			output.push(`${` `.repeat(lineNumberWidth)} │ …`)
+			output.push(styler.dim(`${` `.repeat(lineNumberWidth)} │ …`))
 			continue
 		}
 
 		const expandedText = expandTabs(line.text).trimEnd()
-		const caretStart = expandTabs(
-			line.text.slice(0, line.highlightStart),
-		).length
-		const caretWidth = Math.max(
-			expandTabs(line.text.slice(line.highlightStart, line.highlightEnd))
-				.length,
-			1,
+		const selected = `highlightStart` in line
+		const gutter = styler.dim(
+			`${String(line.line).padStart(lineNumberWidth)} │`,
+		)
+		output.push(
+			`${gutter} ${selected ? expandedText : styler.dim(expandedText)}`,
 		)
 
-		output.push(
-			`${String(line.line).padStart(lineNumberWidth)} │ ${expandedText}`,
-			`${` `.repeat(lineNumberWidth)} │ ${` `.repeat(caretStart)}${`^`.repeat(caretWidth)}`,
-		)
+		if (selected) {
+			const caretStart = expandTabs(
+				line.text.slice(0, line.highlightStart),
+			).length
+			const caretWidth = Math.max(
+				expandTabs(line.text.slice(line.highlightStart, line.highlightEnd))
+					.length,
+				1,
+			)
+
+			output.push(
+				`${styler.dim(`${` `.repeat(lineNumberWidth)} │`)} ${` `.repeat(caretStart)}${styler.caret(`^`.repeat(caretWidth))}`,
+			)
+		}
 	}
 
-	return output.join(`\n`)
+	return {
+		lineNumberWidth,
+		text: output.join(`\n`),
+	}
 }
 
 function formatStylishDiagnostic(
@@ -376,35 +524,476 @@ function formatStylishDiagnostic(
 		? formatWarningRegion(diagnostic, cssSource)
 		: undefined
 
-	return region ? `${message}\n${region}` : message
+	return region ? `${message}\n${region.text}` : message
+}
+
+type DiagnosticFileGroup = {
+	cssPath: string
+	diagnostics: LasertagCliDiagnostic[]
+}
+
+type DisplayStoryChild = DisplayStoryNode | DisplayStoryOpaque
+
+type DisplayStoryNode = {
+	children: DisplayStoryChild[]
+	ghost?: boolean
+	kind: `element`
+	relation?: SelectorPath[number][`relation`]
+	tagName: string
+}
+
+type DisplayStoryOpaque = {
+	kind: `opaque`
+	reason: string
+}
+
+function displayStoryChildren(children: StoryChild[]): DisplayStoryChild[] {
+	return children.flatMap((child): DisplayStoryChild[] => {
+		if (child.kind === `opaque`)
+			return [{ kind: `opaque`, reason: child.reason }]
+		if (child.kind === `choice`) {
+			return child.alternatives.flatMap(displayStoryChildren)
+		}
+
+		return [
+			{
+				children: displayStoryChildren(child.children),
+				kind: `element`,
+				tagName: child.tagName,
+			},
+		]
+	})
+}
+
+function ghostStoryBranch(
+	segments: SelectorPath,
+): DisplayStoryNode | undefined {
+	const [segment, ...descendants] = segments
+
+	if (!segment) return
+
+	const child = ghostStoryBranch(descendants)
+
+	return {
+		children: child ? [child] : [],
+		ghost: true,
+		kind: `element`,
+		relation: segment.relation,
+		tagName: segment.tagName,
+	}
+}
+
+function matchedActualPath(
+	closestPath: string[],
+	selectorPath: SelectorPath,
+	matchedSegments: number,
+): string[] {
+	if (matchedSegments === 0) return []
+
+	let actualIndex = 0
+
+	for (
+		let selectorIndex = 1;
+		selectorIndex < matchedSegments;
+		selectorIndex++
+	) {
+		const segment = selectorPath[selectorIndex]
+
+		if (!segment) break
+
+		actualIndex =
+			segment.relation === `child`
+				? actualIndex + 1
+				: closestPath.indexOf(segment.tagName, actualIndex + 1)
+	}
+
+	return closestPath.slice(0, actualIndex + 1)
+}
+
+function insertGhostStoryBranch(
+	possibility: RenderStoryEvidencePossibility,
+	selectorPath: SelectorPath,
+): DisplayStoryChild[] {
+	const roots = displayStoryChildren(possibility.roots)
+	const ghost = ghostStoryBranch(
+		selectorPath.slice(possibility.matchedSegments),
+	)
+
+	if (!ghost) return roots
+
+	const parentPath = matchedActualPath(
+		possibility.closestPath,
+		selectorPath,
+		possibility.matchedSegments,
+	)
+
+	if (parentPath.length === 0) return [...roots, ghost]
+
+	let inserted = false
+	const visit = (
+		child: DisplayStoryChild,
+		ancestors: string[],
+	): DisplayStoryChild => {
+		if (child.kind === `opaque`) return child
+
+		const path = [...ancestors, child.tagName]
+		const children = child.children.map((nestedChild) =>
+			visit(nestedChild, path),
+		)
+
+		if (
+			!inserted &&
+			path.length === parentPath.length &&
+			path.every((segment, index) => parentPath[index] === segment)
+		) {
+			children.push(ghost)
+			inserted = true
+		}
+
+		return { ...child, children }
+	}
+
+	return roots.map((root) => visit(root, []))
+}
+
+function formatStoryTree(
+	children: DisplayStoryChild[],
+	closestPath: string[],
+	styler: CheckOutputStyler,
+): string[] {
+	const output: string[] = []
+
+	const visit = (
+		child: DisplayStoryChild,
+		parentPath: string[],
+		prefix: string,
+		isLast: boolean,
+		isRoot: boolean,
+	): void => {
+		const branch = isRoot
+			? ``
+			: child.kind === `element` &&
+				  child.ghost &&
+				  child.relation === `descendant`
+				? isLast
+					? `└┄ `
+					: `├┄ `
+				: isLast
+					? `└─ `
+					: `├─ `
+
+		if (child.kind === `opaque`) {
+			output.push(
+				`${styler.dim(prefix)}${styler.dim(branch)}${styler.dim(`… ${child.reason}`)}`,
+			)
+			return
+		}
+
+		const path = [...parentPath, child.tagName]
+		const isNearest =
+			!child.ghost &&
+			path.length === closestPath.length &&
+			path.every((segment, index) => closestPath[index] === segment)
+		const paintBranch = child.ghost
+			? styler.bad
+			: isNearest
+				? styler.warning
+				: styler.dim
+		const tag = child.ghost
+			? styler.bad(child.tagName)
+			: isNearest
+				? styler.warning(child.tagName)
+				: child.tagName
+		const marker =
+			child.ghost && child.children.length === 0
+				? styler.bad(`  ✕ you are here`)
+				: isNearest
+					? styler.warning(`  ← closest rendered path`)
+					: ``
+
+		output.push(`${styler.dim(prefix)}${paintBranch(branch)}${tag}${marker}`)
+
+		const continuation = isRoot ? `` : isLast ? `   ` : `│  `
+
+		for (const [index, nestedChild] of child.children.entries()) {
+			visit(
+				nestedChild,
+				path,
+				`${prefix}${continuation}`,
+				index === child.children.length - 1,
+				false,
+			)
+		}
+	}
+
+	for (const [index, child] of children.entries()) {
+		visit(child, [], ``, index === children.length - 1, children.length === 1)
+	}
+
+	return output
+}
+
+function formatRenderStoryEvidence(
+	diagnostic: LasertagCliDiagnostic,
+	styler: CheckOutputStyler,
+): string | undefined {
+	const evidence = diagnostic.storyEvidence
+
+	if (!evidence || evidence.possibilities.length === 0) return
+
+	const output = [
+		styler.bold(`Where this selector expected to land`),
+		``,
+		`  ${styler.bad(diagnostic.selector)}`,
+		``,
+		`${styler.bold(`Render story possibilities`)}  ${styler.dim(`${evidence.possibilities.length} closest`)}`,
+	]
+
+	for (const [index, possibility] of evidence.possibilities.entries()) {
+		const story = insertGhostStoryBranch(possibility, evidence.selectorPath)
+
+		output.push(
+			``,
+			`${styler.dim(index === evidence.possibilities.length - 1 ? `└─` : `├─`)} ${styler.bold(`Possibility ${index + 1}`)}  ${styler.dim(`closest path matches`)} ${styler.warning(`${possibility.matchedSegments}/${evidence.selectorPath.length}`)} ${styler.dim(`selector steps`)}`,
+			...formatStoryTree(story, possibility.closestPath, styler).map(
+				(line) => `   ${line}`,
+			),
+		)
+	}
+
+	return output.join(`\n`)
+}
+
+function groupDiagnosticsByFile(
+	diagnostics: LasertagCliDiagnostic[],
+): DiagnosticFileGroup[] {
+	const diagnosticsByFile = new Map<string, LasertagCliDiagnostic[]>()
+
+	for (const diagnostic of diagnostics) {
+		const fileDiagnostics = diagnosticsByFile.get(diagnostic.cssPath)
+
+		if (fileDiagnostics) {
+			fileDiagnostics.push(diagnostic)
+		} else {
+			diagnosticsByFile.set(diagnostic.cssPath, [diagnostic])
+		}
+	}
+
+	return [...diagnosticsByFile]
+		.map(([cssPath, fileDiagnostics]) => ({
+			cssPath,
+			diagnostics: fileDiagnostics.toSorted(
+				(left, right) => left.line - right.line || left.column - right.column,
+			),
+		}))
+		.toSorted((left, right) =>
+			left.cssPath < right.cssPath ? -1 : left.cssPath > right.cssPath ? 1 : 0,
+		)
+}
+
+function formatWarningTreeDiagnostic(
+	diagnostic: LasertagCliDiagnostic,
+	sourceText: string,
+	diagnosedLines: ReadonlySet<number>,
+	isLast: boolean,
+	styler: CheckOutputStyler,
+): string {
+	const branch = isLast ? `└─` : `├─`
+	const continuation = isLast ? `   ` : `│  `
+	const region = formatWarningRegion(
+		diagnostic,
+		sourceText,
+		diagnosedLines,
+		styler,
+	)
+	const output = [
+		`${styler.dim(branch)} ${styler.dim(`${diagnostic.line}:${diagnostic.column}`)}  ${styler.code(diagnostic.code)}`,
+	]
+
+	if (region) {
+		output.push(
+			...region.text
+				.split(`\n`)
+				.map((line) => `${styler.dim(continuation)}${line}`),
+			`${styler.dim(continuation)}${` `.repeat(region.lineNumberWidth + 1)}${styler.dim(`╰─`)} ${diagnostic.message}`,
+		)
+	} else {
+		output.push(
+			`${styler.dim(continuation)}${styler.dim(`╰─`)} ${diagnostic.message}`,
+		)
+	}
+
+	const storyEvidence = formatRenderStoryEvidence(diagnostic, styler)
+
+	if (storyEvidence) {
+		output.push(
+			styler.dim(continuation.trimEnd()),
+			...storyEvidence
+				.split(`\n`)
+				.map((line) => `${styler.dim(continuation)}${line}`),
+		)
+	}
+
+	if (!isLast) output.push(styler.dim(`│`))
+
+	return output.join(`\n`)
+}
+
+function formatDiagnosticFileGroup(
+	group: DiagnosticFileGroup,
+	cwd: string,
+	readCssSource: (cssPath: string) => string,
+	styler: CheckOutputStyler,
+): string {
+	const warningCount = group.diagnostics.length
+	const output = [
+		`${styler.bold(displayPath(cwd, group.cssPath))}  ${styler.dim(`${warningCount} ${plural(warningCount, `warning`)}`)}`,
+	]
+	const sourceText = readCssSource(group.cssPath)
+	const diagnosedLines = new Set(
+		group.diagnostics.flatMap((diagnostic) =>
+			diagnostic.range
+				? warningRegionLines(
+						sourceText,
+						diagnostic.range.start,
+						diagnostic.range.end,
+					).map((line) => line.line)
+				: [],
+		),
+	)
+
+	for (const [index, diagnostic] of group.diagnostics.entries()) {
+		output.push(
+			formatWarningTreeDiagnostic(
+				diagnostic,
+				sourceText,
+				diagnosedLines,
+				index === group.diagnostics.length - 1,
+				styler,
+			),
+		)
+	}
+
+	return output.join(`\n`)
+}
+
+function formatCheckSummary({
+	affectedFileCount,
+	detailFileCount,
+	detailWarningCount,
+	fileCount,
+	hiddenFileCount,
+	hiddenWarningCount,
+	styler,
+	warningCount,
+}: {
+	affectedFileCount: number
+	detailFileCount: number
+	detailWarningCount: number
+	fileCount: number
+	hiddenFileCount: number
+	hiddenWarningCount: number
+	styler: CheckOutputStyler
+	warningCount: number
+}): string {
+	const rows: Array<[label: string, count: number, description: string]> = [
+		[`CSS modules`, fileCount, `checked`],
+		[
+			`Detail`,
+			detailWarningCount,
+			`${plural(detailWarningCount, `warning`)} in ${detailFileCount} ${plural(detailFileCount, `file`)} shown`,
+		],
+	]
+
+	if (hiddenFileCount > 0) {
+		rows.push([
+			`Hidden`,
+			hiddenWarningCount,
+			`${plural(hiddenWarningCount, `warning`)} in ${hiddenFileCount} ${plural(hiddenFileCount, `file`)}`,
+		])
+	}
+
+	const labelWidth = Math.max(...rows.map(([label]) => label.length))
+	const countWidth = Math.max(...rows.map(([, count]) => String(count).length))
+	const output = [
+		styler.dim(`─`.repeat(CHECK_SUMMARY_WIDTH)),
+		``,
+		styler.warning(
+			`▲ Check found ${warningCount} ${plural(warningCount, `warning`)} in ${affectedFileCount} ${plural(affectedFileCount, `file`)}`,
+		),
+		``,
+		...rows.map(
+			([label, count, description]) =>
+				`  ${styler.dim(label.padStart(labelWidth))}  ${String(count).padStart(countWidth)} ${description}`,
+		),
+	]
+
+	if (hiddenFileCount > 0) {
+		output.push(
+			``,
+			styler.dim(`  Show everything with lasertag check --max-files=all`),
+		)
+	}
+
+	return output.join(`\n`)
 }
 
 function formatDiagnostics(
 	diagnostics: LasertagCliDiagnostic[],
-	format: LasertagOutputFormat,
+	options: CheckOptions,
 	files: string[],
 	cwd: string,
 	readCssSource: (cssPath: string) => string,
+	styler: CheckOutputStyler,
 ): string {
-	if (format === `json`) {
+	if (options.format === `json`) {
 		return JSON.stringify({ diagnostics, files }, null, 2)
 	}
 
 	if (diagnostics.length === 0) {
-		const noun = files.length === 1 ? `file` : `files`
-
-		return `lasertag check: no dead CSS found in ${files.length} ${noun}.`
+		return styler.success(
+			`✓ No dead CSS found in ${files.length} ${plural(files.length, `file`)}.`,
+		)
 	}
 
-	return diagnostics
-		.map((diagnostic) =>
-			formatStylishDiagnostic(
-				diagnostic,
-				cwd,
-				readCssSource(diagnostic.cssPath),
+	const groups = groupDiagnosticsByFile(diagnostics)
+	const detailFileCount =
+		options[`max-files`] === `all`
+			? groups.length
+			: Math.min(Number.parseInt(options[`max-files`], 10), groups.length)
+	const detailGroups = groups.slice(0, detailFileCount)
+	const hiddenGroups = groups.slice(detailFileCount)
+	const detailWarningCount = detailGroups.reduce(
+		(count, group) => count + group.diagnostics.length,
+		0,
+	)
+	const hiddenWarningCount = diagnostics.length - detailWarningCount
+	const output = detailGroups.map((group) =>
+		formatDiagnosticFileGroup(group, cwd, readCssSource, styler),
+	)
+
+	if (hiddenGroups.length > 0) {
+		output.push(
+			styler.dim(
+				`… ${hiddenGroups.length} more affected ${plural(hiddenGroups.length, `file`)} containing ${hiddenWarningCount} ${plural(hiddenWarningCount, `warning`)}`,
 			),
 		)
-		.join(`\n\n`)
+	}
+
+	output.push(
+		formatCheckSummary({
+			affectedFileCount: groups.length,
+			detailFileCount,
+			detailWarningCount,
+			fileCount: files.length,
+			hiddenFileCount: hiddenGroups.length,
+			hiddenWarningCount,
+			styler,
+			warningCount: diagnostics.length,
+		}),
+	)
+
+	return output.join(`\n\n`)
 }
 
 function createDiagnostic(
@@ -431,9 +1020,13 @@ async function runCheck(
 	environment: LasertagCliEnvironment,
 ): Promise<LasertagCliResult> {
 	const cwd = environment.cwd ?? process.cwd()
+	const styler = createCheckOutputStyler(environment.forceColor, io === console)
 	const files = discoverCssModuleFiles(targets, environment)
 	const fileSystem = checkFileSystemFromEnvironment(environment)
 	const checkResult = await runLasertagCheck(files, {
+		...(options[`show-story`] && options.format === `stylish`
+			? { includeStoryEvidence: true }
+			: {}),
 		...(environment.checkWorkerCount
 			? { workerCount: environment.checkWorkerCount }
 			: {}),
@@ -469,7 +1062,7 @@ async function runCheck(
 	}
 
 	io.log(
-		formatDiagnostics(diagnostics, options.format, files, cwd, readCssSource),
+		formatDiagnostics(diagnostics, options, files, cwd, readCssSource, styler),
 	)
 
 	return {

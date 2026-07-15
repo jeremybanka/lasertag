@@ -8,6 +8,7 @@ import type {
 	SourceRange,
 	StoryAttribute,
 	StoryChild,
+	StoryChoiceNode,
 	StoryNode,
 } from "./diagnostics.ts"
 import { scopeRenderStoryToCssClassRoots } from "./render-story-root.ts"
@@ -69,6 +70,18 @@ function opaque(
 	node: ts.Node,
 ): OpaqueStoryNode {
 	return { kind: `opaque`, reason, range: rangeOf(sourceFile, node) }
+}
+
+function choice(
+	alternatives: StoryChild[][],
+	sourceFile: ts.SourceFile,
+	node: ts.Node,
+): StoryChoiceNode {
+	return {
+		alternatives,
+		kind: `choice`,
+		range: rangeOf(sourceFile, node),
+	}
 }
 
 function hasModifier(
@@ -416,11 +429,15 @@ function analyzeFunctionBody(
 		]
 	}
 
-	return returnedExpressions.flatMap((expression) =>
+	const alternatives = returnedExpressions.map((expression) =>
 		expression
 			? analyzeExpression(context, expression, stack)
 			: [opaque(`empty return statement`, context.sourceFile, body)],
 	)
+
+	return alternatives.length === 1
+		? (alternatives[0] ?? [])
+		: [choice(alternatives, context.sourceFile, body)]
 }
 
 function getJsxTagText(
@@ -700,8 +717,14 @@ function analyzeExpression(
 
 	if (ts.isConditionalExpression(expression)) {
 		return [
-			...analyzeExpression(context, expression.whenTrue, stack),
-			...analyzeExpression(context, expression.whenFalse, stack),
+			choice(
+				[
+					analyzeExpression(context, expression.whenTrue, stack),
+					analyzeExpression(context, expression.whenFalse, stack),
+				],
+				context.sourceFile,
+				expression,
+			),
 		]
 	}
 
@@ -709,7 +732,13 @@ function analyzeExpression(
 		if (
 			expression.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken
 		) {
-			return analyzeExpression(context, expression.right, stack)
+			return [
+				choice(
+					[[], analyzeExpression(context, expression.right, stack)],
+					context.sourceFile,
+					expression,
+				),
+			]
 		}
 
 		if (
@@ -717,8 +746,14 @@ function analyzeExpression(
 			expression.operatorToken.kind === ts.SyntaxKind.BarBarToken
 		) {
 			return [
-				...analyzeExpression(context, expression.left, stack),
-				...analyzeExpression(context, expression.right, stack),
+				choice(
+					[
+						analyzeExpression(context, expression.left, stack),
+						analyzeExpression(context, expression.right, stack),
+					],
+					context.sourceFile,
+					expression,
+				),
 			]
 		}
 	}

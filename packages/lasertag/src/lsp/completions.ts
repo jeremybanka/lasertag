@@ -138,6 +138,12 @@ function walkStoryNodes(children: StoryChild[]): StoryNode[] {
 	const nodes: StoryNode[] = []
 
 	for (const child of children) {
+		if (child.kind === `choice`) {
+			for (const alternative of child.alternatives) {
+				nodes.push(...walkStoryNodes(alternative))
+			}
+			continue
+		}
 		if (child.kind !== `element`) continue
 
 		nodes.push(child)
@@ -147,10 +153,19 @@ function walkStoryNodes(children: StoryChild[]): StoryNode[] {
 	return nodes
 }
 
+function directStoryNodes(children: StoryChild[]): StoryNode[] {
+	return children.flatMap((child): StoryNode[] => {
+		if (child.kind === `element`) return [child]
+		if (child.kind === `choice`) {
+			return child.alternatives.flatMap(directStoryNodes)
+		}
+
+		return []
+	})
+}
+
 function rootNodes(renderStory: RenderStory): StoryNode[] {
-	return renderStory.roots.filter(
-		(root): root is StoryNode => root.kind === `element`,
-	)
+	return directStoryNodes(renderStory.roots)
 }
 
 function allNodes(renderStory: RenderStory): StoryNode[] {
@@ -166,11 +181,7 @@ function rootTagNames(renderStory: RenderStory): string[] {
 }
 
 function childNodes(nodes: StoryNode[]): StoryNode[] {
-	return nodes.flatMap((node) =>
-		node.children.filter(
-			(child): child is StoryNode => child.kind === `element`,
-		),
-	)
+	return nodes.flatMap((node) => directStoryNodes(node.children))
 }
 
 function descendantNodes(nodes: StoryNode[]): StoryNode[] {

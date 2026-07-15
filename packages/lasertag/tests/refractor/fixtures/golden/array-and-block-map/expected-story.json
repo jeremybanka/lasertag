@@ -7,14 +7,22 @@
 			"children": []
 		},
 		{
-			"kind": "element",
-			"tagName": "grid-row",
-			"children": [
-				{
-					"kind": "element",
-					"tagName": "grid-cell",
-					"children": []
-				}
+			"kind": "choice",
+			"alternatives": [
+				[],
+				[
+					{
+						"kind": "element",
+						"tagName": "grid-row",
+						"children": [
+							{
+								"kind": "element",
+								"tagName": "grid-cell",
+								"children": []
+							}
+						]
+					}
+				]
 			]
 		}
 	],

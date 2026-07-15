@@ -3,7 +3,7 @@ export type SourceRange = {
 	end: number
 }
 
-export type StoryChild = StoryNode | OpaqueStoryNode
+export type StoryChild = StoryNode | OpaqueStoryNode | StoryChoiceNode
 
 export type StoryAttribute = {
 	expression?: string
@@ -24,6 +24,12 @@ export type StoryNode = {
 export type OpaqueStoryNode = {
 	kind: `opaque`
 	reason: string
+	range?: SourceRange
+}
+
+export type StoryChoiceNode = {
+	alternatives: StoryChild[][]
+	kind: `choice`
 	range?: SourceRange
 }
 
@@ -62,5 +68,17 @@ export type CssReachabilityDiagnostic = {
 		| `unused-expect-error`
 	message: string
 	selector: string
+	storyEvidence?: RenderStoryEvidence
 	range?: SourceRange
+}
+
+export type RenderStoryEvidence = {
+	possibilities: RenderStoryEvidencePossibility[]
+	selectorPath: SelectorPath
+}
+
+export type RenderStoryEvidencePossibility = {
+	closestPath: string[]
+	matchedSegments: number
+	roots: StoryChild[]
 }

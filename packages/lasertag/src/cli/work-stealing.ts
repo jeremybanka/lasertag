@@ -13,6 +13,7 @@ export type LasertagWorkerOperation = `check` | `fix`
 
 export type LasertagWorkTask = {
 	cssPath: string
+	includeStoryEvidence?: boolean
 	index: number
 	operation: LasertagWorkerOperation
 	stolenFrom?: number
@@ -51,6 +52,7 @@ export type WorkStealingRunResult<TResult extends LasertagWorkResult> = {
 export type RunWorkStealingOptions<TResult extends LasertagWorkResult> = {
 	files: string[]
 	forceSerial?: boolean
+	includeStoryEvidence?: boolean
 	onProgress?: (progress: WorkStealingProgress<TResult>) => void
 	onStart?: (start: WorkStealingStart) => void
 	operation: LasertagWorkerOperation
@@ -93,8 +95,14 @@ function createWorkDeques(
 	files: string[],
 	workerCount: number,
 	operation: LasertagWorkerOperation,
+	includeStoryEvidence: boolean | undefined,
 ): WorkDeque[] {
-	const tasks = files.map((cssPath, index) => ({ cssPath, index, operation }))
+	const tasks = files.map((cssPath, index) => ({
+		cssPath,
+		...(includeStoryEvidence ? { includeStoryEvidence: true } : {}),
+		index,
+		operation,
+	}))
 	const baseSize = Math.floor(tasks.length / workerCount)
 	let remainder = tasks.length % workerCount
 	let start = 0
@@ -171,7 +179,12 @@ function runSerial<TResult extends LasertagWorkResult>(
 
 	for (const [index, cssPath] of options.files.entries()) {
 		const result = options.processSerial(
-			{ cssPath, index, operation: options.operation },
+			{
+				cssPath,
+				...(options.includeStoryEvidence ? { includeStoryEvidence: true } : {}),
+				index,
+				operation: options.operation,
+			},
 			0,
 		)
 
@@ -198,7 +211,12 @@ async function runParallel<TResult extends LasertagWorkResult>(
 
 	if (!workerModuleUrl) return runSerial(options)
 
-	const deques = createWorkDeques(options.files, workerCount, options.operation)
+	const deques = createWorkDeques(
+		options.files,
+		workerCount,
+		options.operation,
+		options.includeStoryEvidence,
+	)
 	const fileResults: TResult[] = []
 	const workers: Worker[] = []
 	const workerStopTimers = new Map<Worker, ReturnType<typeof setTimeout>>()

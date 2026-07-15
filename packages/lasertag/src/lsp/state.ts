@@ -356,6 +356,14 @@ function countRenderStoryNodes(children: StoryChild[]): {
 			opaqueCount += 1
 			continue
 		}
+		if (child.kind === `choice`) {
+			for (const alternative of child.alternatives) {
+				const descendants = countRenderStoryNodes(alternative)
+				elementCount += descendants.elementCount
+				opaqueCount += descendants.opaqueCount
+			}
+			continue
+		}
 
 		elementCount += 1
 		const descendants = countRenderStoryNodes(child.children)
