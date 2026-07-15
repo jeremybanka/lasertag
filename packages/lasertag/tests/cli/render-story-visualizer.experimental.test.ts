@@ -322,7 +322,7 @@ function formatRealityLanes(scenario: VisualizerScenario): string {
 }
 
 const misspelledSelector: VisualizerScenario = {
-	explanation: `“avater” never appears; “avatar” is one edit away in the ready reality.`,
+	explanation: `“avatars” never appears; “avatar” is one edit away in the ready reality.`,
 	realities: [
 		{
 			condition: `while account data is loading`,
@@ -344,7 +344,7 @@ const misspelledSelector: VisualizerScenario = {
 			root: node(`account-panel`, node(`error-state`, node(`retry-button`))),
 		},
 	],
-	selector: [`account-panel.class`, `profile-header`, `avater`],
+	selector: [`account-panel.class`, `profile-header`, `avatars`],
 	suggestion: [`account-panel.class`, `profile-header`, `avatar`],
 	title: `misspelled selector`,
 }
@@ -431,7 +431,7 @@ describe(`experimental ANSI render story visualizer`, () => {
 		expect(plainOutput).toContain(
 			`Likely fix  account-panel.class > profile-header > avatar`,
 		)
-		expect(plainOutput.match(/avater  ✕ you are here/g)).toHaveLength(3)
+		expect(plainOutput.match(/avatars  ✕ you are here/g)).toHaveLength(3)
 	})
 
 	it(`concept B — path evidence exposes a misplaced selector`, () => {

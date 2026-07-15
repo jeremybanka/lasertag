@@ -8,7 +8,7 @@ simultaneous siblings.
 The experimental ANSI gallery lives in
 `tests/cli/render-story-visualizer.experimental.test.ts`. It uses three scenarios:
 
-- a profile selector with a misspelled `avater` tag, where `avatar` exists in
+- a profile selector with an incorrect plural `avatars` tag, where `avatar` exists in
   only the ready reality;
 - an inbox selector with `message-row` at the wrong depth, where the missing
   `message-list` step is visible in the populated reality;

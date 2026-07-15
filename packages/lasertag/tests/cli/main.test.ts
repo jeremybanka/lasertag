@@ -427,7 +427,7 @@ export function CleanPanel() {
 		const fixture = createFixture({
 			"src/AccountPanel.module.css": `account-panel.class {
 	> profile-header {
-		> avater {}
+		> avatars {}
 	}
 }
 `,
@@ -479,9 +479,11 @@ export function AccountPanel({ state }: { state: "loading" | "ready" | "failure"
 			`Possibility 1  closest path matches 2/3 selector steps`,
 		)
 		expect(plainDetailedOutput).toContain(`avatar  ← closest rendered path`)
-		expect(plainDetailedOutput.match(/avater  ✕ you are here/g)).toHaveLength(3)
+		expect(plainDetailedOutput.match(/avatars  ✕ you are here/g)).toHaveLength(
+			3,
+		)
 		expect(detailedOutput).toContain(
-			styleText([`bold`, `red`], `avater`, { validateStream: false }),
+			styleText([`bold`, `red`], `avatars`, { validateStream: false }),
 		)
 	})
 
