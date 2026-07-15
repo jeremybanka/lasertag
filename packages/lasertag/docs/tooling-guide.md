@@ -132,25 +132,34 @@ The default `stylish` output groups warnings under their CSS Module. It shows
 up to ten affected files in path order; `--max-files=all` shows every affected
 file, and `--max-files=<number>` selects another positive limit. The cap only
 affects human-readable detail: `--format=json` always returns every diagnostic.
+Each warning includes one neighboring source line above and below its selected
+range. Context stops at file boundaries and before a line selected by another
+warning, keeping adjacent diagnostics distinct.
 
 This is the reference appearance for a check with warnings:
 
 ```text
 src/components/AppPanel.module.css  2 warnings
 ├─ 12:2  dead-selector
+│  11 │   > header {}
 │  12 │   > footer {}
 │     │   ^^^^^^^^^^^
+│  13 │   > action-row {}
 │     ╰─ Selector "app-panel.class > footer" does not match any supported render story path.
 │
 └─ 28:2  impossible-local-class
+   27 │   color: var(--color-accent);
    28 │   .secondaryAction {}
       │   ^^^^^^^^^^^^^^^^
+   29 │ }
       ╰─ Local class ".secondaryAction" is unreachable; lasertag CSS modules expose only "css.class".
 
 src/components/MenuPanel.module.css  1 warning
 └─ 41:3  dead-selector
+   40 │     > menu-item {}
    41 │     > menu-divider {}
       │     ^^^^^^^^^^^^^^^^^
+   42 │   }
       ╰─ Selector "menu-panel.class > menu-divider" does not match any supported render story path.
 
 … 4 more affected files containing 7 warnings
@@ -167,10 +176,10 @@ src/components/MenuPanel.module.css  1 warning
 ```
 
 The hierarchy is intentionally restrained: file paths lead, tree rails connect
-each warning to its source region and explanation, and the summary accounts for
-both visible and hidden detail. Interactive color may emphasize status and
-carets, but the structure must remain legible without color. A clean check stays
-brief:
+each warning to its compact source frame and explanation, and the summary
+accounts for both visible and hidden detail. Interactive color may emphasize
+status, selected source, and carets while neighboring context stays dim, but the
+structure must remain legible without color. A clean check stays brief:
 
 ```text
 ✓ No dead CSS found in 187 files.

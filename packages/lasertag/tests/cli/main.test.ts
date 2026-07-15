@@ -324,8 +324,8 @@ describe(`lasertag cli`, () => {
 		const fixture = createFixture({
 			"src/AppPanel.module.css": `app-panel.class {
 	> footer {}
+	> nav {}
 }
-.secondaryAction {}
 `,
 			"src/AppPanel.tsx": `import css from "./AppPanel.module.css"
 
@@ -341,14 +341,16 @@ export function AppPanel() {
 		expect(logs).toEqual([
 			`src/AppPanel.module.css  2 warnings
 ├─ 2:2  dead-selector
+│  1 │ app-panel.class {
 │  2 │     > footer {}
 │    │     ^^^^^^^^
 │    ╰─ Selector "app-panel.class > footer" does not match any supported render story path.
 │
-└─ 4:1  impossible-local-class
-   4 │ .secondaryAction {}
-     │ ^^^^^^^^^^^^^^^^
-     ╰─ Local class ".secondaryAction" is unreachable; lasertag CSS modules expose only "css.class".
+└─ 3:2  dead-selector
+   3 │     > nav {}
+     │     ^^^^^
+   4 │ }
+     ╰─ Selector "app-panel.class > nav" does not match any supported render story path.
 
 ────────────────────────────────────────────────────────
 

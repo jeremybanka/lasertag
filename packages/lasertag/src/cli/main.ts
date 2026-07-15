@@ -281,8 +281,11 @@ type WarningRegionLine = {
 	highlightEnd: number
 	highlightStart: number
 	line: number
+	lineStart: number
 	text: string
 }
+
+type WarningContextLine = Pick<WarningRegionLine, `line` | `text`>
 
 const MAX_WARNING_REGION_LINES = 2
 
@@ -309,7 +312,7 @@ function warningRegionLines(
 			text.length,
 		)
 
-		lines.push({ highlightEnd, highlightStart, line, text })
+		lines.push({ highlightEnd, highlightStart, line, lineStart, text })
 
 		if (lineEnd > lastSelectedOffset || newline === -1) break
 
@@ -318,6 +321,39 @@ function warningRegionLines(
 	}
 
 	return lines
+}
+
+function warningContextLineBefore(
+	sourceText: string,
+	firstSelectedLine: WarningRegionLine,
+): WarningContextLine | undefined {
+	if (firstSelectedLine.lineStart === 0) return
+
+	const lineEnd = firstSelectedLine.lineStart - 1
+	const lineStart = sourceText.lastIndexOf(`\n`, lineEnd - 1) + 1
+
+	return {
+		line: firstSelectedLine.line - 1,
+		text: sourceText.slice(lineStart, lineEnd).replace(/\r$/, ``),
+	}
+}
+
+function warningContextLineAfter(
+	sourceText: string,
+	lastSelectedLine: WarningRegionLine,
+): WarningContextLine | undefined {
+	const selectedLineEnd = sourceText.indexOf(`\n`, lastSelectedLine.lineStart)
+
+	if (selectedLineEnd === -1 || selectedLineEnd + 1 >= sourceText.length) return
+
+	const lineStart = selectedLineEnd + 1
+	const nextNewline = sourceText.indexOf(`\n`, lineStart)
+	const lineEnd = nextNewline === -1 ? sourceText.length : nextNewline
+
+	return {
+		line: lastSelectedLine.line + 1,
+		text: sourceText.slice(lineStart, lineEnd).replace(/\r$/, ``),
+	}
 }
 
 function expandTabs(text: string): string {
@@ -332,6 +368,7 @@ type FormattedWarningRegion = {
 function formatWarningRegion(
 	diagnostic: LasertagCliDiagnostic,
 	sourceText: string,
+	diagnosedLines: ReadonlySet<number> = new Set(),
 ): FormattedWarningRegion | undefined {
 	if (!diagnostic.range) return
 
@@ -343,11 +380,31 @@ function formatWarningRegion(
 
 	if (lines.length === 0) return
 
-	const visibleLines =
+	const visibleSelectedLines =
 		lines.length <= MAX_WARNING_REGION_LINES
 			? lines
 			: [lines[0], undefined, lines.at(-1)]
-	const lineNumberWidth = String(lines.at(-1)?.line ?? diagnostic.line).length
+	const firstSelectedLine = lines[0]
+	const lastSelectedLine = lines.at(-1)
+
+	if (!firstSelectedLine || !lastSelectedLine) return
+
+	const contextBefore = warningContextLineBefore(sourceText, firstSelectedLine)
+	const contextAfter = warningContextLineAfter(sourceText, lastSelectedLine)
+	const visibleLines: Array<
+		WarningContextLine | WarningRegionLine | undefined
+	> = [
+		...(contextBefore && !diagnosedLines.has(contextBefore.line)
+			? [contextBefore]
+			: []),
+		...visibleSelectedLines,
+		...(contextAfter && !diagnosedLines.has(contextAfter.line)
+			? [contextAfter]
+			: []),
+	]
+	const lineNumberWidth = Math.max(
+		...visibleLines.map((line) => String(line?.line ?? diagnostic.line).length),
+	)
 	const output: string[] = []
 
 	for (const line of visibleLines) {
@@ -357,19 +414,24 @@ function formatWarningRegion(
 		}
 
 		const expandedText = expandTabs(line.text).trimEnd()
-		const caretStart = expandTabs(
-			line.text.slice(0, line.highlightStart),
-		).length
-		const caretWidth = Math.max(
-			expandTabs(line.text.slice(line.highlightStart, line.highlightEnd))
-				.length,
-			1,
-		)
-
 		output.push(
 			`${String(line.line).padStart(lineNumberWidth)} │ ${expandedText}`,
-			`${` `.repeat(lineNumberWidth)} │ ${` `.repeat(caretStart)}${`^`.repeat(caretWidth)}`,
 		)
+
+		if (`highlightStart` in line) {
+			const caretStart = expandTabs(
+				line.text.slice(0, line.highlightStart),
+			).length
+			const caretWidth = Math.max(
+				expandTabs(line.text.slice(line.highlightStart, line.highlightEnd))
+					.length,
+				1,
+			)
+
+			output.push(
+				`${` `.repeat(lineNumberWidth)} │ ${` `.repeat(caretStart)}${`^`.repeat(caretWidth)}`,
+			)
+		}
 	}
 
 	return {
@@ -436,11 +498,12 @@ function groupDiagnosticsByFile(
 function formatWarningTreeDiagnostic(
 	diagnostic: LasertagCliDiagnostic,
 	sourceText: string,
+	diagnosedLines: ReadonlySet<number>,
 	isLast: boolean,
 ): string {
 	const branch = isLast ? `└─` : `├─`
 	const continuation = isLast ? `   ` : `│  `
-	const region = formatWarningRegion(diagnostic, sourceText)
+	const region = formatWarningRegion(diagnostic, sourceText, diagnosedLines)
 	const output = [
 		`${branch} ${diagnostic.line}:${diagnostic.column}  ${diagnostic.code}`,
 	]
@@ -469,12 +532,24 @@ function formatDiagnosticFileGroup(
 		`${displayPath(cwd, group.cssPath)}  ${warningCount} ${plural(warningCount, `warning`)}`,
 	]
 	const sourceText = readCssSource(group.cssPath)
+	const diagnosedLines = new Set(
+		group.diagnostics.flatMap((diagnostic) =>
+			diagnostic.range
+				? warningRegionLines(
+						sourceText,
+						diagnostic.range.start,
+						diagnostic.range.end,
+					).map((line) => line.line)
+				: [],
+		),
+	)
 
 	for (const [index, diagnostic] of group.diagnostics.entries()) {
 		output.push(
 			formatWarningTreeDiagnostic(
 				diagnostic,
 				sourceText,
+				diagnosedLines,
 				index === group.diagnostics.length - 1,
 			),
 		)
