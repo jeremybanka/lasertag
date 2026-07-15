@@ -10,6 +10,7 @@ import {
 import { createRequire } from "node:module"
 import { tmpdir } from "node:os"
 import path from "node:path"
+import { stripVTControlCharacters, styleText } from "node:util"
 
 import { afterEach, describe, expect, it } from "vitest"
 
@@ -39,11 +40,11 @@ function createTestIO({ echo = false }: { echo?: boolean } = {}) {
 		io: {
 			error: (message: string) => {
 				errors.push(message)
-				if (echo) process.stderr.write(`${message}\n`)
+				if (echo) console.error(message)
 			},
 			log: (message: string) => {
 				logs.push(message)
-				if (echo) process.stdout.write(`${message}\n`)
+				if (echo) console.log(message)
 			},
 		},
 		logs,
@@ -361,6 +362,67 @@ export function AppPanel() {
 		])
 	})
 
+	it(`forces Node terminal colors for stylish output`, async () => {
+		const fixture = createFixture({
+			"src/AppPanel.module.css": `app-panel.class {
+	> footer {}
+}
+`,
+			"src/AppPanel.tsx": `import css from "./AppPanel.module.css"
+
+export function AppPanel() {
+	return <app-panel className={css.class}><header /></app-panel>
+}
+`,
+			"src/CleanPanel.module.css": `clean-panel.class {
+	> header {}
+}
+`,
+			"src/CleanPanel.tsx": `import css from "./CleanPanel.module.css"
+
+export function CleanPanel() {
+	return <clean-panel className={css.class}><header /></clean-panel>
+}
+`,
+		})
+		const warning = createTestIO({ echo: SHOW_TRAINING_COURSE_OUTPUT })
+
+		await runLasertagCli(
+			[`lasertag`, `check`, fixture.path(`src/AppPanel.module.css`)],
+			warning.io,
+			{ cwd: fixture.root, forceColor: true },
+		)
+
+		const warningOutput = warning.logs[0] ?? ``
+		const forceStyle = (
+			format: Parameters<typeof styleText>[0],
+			text: string,
+		) => styleText(format, text, { validateStream: false })
+
+		expect(warningOutput).toContain(
+			forceStyle(`bold`, `src/AppPanel.module.css`),
+		)
+		expect(warningOutput).toContain(forceStyle(`cyan`, `dead-selector`))
+		expect(warningOutput).toContain(
+			forceStyle([`bold`, `yellow`], `▲ Check found 1 warning in 1 file`),
+		)
+		expect(stripVTControlCharacters(warningOutput)).toContain(
+			`2 │     > footer {}`,
+		)
+
+		const clean = createTestIO({ echo: SHOW_TRAINING_COURSE_OUTPUT })
+
+		await runLasertagCli(
+			[`lasertag`, `check`, fixture.path(`src/CleanPanel.module.css`)],
+			clean.io,
+			{ cwd: fixture.root, forceColor: true },
+		)
+
+		expect(clean.logs).toEqual([
+			forceStyle([`bold`, `green`], `✓ No dead CSS found in 1 file.`),
+		])
+	})
+
 	it(`accepts one css module file path as the positional check glob`, async () => {
 		const fixture = createFixture({
 			"src/AppPanel.module.css": `
@@ -453,6 +515,7 @@ export function AppPanel() {
 			{
 				checkWorkerCount: 2,
 				cwd: fixture.root,
+				forceColor: SHOW_TRAINING_COURSE_OUTPUT,
 			},
 		)
 		const renderedOutput = output.logs[0] ?? ``

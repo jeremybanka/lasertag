@@ -2,6 +2,7 @@
 
 import { existsSync, readFileSync } from "node:fs"
 import path from "node:path"
+import { styleText } from "node:util"
 import { isMainThread, workerData } from "node:worker_threads"
 
 import {
@@ -55,6 +56,50 @@ const DEFAULT_IGNORE_PATTERNS = [
 const FORMAT_OPTIONS = [`stylish`, `json`] as const
 const DEFAULT_MAX_DETAIL_FILES = 10
 const CHECK_SUMMARY_WIDTH = 56
+
+type CheckOutputStyler = {
+	bold: (text: string) => string
+	caret: (text: string) => string
+	code: (text: string) => string
+	dim: (text: string) => string
+	success: (text: string) => string
+	warning: (text: string) => string
+}
+
+const PLAIN_CHECK_OUTPUT_STYLER: CheckOutputStyler = {
+	bold: (text) => text,
+	caret: (text) => text,
+	code: (text) => text,
+	dim: (text) => text,
+	success: (text) => text,
+	warning: (text) => text,
+}
+
+function createCheckOutputStyler(
+	forceColor: boolean | undefined,
+	outputIsConsole: boolean,
+): CheckOutputStyler {
+	if (forceColor === false || (!outputIsConsole && forceColor !== true)) {
+		return PLAIN_CHECK_OUTPUT_STYLER
+	}
+
+	const options = forceColor
+		? { validateStream: false }
+		: { stream: process.stdout }
+	const apply = (
+		format: Parameters<typeof styleText>[0],
+		text: string,
+	): string => styleText(format, text, options)
+
+	return {
+		bold: (text) => apply(`bold`, text),
+		caret: (text) => apply([`bold`, `yellow`], text),
+		code: (text) => apply(`cyan`, text),
+		dim: (text) => apply(`dim`, text),
+		success: (text) => apply([`bold`, `green`], text),
+		warning: (text) => apply([`bold`, `yellow`], text),
+	}
+}
 
 const rootOptionsSchema = z.object({
 	help: z.boolean().default(false),
@@ -125,6 +170,7 @@ export type LasertagCliEnvironment = {
 	cwd?: string
 	fileExists?: (filePath: string) => boolean
 	fixWorkerCount?: number
+	forceColor?: boolean
 	glob?: typeof globSync
 	installVscodeExtension?: (
 		request: LasertagVscodeInstallRequest,
@@ -369,6 +415,7 @@ function formatWarningRegion(
 	diagnostic: LasertagCliDiagnostic,
 	sourceText: string,
 	diagnosedLines: ReadonlySet<number> = new Set(),
+	styler: CheckOutputStyler = PLAIN_CHECK_OUTPUT_STYLER,
 ): FormattedWarningRegion | undefined {
 	if (!diagnostic.range) return
 
@@ -409,16 +456,20 @@ function formatWarningRegion(
 
 	for (const line of visibleLines) {
 		if (!line) {
-			output.push(`${` `.repeat(lineNumberWidth)} │ …`)
+			output.push(styler.dim(`${` `.repeat(lineNumberWidth)} │ …`))
 			continue
 		}
 
 		const expandedText = expandTabs(line.text).trimEnd()
+		const selected = `highlightStart` in line
+		const gutter = styler.dim(
+			`${String(line.line).padStart(lineNumberWidth)} │`,
+		)
 		output.push(
-			`${String(line.line).padStart(lineNumberWidth)} │ ${expandedText}`,
+			`${gutter} ${selected ? expandedText : styler.dim(expandedText)}`,
 		)
 
-		if (`highlightStart` in line) {
+		if (selected) {
 			const caretStart = expandTabs(
 				line.text.slice(0, line.highlightStart),
 			).length
@@ -429,7 +480,7 @@ function formatWarningRegion(
 			)
 
 			output.push(
-				`${` `.repeat(lineNumberWidth)} │ ${` `.repeat(caretStart)}${`^`.repeat(caretWidth)}`,
+				`${styler.dim(`${` `.repeat(lineNumberWidth)} │`)} ${` `.repeat(caretStart)}${styler.caret(`^`.repeat(caretWidth))}`,
 			)
 		}
 	}
@@ -500,24 +551,34 @@ function formatWarningTreeDiagnostic(
 	sourceText: string,
 	diagnosedLines: ReadonlySet<number>,
 	isLast: boolean,
+	styler: CheckOutputStyler,
 ): string {
 	const branch = isLast ? `└─` : `├─`
 	const continuation = isLast ? `   ` : `│  `
-	const region = formatWarningRegion(diagnostic, sourceText, diagnosedLines)
+	const region = formatWarningRegion(
+		diagnostic,
+		sourceText,
+		diagnosedLines,
+		styler,
+	)
 	const output = [
-		`${branch} ${diagnostic.line}:${diagnostic.column}  ${diagnostic.code}`,
+		`${styler.dim(branch)} ${styler.dim(`${diagnostic.line}:${diagnostic.column}`)}  ${styler.code(diagnostic.code)}`,
 	]
 
 	if (region) {
 		output.push(
-			...region.text.split(`\n`).map((line) => `${continuation}${line}`),
-			`${continuation}${` `.repeat(region.lineNumberWidth + 1)}╰─ ${diagnostic.message}`,
+			...region.text
+				.split(`\n`)
+				.map((line) => `${styler.dim(continuation)}${line}`),
+			`${styler.dim(continuation)}${` `.repeat(region.lineNumberWidth + 1)}${styler.dim(`╰─`)} ${diagnostic.message}`,
 		)
 	} else {
-		output.push(`${continuation}╰─ ${diagnostic.message}`)
+		output.push(
+			`${styler.dim(continuation)}${styler.dim(`╰─`)} ${diagnostic.message}`,
+		)
 	}
 
-	if (!isLast) output.push(`│`)
+	if (!isLast) output.push(styler.dim(`│`))
 
 	return output.join(`\n`)
 }
@@ -526,10 +587,11 @@ function formatDiagnosticFileGroup(
 	group: DiagnosticFileGroup,
 	cwd: string,
 	readCssSource: (cssPath: string) => string,
+	styler: CheckOutputStyler,
 ): string {
 	const warningCount = group.diagnostics.length
 	const output = [
-		`${displayPath(cwd, group.cssPath)}  ${warningCount} ${plural(warningCount, `warning`)}`,
+		`${styler.bold(displayPath(cwd, group.cssPath))}  ${styler.dim(`${warningCount} ${plural(warningCount, `warning`)}`)}`,
 	]
 	const sourceText = readCssSource(group.cssPath)
 	const diagnosedLines = new Set(
@@ -551,6 +613,7 @@ function formatDiagnosticFileGroup(
 				sourceText,
 				diagnosedLines,
 				index === group.diagnostics.length - 1,
+				styler,
 			),
 		)
 	}
@@ -565,6 +628,7 @@ function formatCheckSummary({
 	fileCount,
 	hiddenFileCount,
 	hiddenWarningCount,
+	styler,
 	warningCount,
 }: {
 	affectedFileCount: number
@@ -573,6 +637,7 @@ function formatCheckSummary({
 	fileCount: number
 	hiddenFileCount: number
 	hiddenWarningCount: number
+	styler: CheckOutputStyler
 	warningCount: number
 }): string {
 	const rows: Array<[label: string, count: number, description: string]> = [
@@ -595,18 +660,23 @@ function formatCheckSummary({
 	const labelWidth = Math.max(...rows.map(([label]) => label.length))
 	const countWidth = Math.max(...rows.map(([, count]) => String(count).length))
 	const output = [
-		`─`.repeat(CHECK_SUMMARY_WIDTH),
+		styler.dim(`─`.repeat(CHECK_SUMMARY_WIDTH)),
 		``,
-		`▲ Check found ${warningCount} ${plural(warningCount, `warning`)} in ${affectedFileCount} ${plural(affectedFileCount, `file`)}`,
+		styler.warning(
+			`▲ Check found ${warningCount} ${plural(warningCount, `warning`)} in ${affectedFileCount} ${plural(affectedFileCount, `file`)}`,
+		),
 		``,
 		...rows.map(
 			([label, count, description]) =>
-				`  ${label.padStart(labelWidth)}  ${String(count).padStart(countWidth)} ${description}`,
+				`  ${styler.dim(label.padStart(labelWidth))}  ${String(count).padStart(countWidth)} ${description}`,
 		),
 	]
 
 	if (hiddenFileCount > 0) {
-		output.push(``, `  Show everything with lasertag check --max-files=all`)
+		output.push(
+			``,
+			styler.dim(`  Show everything with lasertag check --max-files=all`),
+		)
 	}
 
 	return output.join(`\n`)
@@ -618,13 +688,16 @@ function formatDiagnostics(
 	files: string[],
 	cwd: string,
 	readCssSource: (cssPath: string) => string,
+	styler: CheckOutputStyler,
 ): string {
 	if (options.format === `json`) {
 		return JSON.stringify({ diagnostics, files }, null, 2)
 	}
 
 	if (diagnostics.length === 0) {
-		return `✓ No dead CSS found in ${files.length} ${plural(files.length, `file`)}.`
+		return styler.success(
+			`✓ No dead CSS found in ${files.length} ${plural(files.length, `file`)}.`,
+		)
 	}
 
 	const groups = groupDiagnosticsByFile(diagnostics)
@@ -640,12 +713,14 @@ function formatDiagnostics(
 	)
 	const hiddenWarningCount = diagnostics.length - detailWarningCount
 	const output = detailGroups.map((group) =>
-		formatDiagnosticFileGroup(group, cwd, readCssSource),
+		formatDiagnosticFileGroup(group, cwd, readCssSource, styler),
 	)
 
 	if (hiddenGroups.length > 0) {
 		output.push(
-			`… ${hiddenGroups.length} more affected ${plural(hiddenGroups.length, `file`)} containing ${hiddenWarningCount} ${plural(hiddenWarningCount, `warning`)}`,
+			styler.dim(
+				`… ${hiddenGroups.length} more affected ${plural(hiddenGroups.length, `file`)} containing ${hiddenWarningCount} ${plural(hiddenWarningCount, `warning`)}`,
+			),
 		)
 	}
 
@@ -657,6 +732,7 @@ function formatDiagnostics(
 			fileCount: files.length,
 			hiddenFileCount: hiddenGroups.length,
 			hiddenWarningCount,
+			styler,
 			warningCount: diagnostics.length,
 		}),
 	)
@@ -688,6 +764,7 @@ async function runCheck(
 	environment: LasertagCliEnvironment,
 ): Promise<LasertagCliResult> {
 	const cwd = environment.cwd ?? process.cwd()
+	const styler = createCheckOutputStyler(environment.forceColor, io === console)
 	const files = discoverCssModuleFiles(targets, environment)
 	const fileSystem = checkFileSystemFromEnvironment(environment)
 	const checkResult = await runLasertagCheck(files, {
@@ -725,7 +802,9 @@ async function runCheck(
 		)
 	}
 
-	io.log(formatDiagnostics(diagnostics, options, files, cwd, readCssSource))
+	io.log(
+		formatDiagnostics(diagnostics, options, files, cwd, readCssSource, styler),
+	)
 
 	return {
 		diagnostics,

@@ -179,7 +179,14 @@ The hierarchy is intentionally restrained: file paths lead, tree rails connect
 each warning to its compact source frame and explanation, and the summary
 accounts for both visible and hidden detail. Interactive color may emphasize
 status, selected source, and carets while neighboring context stays dim, but the
-structure must remain legible without color. A clean check stays brief:
+structure must remain legible without color.
+
+Lasertag uses Node's `styleText` terminal API: paths are bold, diagnostic codes
+are cyan, warning status and carets are yellow, clean status is green, and
+structural rails and context are dim. Styling follows terminal support and the
+`NO_COLOR`, `NODE_DISABLE_COLORS`, and `FORCE_COLOR` environment variables.
+
+A clean check stays brief:
 
 ```text
 ✓ No dead CSS found in 187 files.
