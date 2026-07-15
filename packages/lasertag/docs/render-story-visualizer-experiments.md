@@ -1,8 +1,9 @@
 # Render Story Visualizer Experiments
 
 `dead-selector` can prove that a selector matches no supported render story, but
-the next useful question is _why_. A detailed explanation should show the
-evidence without making alternate renders look like simultaneous siblings.
+the next useful question is where that selector expected to land. A detailed
+view should show the failed location without making alternate renders look like
+simultaneous siblings.
 
 The experimental ANSI gallery lives in
 `tests/cli/render-story-visualizer.experimental.test.ts`. It uses three scenarios:
@@ -18,10 +19,12 @@ The experimental ANSI gallery lives in
 
 ### A. Story atlas
 
-Stack complete realities vertically, label the condition that selects each one,
-and highlight the closest rendered path. This is the strongest default: it fits
-narrow terminals, preserves tree structure, scales to uneven realities, and has
-room for a specific likely fix.
+Stack complete realities vertically and mark only the closest rendered node.
+Insert the selector's impossible continuation into each tree in red, ending with
+`✕ you are here`; leave the surrounding tree neutral. This is the strongest
+default: it fits narrow terminals, preserves tree structure, scales to uneven
+realities, and has room for a specific likely fix without offering a speculative
+control-flow explanation.
 
 ### B. Path evidence
 

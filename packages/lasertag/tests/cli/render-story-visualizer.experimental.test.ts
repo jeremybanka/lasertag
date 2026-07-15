@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest"
 
 type StoryNode = {
 	children?: StoryNode[]
+	ghost?: boolean
 	tagName: string
 }
 
@@ -116,11 +117,46 @@ function closestPath(reality: Reality, selector: string[]): string[] {
 	)
 }
 
-function renderTree(
+function ghostBranch(segments: string[]): StoryNode | undefined {
+	const [tagName, ...descendants] = segments
+
+	if (!tagName) return
+
+	const child = ghostBranch(descendants)
+
+	return child
+		? { children: [child], ghost: true, tagName }
+		: { ghost: true, tagName }
+}
+
+function insertGhostBranch(
 	root: StoryNode,
-	highlightPath: string[] = [],
-	wantedPath: string[] = [],
-): string[] {
+	parentPath: string[],
+	segments: string[],
+): StoryNode {
+	const ghost = ghostBranch(segments)
+
+	if (!ghost) return root
+	const ghostNode = ghost
+
+	function visit(current: StoryNode, ancestors: string[]): StoryNode {
+		const path = [...ancestors, current.tagName]
+		const children = (current.children ?? []).map((child) => visit(child, path))
+
+		if (
+			path.length === parentPath.length &&
+			path.every((segment, index) => parentPath[index] === segment)
+		) {
+			children.push(ghostNode)
+		}
+
+		return children.length > 0 ? { ...current, children } : current
+	}
+
+	return visit(root, [])
+}
+
+function renderTree(root: StoryNode, highlightPath: string[] = []): string[] {
 	const output: string[] = []
 
 	function visit(
@@ -130,29 +166,27 @@ function renderTree(
 		isLast: boolean,
 	): void {
 		const path = [...parentPath, current.tagName]
+		const isGhost = current.ghost === true
 		const onClosestPath =
 			path.every((segment, index) => highlightPath[index] === segment) &&
 			path.length <= highlightPath.length
-		const matchesSelector =
-			onClosestPath &&
-			path.every((segment, index) => wantedPath[index] === segment)
+		const isNearest = path.length === highlightPath.length && onClosestPath
 		const branch = parentPath.length === 0 ? `` : isLast ? `└─ ` : `├─ `
-		const branchColor = matchesSelector
-			? ansi.hint
-			: onClosestPath
-				? ansi.warning
-				: ansi.dim
-		const tag = matchesSelector
-			? ansi.accent(current.tagName)
-			: onClosestPath
+		const branchColor = isGhost ? ansi.bad : isNearest ? ansi.warning : ansi.dim
+		const tag = isGhost
+			? ansi.bad(current.tagName)
+			: isNearest
 				? ansi.warning(current.tagName)
 				: current.tagName
-		const nearest =
-			path.length === highlightPath.length && onClosestPath
-				? ansi.warning(`  ← closest rendered path`)
+		const nearest = isNearest ? ansi.warning(`  ← closest rendered path`) : ``
+		const youAreHere =
+			isGhost && (current.children?.length ?? 0) === 0
+				? ansi.bad(`  ✕ you are here`)
 				: ``
 
-		output.push(`${ansi.dim(prefix)}${branchColor(branch)}${tag}${nearest}`)
+		output.push(
+			`${ansi.dim(prefix)}${branchColor(branch)}${tag}${nearest}${youAreHere}`,
+		)
 
 		const children = current.children ?? []
 		const continuation = parentPath.length === 0 ? `` : isLast ? `   ` : `│  `
@@ -174,10 +208,9 @@ function renderTree(
 function formatStoryAtlas(scenario: VisualizerScenario): string {
 	const wanted = normalizedSelector(scenario.selector)
 	const output = [
-		ansi.bold(`Why this selector is unreachable`),
+		ansi.bold(`Where this selector expected to land`),
 		``,
 		`  ${ansi.bad(selectorText(scenario.selector))}`,
-		`  ${ansi.dim(`╰─`)} ${scenario.explanation}`,
 		``,
 		`${ansi.bold(`Parallel render stories`)}  ${ansi.dim(`${scenario.realities.length} realities · each tree stands alone`)}`,
 	]
@@ -185,13 +218,18 @@ function formatStoryAtlas(scenario: VisualizerScenario): string {
 	for (const [index, reality] of scenario.realities.entries()) {
 		const closest = closestPath(reality, scenario.selector)
 		const matched = commonPrefixLength(closest, wanted)
+		const storyWithGhost = insertGhostBranch(
+			reality.root,
+			wanted.slice(0, matched),
+			wanted.slice(matched),
+		)
 		const branch = index === scenario.realities.length - 1 ? `└` : `├`
 
 		output.push(
 			``,
 			`${ansi.dim(`${branch}─`)} ${ansi.bold(`Reality ${index + 1} · ${reality.name}`)}  ${ansi.dim(reality.condition)}`,
 			`   ${ansi.dim(`closest path matches`)} ${ansi.warning(`${matched}/${wanted.length}`)} ${ansi.dim(`selector steps`)}`,
-			...renderTree(reality.root, closest, wanted).map((line) => `   ${line}`),
+			...renderTree(storyWithGhost, closest).map((line) => `   ${line}`),
 		)
 	}
 
@@ -384,14 +422,16 @@ const absentState: VisualizerScenario = {
 describe(`experimental ANSI render story visualizer`, () => {
 	it(`concept A — story atlas diagnoses a likely typo`, () => {
 		const output = formatStoryAtlas(misspelledSelector)
+		const plainOutput = stripVTControlCharacters(output)
 
 		console.log(`\n${output}\n`)
-		expect(stripVTControlCharacters(output)).toContain(
+		expect(plainOutput).toContain(
 			`Reality 2 · ready  when account data is ready`,
 		)
-		expect(stripVTControlCharacters(output)).toContain(
+		expect(plainOutput).toContain(
 			`Likely fix  account-panel.class > profile-header > avatar`,
 		)
+		expect(plainOutput.match(/avater  ✕ you are here/g)).toHaveLength(3)
 	})
 
 	it(`concept B — path evidence exposes a misplaced selector`, () => {
