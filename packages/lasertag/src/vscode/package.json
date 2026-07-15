@@ -23,6 +23,7 @@
 		"onLanguage:astro",
 		"onLanguage:css",
 		"onLanguage:typescriptreact",
+		"onView:lasertag.renderStory",
 		"workspaceContains:**/*.module.css"
 	],
 	"extensionKind": [
@@ -43,8 +44,50 @@
 			{
 				"command": "lasertag.restartServer",
 				"title": "Lasertag: Restart Lasertag Server"
+			},
+			{
+				"command": "lasertag.openStyles",
+				"icon": "$(symbol-color)",
+				"title": "Lasertag: Open Styles"
+			},
+			{
+				"command": "lasertag.openRenderSource",
+				"icon": "$(file-code)",
+				"title": "Lasertag: Open Render Source"
 			}
 		],
+		"viewsContainers": {
+			"activitybar": [
+				{
+					"id": "lasertag",
+					"icon": "dist/LasertagActivity.svg",
+					"title": "Lasertag"
+				}
+			]
+		},
+		"views": {
+			"lasertag": [
+				{
+					"id": "lasertag.renderStory",
+					"name": "Render Story",
+					"when": "lasertag.inContext"
+				}
+			]
+		},
+		"menus": {
+			"view/title": [
+				{
+					"command": "lasertag.openStyles",
+					"group": "navigation@1",
+					"when": "view == lasertag.renderStory && lasertag.inContext"
+				},
+				{
+					"command": "lasertag.openRenderSource",
+					"group": "navigation@2",
+					"when": "view == lasertag.renderStory && lasertag.inContext"
+				}
+			]
+		},
 		"configuration": {
 			"title": "Lasertag",
 			"properties": {

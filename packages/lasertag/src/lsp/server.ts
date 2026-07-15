@@ -48,6 +48,13 @@ import {
 	type OffsetRange,
 } from "./code-actions.ts"
 import { createCssModuleCompletionItems } from "./completions.ts"
+import {
+	LASERTAG_RENDER_STORY_CHANGED_NOTIFICATION,
+	LASERTAG_RENDER_STORY_REQUEST,
+	type LasertagRenderStoryChangedNotification,
+	type LasertagRenderStoryRequest,
+	type LasertagRenderStoryView,
+} from "./render-story-view.ts"
 
 export type LasertagLspReadOptions = {
 	cssPath?: string
@@ -477,6 +484,10 @@ export function createLasertagLspServer(
 			diagnostics,
 			uri,
 		})
+		void connection.sendNotification(
+			LASERTAG_RENDER_STORY_CHANGED_NOTIFICATION,
+			{ uri } satisfies LasertagRenderStoryChangedNotification,
+		)
 		chronicle?.mark(`diagnostics queued`)
 		logger.info(`diagnostics`, `published`, {
 			cssPath,
@@ -519,6 +530,10 @@ export function createLasertagLspServer(
 			diagnostics: [],
 			uri,
 		})
+		void connection.sendNotification(
+			LASERTAG_RENDER_STORY_CHANGED_NOTIFICATION,
+			{ uri } satisfies LasertagRenderStoryChangedNotification,
+		)
 		logger.info(`diagnostics`, `cleared`, { cssPath, uri })
 	}
 
@@ -734,6 +749,16 @@ export function createLasertagLspServer(
 	})
 	connection.onCodeAction(createCodeActions)
 	connection.onCompletion(createCompletions)
+	connection.onRequest<LasertagRenderStoryView, never>(
+		LASERTAG_RENDER_STORY_REQUEST,
+		(params: LasertagRenderStoryRequest): LasertagRenderStoryView => {
+			const filePath = filePathFromUri(params.uri)
+
+			return filePath
+				? state.getRenderStoryView(filePath)
+				: { kind: `outside-context` as const }
+		},
+	)
 	connection.onDidChangeWatchedFiles((event) => {
 		logger.info(`watchers`, `received file changes`, {
 			changeCount: event.changes.length,

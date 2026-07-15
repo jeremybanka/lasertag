@@ -14,6 +14,14 @@ file changes. If both source siblings exist, Lasertag reports an ambiguity error
 - Completes root selectors, child and descendant tags, observed attributes and
   literal values, global escapes, and supported pseudo refinements from the
   sibling component's render story.
+- Adds a Lasertag Activity Bar view while a CSS Module or its same-named render
+  source is active. **Render Story** shows each parallel possibility as its own
+  nested tree: green branches have matching styles and open those styles when
+  selected; unstyled branches open their JSX or Astro source.
+- Collects styled selectors that no render possibility can reach under
+  **Unreachable styles**. Warning-colored entries are unexpected; normal entries
+  ending in `*` are suppressed by `@lasertag-expect-error`. Every entry opens its
+  selector in the CSS Module.
 - Offers a quick fix and a command to remove diagnosed selectors safely from
   selector lists or whole rules.
 
@@ -45,6 +53,11 @@ Open the Command Palette to run:
 
 - **Lasertag: Clean up Dead Selectors** — applies the cleanup action to the
   active CSS Module.
+- **Lasertag: Open Styles** — opens the active component's CSS Module. This is
+  also available from the Render Story view title.
+- **Lasertag: Open Render Source** — opens the active component's same-named
+  `.tsx` or `.astro` file. This is also available from the Render Story view
+  title.
 - **Lasertag: Restart Lasertag Server** — restarts the language server used by
   the extension.
 

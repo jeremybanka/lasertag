@@ -4,16 +4,67 @@ import {
 	LASERTAG_RESTART_SERVER_COMMAND,
 } from "../lsp/code-actions.ts"
 import {
+	LASERTAG_RENDER_STORY_CHANGED_NOTIFICATION,
+	LASERTAG_RENDER_STORY_REQUEST,
+	type LasertagRenderStoryChangedNotification,
+	type LasertagRenderStoryRequest,
+	type LasertagRenderStoryView,
+	type RenderStoryViewLocation,
+} from "../lsp/render-story-view.ts"
+import {
 	resolveBundledTypescriptSdkPath,
 	resolveTypescriptSdkPath,
 	resolveWorkspacePath,
 	withTypescriptSdkPathEnvironment,
 } from "./config.ts"
+import {
+	createRenderStoryTree,
+	LASERTAG_IN_CONTEXT_KEY,
+	LASERTAG_OPEN_RENDER_SOURCE_COMMAND,
+	LASERTAG_OPEN_STORY_LOCATION_COMMAND,
+	LASERTAG_OPEN_STYLES_COMMAND,
+	LASERTAG_RENDER_STORY_VIEW_ID,
+	type RenderStoryTreeEntry,
+} from "./render-story-tree.ts"
 
 declare const require: (id: string) => unknown
 
 type Disposable = {
 	dispose(): void
+}
+
+type Uri = {
+	path: string
+	scheme: string
+	toString(): string
+}
+
+type Position = {
+	character: number
+	line: number
+}
+
+type TextDocument = {
+	positionAt(offset: number): Position
+	uri: Uri
+}
+
+type TextEditor = {
+	document: TextDocument
+	revealRange(range: unknown, revealType?: unknown): void
+	selection: unknown
+}
+
+type TreeItem = {
+	command?: {
+		arguments?: unknown[]
+		command: string
+		title: string
+	}
+	description?: string
+	iconPath?: unknown
+	resourceUri?: Uri
+	tooltip?: string
 }
 
 type ExtensionContext = {
@@ -24,6 +75,26 @@ type ExtensionContext = {
 }
 
 type VscodeModule = {
+	EventEmitter: new <T>() => {
+		dispose(): void
+		event: (listener: (event: T) => unknown) => Disposable
+		fire(event: T): void
+	}
+	Range: new (start: Position, end: Position) => unknown
+	Selection: new (start: Position, end: Position) => unknown
+	ThemeColor: new (id: string) => unknown
+	ThemeIcon: new (id: string, color?: unknown) => unknown
+	TreeItem: new (label: string, collapsibleState?: number) => TreeItem
+	TreeItemCollapsibleState: {
+		Collapsed: number
+		None: number
+	}
+	TextEditorRevealType: {
+		InCenterIfOutsideViewport: unknown
+	}
+	Uri: {
+		parse(value: string): Uri
+	}
 	commands: {
 		executeCommand<T = unknown>(
 			command: string,
@@ -34,11 +105,35 @@ type VscodeModule = {
 			callback: (...args: unknown[]) => unknown,
 		): Disposable
 	}
+	window: {
+		activeTextEditor?: TextEditor
+		onDidChangeActiveTextEditor(
+			listener: (editor: TextEditor | undefined) => unknown,
+		): Disposable
+		registerFileDecorationProvider(provider: {
+			provideFileDecoration(uri: Uri): unknown
+		}): Disposable
+		registerTreeDataProvider<T>(
+			viewId: string,
+			provider: {
+				getChildren(element?: T): T[] | PromiseLike<T[]>
+				getTreeItem(element: T): TreeItem
+				onDidChangeTreeData: (
+					listener: (event: T | undefined) => unknown,
+				) => Disposable
+			},
+		): Disposable
+		showTextDocument(
+			document: TextDocument,
+			options?: { preview?: boolean },
+		): PromiseLike<TextEditor>
+	}
 	workspace: {
 		createFileSystemWatcher(globPattern: string): unknown
 		getConfiguration(section: string): {
 			get<T>(key: string, defaultValue: T): T
 		}
+		openTextDocument(uri: Uri): PromiseLike<TextDocument>
 		workspaceFolders?: Array<{
 			uri: {
 				fsPath: string
@@ -63,6 +158,148 @@ class LasertagLanguageClient extends LanguageClient {
 }
 
 let client: InstanceType<typeof LasertagLanguageClient> | undefined
+
+class RenderStoryTreeProvider {
+	readonly onDidChangeTreeData
+	#activeUri: string | undefined
+	#entries: RenderStoryTreeEntry[] = []
+	#emitter = new vscode.EventEmitter<RenderStoryTreeEntry | undefined>()
+	#requestVersion = 0
+	#view: LasertagRenderStoryView = { kind: `outside-context` }
+
+	constructor() {
+		this.onDidChangeTreeData = this.#emitter.event
+	}
+
+	dispose(): void {
+		this.#emitter.dispose()
+	}
+
+	getChildren(element?: RenderStoryTreeEntry): RenderStoryTreeEntry[] {
+		return element ? element.children : this.#entries
+	}
+
+	getTreeItem(entry: RenderStoryTreeEntry): TreeItem {
+		const item = new vscode.TreeItem(
+			entry.label,
+			entry.children.length > 0
+				? vscode.TreeItemCollapsibleState.Collapsed
+				: vscode.TreeItemCollapsibleState.None,
+		)
+
+		if (entry.description) item.description = entry.description
+		if (entry.tooltip) item.tooltip = entry.tooltip
+
+		if (entry.icon) {
+			const color =
+				entry.icon === `warning`
+					? new vscode.ThemeColor(`list.warningForeground`)
+					: undefined
+
+			item.iconPath = new vscode.ThemeIcon(entry.icon, color)
+		}
+
+		if (entry.decoration) {
+			item.resourceUri = vscode.Uri.parse(
+				`lasertag-story:/${entry.decoration}/${encodeURIComponent(entry.label)}`,
+			)
+		}
+
+		if (entry.location) {
+			item.command = {
+				arguments: [entry.location],
+				command: LASERTAG_OPEN_STORY_LOCATION_COMMAND,
+				title: `Open ${entry.label}`,
+			}
+		}
+
+		return item
+	}
+
+	get cssLocation(): RenderStoryViewLocation | undefined {
+		return this.#view.kind === `ready` || this.#view.kind === `unavailable`
+			? this.#view.cssLocation
+			: undefined
+	}
+
+	get sourceLocation(): RenderStoryViewLocation | undefined {
+		return this.#view.kind === `ready` || this.#view.kind === `unavailable`
+			? this.#view.sourceLocation
+			: undefined
+	}
+
+	async refresh(activeUri = this.#activeUri): Promise<void> {
+		this.#activeUri = activeUri
+		const requestVersion = ++this.#requestVersion
+		let view: LasertagRenderStoryView = { kind: `outside-context` }
+
+		if (activeUri && client) {
+			try {
+				view = await client.sendRequest<LasertagRenderStoryView>(
+					LASERTAG_RENDER_STORY_REQUEST,
+					{ uri: activeUri } satisfies LasertagRenderStoryRequest,
+				)
+			} catch {
+				view = { kind: `outside-context` }
+			}
+		}
+
+		if (requestVersion !== this.#requestVersion) return
+
+		this.#view = view
+		this.#entries = createRenderStoryTree(view)
+		await vscode.commands.executeCommand(
+			`setContext`,
+			LASERTAG_IN_CONTEXT_KEY,
+			view.kind !== `outside-context`,
+		)
+		this.#emitter.fire(undefined)
+	}
+}
+
+class RenderStoryDecorationProvider {
+	provideFileDecoration(uri: Uri): unknown {
+		if (uri.scheme !== `lasertag-story`) return
+
+		if (uri.path.startsWith(`/supported/`)) {
+			return {
+				color: new vscode.ThemeColor(`charts.green`),
+				propagate: false,
+				tooltip: `Styled branch`,
+			}
+		}
+
+		if (uri.path.startsWith(`/unreachable/`)) {
+			return {
+				color: new vscode.ThemeColor(`list.warningForeground`),
+				propagate: false,
+				tooltip: `Styled, but unreachable`,
+			}
+		}
+	}
+}
+
+async function openStoryLocation(
+	location: RenderStoryViewLocation | undefined,
+): Promise<void> {
+	if (!location) return
+
+	const document = await vscode.workspace.openTextDocument(
+		vscode.Uri.parse(location.uri),
+	)
+	const editor = await vscode.window.showTextDocument(document, {
+		preview: false,
+	})
+	const start = document.positionAt(location.start)
+	const end = document.positionAt(location.end)
+	const range = new vscode.Range(start, end)
+
+	editor.selection = new vscode.Selection(start, end)
+	editor.revealRange(
+		range,
+		vscode.TextEditorRevealType.InCenterIfOutsideViewport,
+	)
+}
 
 function traceFromSetting(trace: string): 0 | 1 | 3 {
 	switch (trace) {
@@ -240,6 +477,43 @@ export async function activate(context: ExtensionContext) {
 
 	await client.setTrace(traceFromSetting(trace))
 	await client.start()
+
+	const storyTreeProvider = new RenderStoryTreeProvider()
+
+	context.subscriptions.push(
+		storyTreeProvider,
+		vscode.window.registerTreeDataProvider(
+			LASERTAG_RENDER_STORY_VIEW_ID,
+			storyTreeProvider,
+		),
+		vscode.window.registerFileDecorationProvider(
+			new RenderStoryDecorationProvider(),
+		),
+		vscode.commands.registerCommand(
+			LASERTAG_OPEN_STORY_LOCATION_COMMAND,
+			(location: unknown) =>
+				openStoryLocation(location as RenderStoryViewLocation),
+		),
+		vscode.commands.registerCommand(LASERTAG_OPEN_STYLES_COMMAND, () =>
+			openStoryLocation(storyTreeProvider.cssLocation),
+		),
+		vscode.commands.registerCommand(LASERTAG_OPEN_RENDER_SOURCE_COMMAND, () =>
+			openStoryLocation(storyTreeProvider.sourceLocation),
+		),
+		vscode.window.onDidChangeActiveTextEditor((editor) => {
+			void storyTreeProvider.refresh(editor?.document.uri.toString())
+		}),
+		client.onNotification(
+			LASERTAG_RENDER_STORY_CHANGED_NOTIFICATION,
+			(_notification: LasertagRenderStoryChangedNotification) => {
+				void storyTreeProvider.refresh()
+			},
+		),
+	)
+
+	await storyTreeProvider.refresh(
+		vscode.window.activeTextEditor?.document.uri.toString(),
+	)
 }
 
 export function deactivate() {
