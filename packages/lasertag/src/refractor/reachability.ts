@@ -47,12 +47,27 @@ function canReachDirectChild(
 	path: SelectorPath,
 	segmentIndex: number,
 ): Reachability {
+	return canReachDirectChildFromChildren(node.children, path, segmentIndex)
+}
+
+function canReachDirectChildFromChildren(
+	children: StoryChild[],
+	path: SelectorPath,
+	segmentIndex: number,
+): Reachability {
 	const segment = path[segmentIndex]
 
 	if (!segment) return `reachable`
 
-	const results = node.children.map((child): Reachability => {
+	const results = children.map((child): Reachability => {
 		if (child.kind === `opaque`) return `unknown`
+		if (child.kind === `choice`) {
+			return combineReachability(
+				child.alternatives.map((alternative) =>
+					canReachDirectChildFromChildren(alternative, path, segmentIndex),
+				),
+			)
+		}
 		if (!segmentMatches(child, segment)) return `unreachable`
 
 		return canReachFromNode(child, path, segmentIndex + 1)
@@ -66,12 +81,27 @@ function canReachDescendant(
 	path: SelectorPath,
 	segmentIndex: number,
 ): Reachability {
+	return canReachDescendantFromChildren(node.children, path, segmentIndex)
+}
+
+function canReachDescendantFromChildren(
+	children: StoryChild[],
+	path: SelectorPath,
+	segmentIndex: number,
+): Reachability {
 	const segment = path[segmentIndex]
 
 	if (!segment) return `reachable`
 
-	const results = node.children.map((child): Reachability => {
+	const results = children.map((child): Reachability => {
 		if (child.kind === `opaque`) return `unknown`
+		if (child.kind === `choice`) {
+			return combineReachability(
+				child.alternatives.map((alternative) =>
+					canReachDescendantFromChildren(alternative, path, segmentIndex),
+				),
+			)
+		}
 
 		const fromChild = segmentMatches(child, segment)
 			? canReachFromNode(child, path, segmentIndex + 1)
@@ -86,6 +116,13 @@ function canReachDescendant(
 
 function canReachFromRoot(root: StoryChild, path: SelectorPath): Reachability {
 	if (root.kind === `opaque`) return `unknown`
+	if (root.kind === `choice`) {
+		return combineReachability(
+			root.alternatives.flatMap((alternative) =>
+				alternative.map((child) => canReachFromRoot(child, path)),
+			),
+		)
+	}
 
 	const rootSegment = path[0]
 

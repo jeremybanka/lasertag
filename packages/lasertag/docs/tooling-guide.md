@@ -117,6 +117,7 @@ pass `missingAttachment: "opaque"` for validation's conservative behavior.
 pnpm lasertag check
 pnpm lasertag check --format=json "src/**/*.module.css"
 pnpm lasertag check --max-files=all
+pnpm lasertag check --show-story
 pnpm lasertag check "src/**/*.module.css,examples/**/*.module.css"
 ```
 
@@ -191,6 +192,13 @@ A clean check stays brief:
 ```text
 ✓ No dead CSS found in 187 files.
 ```
+
+Pass `--show-story` to expand each displayed warning with up to three closest
+render-story possibilities. The ordinary tree stays neutral, the closest real
+node is yellow, and the selector's impossible continuation is inserted in red
+with `✕ you are here`. Structural alternatives are numbered rather than given
+speculative names or control-flow explanations. The flag affects stylish output
+only when a dead selector has render-story evidence; default output stays compact.
 
 `fix` mutates matched stylesheets, removing selectors reported as
 `dead-selector` or `impossible-local-class`:

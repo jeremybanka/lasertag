@@ -940,6 +940,23 @@ function validateStoryChild(
 		validateElement(child, sourceLength, label, errors)
 		return
 	}
+	if (child.kind === `choice`) {
+		validateRange(child.range, sourceLength, `${label}.range`, errors)
+		for (const [
+			alternativeIndex,
+			alternative,
+		] of child.alternatives.entries()) {
+			for (const [childIndex, alternativeChild] of alternative.entries()) {
+				validateStoryChild(
+					alternativeChild,
+					sourceLength,
+					`${label}.alternatives[${alternativeIndex}][${childIndex}]`,
+					errors,
+				)
+			}
+		}
+		return
+	}
 
 	validateOpaque(child, sourceLength, label, errors)
 }
@@ -1048,6 +1065,22 @@ function collectChildFacts(
 	if (child.kind === `opaque`) {
 		stats.opaqueCount += 1
 		incrementCount(opaqueReasons, child.reason)
+		return
+	}
+	if (child.kind === `choice`) {
+		for (const alternative of child.alternatives) {
+			for (const alternativeChild of alternative) {
+				collectChildFacts(
+					renderStory,
+					alternativeChild,
+					depth,
+					parentPath,
+					elementPaths,
+					opaqueReasons,
+					stats,
+				)
+			}
+		}
 		return
 	}
 

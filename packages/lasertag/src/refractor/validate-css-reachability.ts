@@ -11,6 +11,7 @@ import type {
 } from "./diagnostics.ts"
 import { applyLasertagExpectErrorDirectives } from "./expect-error.ts"
 import { canReachSelectorPath } from "./reachability.ts"
+import { createRenderStoryEvidence } from "./render-story-evidence.ts"
 import { scopeRenderStoryToCssClassRoots } from "./render-story-root.ts"
 import type { TypescriptAstSession } from "./typescript-ast.ts"
 
@@ -21,6 +22,7 @@ export type ValidateCssReachabilityOptions = {
 	cssPath?: string
 	componentName?: string
 	typescriptSdkPath?: string
+	includeStoryEvidence?: boolean
 }
 
 export type ValidateCssReachabilityResult = {
@@ -35,10 +37,12 @@ export type ValidateRenderSourceCssReachabilityOptions = {
 	cssPath?: string
 	componentName?: string
 	typescriptSdkPath?: string
+	includeStoryEvidence?: boolean
 }
 
 export type CreateCssReachabilityDiagnosticsOptions = {
 	cssSource?: string
+	includeStoryEvidence?: boolean
 	renderStory: RenderStory
 	selectorAnalyses: CssSelectorAnalysis[]
 }
@@ -77,6 +81,7 @@ function combineReachability(results: Reachability[]): Reachability {
 
 export function analyzeCssReachability({
 	cssSource,
+	includeStoryEvidence = false,
 	renderStory,
 	selectorAnalyses,
 }: CreateCssReachabilityDiagnosticsOptions): CssReachabilityAnalysis {
@@ -133,10 +138,15 @@ export function analyzeCssReachability({
 		})
 
 		if (reachability === `unreachable`) {
+			const storyEvidence = includeStoryEvidence
+				? createRenderStoryEvidence(renderStory, result.paths)
+				: undefined
+
 			diagnostics.push({
 				code: `dead-selector`,
 				message: deadSelectorMessage(selectorAnalysis.selector),
 				selector: selectorAnalysis.selector,
+				...(storyEvidence ? { storyEvidence } : {}),
 				range: selectorAnalysis.range,
 			})
 		}
@@ -153,11 +163,13 @@ export function analyzeCssReachability({
 
 export function createCssReachabilityDiagnostics({
 	cssSource,
+	includeStoryEvidence,
 	renderStory,
 	selectorAnalyses,
 }: CreateCssReachabilityDiagnosticsOptions): CssReachabilityDiagnostic[] {
 	return analyzeCssReachability({
 		...(cssSource === undefined ? {} : { cssSource }),
+		...(includeStoryEvidence === undefined ? {} : { includeStoryEvidence }),
 		renderStory,
 		selectorAnalyses,
 	}).diagnostics
@@ -182,6 +194,9 @@ export function validateCssReachability(
 	const selectorAnalyses = analyzeCssModuleSelectors(options.cssSource)
 	const diagnostics = createCssReachabilityDiagnostics({
 		cssSource: options.cssSource,
+		...(options.includeStoryEvidence === undefined
+			? {}
+			: { includeStoryEvidence: options.includeStoryEvidence }),
 		renderStory,
 		selectorAnalyses,
 	})
@@ -212,6 +227,9 @@ export function validateRenderSourceCssReachability(
 	const selectorAnalyses = analyzeCssModuleSelectors(options.cssSource)
 	const diagnostics = createCssReachabilityDiagnostics({
 		cssSource: options.cssSource,
+		...(options.includeStoryEvidence === undefined
+			? {}
+			: { includeStoryEvidence: options.includeStoryEvidence }),
 		renderStory,
 		selectorAnalyses,
 	})

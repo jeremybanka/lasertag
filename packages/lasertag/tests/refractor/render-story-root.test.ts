@@ -82,4 +82,36 @@ describe(`CSS Module render story roots`, () => {
 
 		expect(roots).toMatchObject([{ kind: `element`, tagName: `generic-root` }])
 	})
+
+	it(`preserves alternatives when ownership roots are conditional`, () => {
+		const ownedRoot = (tagName: string) => ({
+			attributes: [{ expression: `css.class`, name: `class` }],
+			children: [],
+			kind: `element` as const,
+			tagName,
+		})
+		const renderStory: RenderStory = {
+			componentName: `ConditionalPanel`,
+			roots: [
+				{
+					alternatives: [
+						[ownedRoot(`ready-panel`)],
+						[ownedRoot(`loading-panel`)],
+					],
+					kind: `choice`,
+				},
+			],
+			warnings: [],
+		}
+
+		expect(scopeRenderStoryToCssClassRoots(renderStory).roots).toMatchObject([
+			{
+				alternatives: [
+					[{ kind: `element`, tagName: `ready-panel` }],
+					[{ kind: `element`, tagName: `loading-panel` }],
+				],
+				kind: `choice`,
+			},
+		])
+	})
 })

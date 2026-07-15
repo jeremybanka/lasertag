@@ -15,6 +15,9 @@ The experimental ANSI gallery lives in
 - a checkout `error-banner` absent from every modeled reality, suggesting stale
   CSS or an unimplemented state rather than a spelling correction.
 
+Concept A is now available in production stylish output through
+`lasertag check --show-story`. Concepts B and C remain product explorations.
+
 ## Concepts
 
 ### A. Story atlas

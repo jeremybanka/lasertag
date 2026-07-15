@@ -42,6 +42,7 @@ export type LasertagCheckFileSystem = {
 
 export type RunLasertagCheckOptions = {
 	fileSystem?: Partial<LasertagCheckFileSystem>
+	includeStoryEvidence?: boolean
 	typescriptSdkPath?: string
 	workerCount?: number
 	workerModuleUrl?: string | URL
@@ -93,6 +94,7 @@ function checkFile(
 			{
 				cssPath,
 				cssSource,
+				...(task.includeStoryEvidence ? { includeStoryEvidence: true } : {}),
 				sourcePath,
 				sourceText: fileSystem.readFile(sourcePath),
 			},
@@ -189,6 +191,7 @@ export async function runLasertagCheck(
 		const work = await runWorkStealing<LasertagCheckFileResult>({
 			files,
 			forceSerial: hasCustomFileSystem,
+			...(options.includeStoryEvidence ? { includeStoryEvidence: true } : {}),
 			operation: `check`,
 			processSerial: (task, workerId) =>
 				checkFile(task, workerId, fileSystem, typescriptSession),

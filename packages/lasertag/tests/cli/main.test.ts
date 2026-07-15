@@ -423,6 +423,68 @@ export function CleanPanel() {
 		])
 	})
 
+	it(`shows closest render story possibilities only when requested`, async () => {
+		const fixture = createFixture({
+			"src/AccountPanel.module.css": `account-panel.class {
+	> profile-header {
+		> avater {}
+	}
+}
+`,
+			"src/AccountPanel.tsx": `import css from "./AccountPanel.module.css"
+
+export function AccountPanel({ state }: { state: "loading" | "ready" | "failure" }) {
+	return (
+		<account-panel className={css.class}>
+			{state === "loading" ? (
+				<loading-state><spinner-ring /></loading-state>
+			) : state === "ready" ? (
+				<profile-header><avatar /><display-name /></profile-header>
+			) : (
+				<error-state><retry-button /></error-state>
+			)}
+		</account-panel>
+	)
+}
+`,
+		})
+		const regular = createTestIO()
+		const detailed = createTestIO({ echo: SHOW_TRAINING_COURSE_OUTPUT })
+
+		await runLasertagCli(
+			[`lasertag`, `check`, fixture.path(`src/AccountPanel.module.css`)],
+			regular.io,
+			{ cwd: fixture.root },
+		)
+		await runLasertagCli(
+			[
+				`lasertag`,
+				`check`,
+				`--show-story`,
+				fixture.path(`src/AccountPanel.module.css`),
+			],
+			detailed.io,
+			{ cwd: fixture.root, forceColor: true },
+		)
+
+		const regularOutput = regular.logs[0] ?? ``
+		const detailedOutput = detailed.logs[0] ?? ``
+		const plainDetailedOutput = stripVTControlCharacters(detailedOutput)
+
+		expect(regularOutput).not.toContain(`Render story possibilities`)
+		expect(plainDetailedOutput).toContain(
+			`Render story possibilities  3 closest`,
+		)
+		expect(plainDetailedOutput).toContain(
+			`Possibility 1  closest path matches 2/3 selector steps`,
+		)
+		expect(plainDetailedOutput).toContain(`avatar  ← closest rendered path`)
+		expect(plainDetailedOutput.match(/avater  ✕ you are here/g)).toHaveLength(3)
+		expect(detailedOutput).toContain(
+			styleText([`bold`, `red`], `avater`, { validateStream: false }),
+		)
+	})
+
 	it(`accepts one css module file path as the positional check glob`, async () => {
 		const fixture = createFixture({
 			"src/AppPanel.module.css": `

@@ -63,6 +63,12 @@ export function findCssClassRenderRoots(
 
 	for (const child of children) {
 		if (child.kind === `opaque`) continue
+		if (child.kind === `choice`) {
+			for (const alternative of child.alternatives) {
+				roots.push(...findCssClassRenderRoots(alternative, options))
+			}
+			continue
+		}
 
 		if (hasCssClassAttachment(child, options)) {
 			roots.push(child)
@@ -75,11 +81,32 @@ export function findCssClassRenderRoots(
 	return roots
 }
 
+function scopedCssClassRenderRoots(
+	children: readonly StoryChild[],
+	options: CssClassRenderRootOptions,
+): StoryChild[] {
+	return children.flatMap((child): StoryChild[] => {
+		if (child.kind === `opaque`) return []
+		if (child.kind === `choice`) {
+			const alternatives = child.alternatives.map((alternative) =>
+				scopedCssClassRenderRoots(alternative, options),
+			)
+
+			return alternatives.some((alternative) => alternative.length > 0)
+				? [{ ...child, alternatives }]
+				: []
+		}
+		if (hasCssClassAttachment(child, options)) return [child]
+
+		return scopedCssClassRenderRoots(child.children, options)
+	})
+}
+
 export function scopeRenderStoryToCssClassRoots(
 	renderStory: RenderStory,
 	options: CssClassRenderRootOptions = {},
 ): RenderStory {
-	const roots = findCssClassRenderRoots(renderStory.roots, options)
+	const roots = scopedCssClassRenderRoots(renderStory.roots, options)
 
 	if (roots.length > 0) return { ...renderStory, roots }
 	if (options.missingAttachment !== `opaque`) return renderStory

@@ -21,6 +21,9 @@ import { z } from "zod/v4"
 import {
 	createTypescriptAstSession,
 	type CssReachabilityDiagnostic,
+	type RenderStoryEvidencePossibility,
+	type SelectorPath,
+	type StoryChild,
 } from "../refractor/index.ts"
 import {
 	processLasertagCheckTask,
@@ -58,6 +61,7 @@ const DEFAULT_MAX_DETAIL_FILES = 10
 const CHECK_SUMMARY_WIDTH = 56
 
 type CheckOutputStyler = {
+	bad: (text: string) => string
 	bold: (text: string) => string
 	caret: (text: string) => string
 	code: (text: string) => string
@@ -67,6 +71,7 @@ type CheckOutputStyler = {
 }
 
 const PLAIN_CHECK_OUTPUT_STYLER: CheckOutputStyler = {
+	bad: (text) => text,
 	bold: (text) => text,
 	caret: (text) => text,
 	code: (text) => text,
@@ -92,6 +97,7 @@ function createCheckOutputStyler(
 	): string => styleText(format, text, options)
 
 	return {
+		bad: (text) => apply([`bold`, `red`], text),
 		bold: (text) => apply(`bold`, text),
 		caret: (text) => apply([`bold`, `yellow`], text),
 		code: (text) => apply(`cyan`, text),
@@ -115,6 +121,7 @@ const checkOptionsSchema = z.object({
 			`expected "all" or a positive integer`,
 		)
 		.default(String(DEFAULT_MAX_DETAIL_FILES)),
+	"show-story": z.boolean().default(false),
 })
 
 const vsixOptionsSchema = z.object({
@@ -206,6 +213,12 @@ const checkRouteOptions = options(
 			description: `maximum affected files shown in stylish output`,
 			example: `--max-files all`,
 			parse: parseStringOption,
+			required: false,
+		},
+		"show-story": {
+			description: `show closest render story possibilities for each warning`,
+			example: `--show-story`,
+			parse: parseBooleanOption,
 			required: false,
 		},
 	},
@@ -519,6 +532,238 @@ type DiagnosticFileGroup = {
 	diagnostics: LasertagCliDiagnostic[]
 }
 
+type DisplayStoryChild = DisplayStoryNode | DisplayStoryOpaque
+
+type DisplayStoryNode = {
+	children: DisplayStoryChild[]
+	ghost?: boolean
+	kind: `element`
+	relation?: SelectorPath[number][`relation`]
+	tagName: string
+}
+
+type DisplayStoryOpaque = {
+	kind: `opaque`
+	reason: string
+}
+
+function displayStoryChildren(children: StoryChild[]): DisplayStoryChild[] {
+	return children.flatMap((child): DisplayStoryChild[] => {
+		if (child.kind === `opaque`)
+			return [{ kind: `opaque`, reason: child.reason }]
+		if (child.kind === `choice`) {
+			return child.alternatives.flatMap(displayStoryChildren)
+		}
+
+		return [
+			{
+				children: displayStoryChildren(child.children),
+				kind: `element`,
+				tagName: child.tagName,
+			},
+		]
+	})
+}
+
+function ghostStoryBranch(
+	segments: SelectorPath,
+): DisplayStoryNode | undefined {
+	const [segment, ...descendants] = segments
+
+	if (!segment) return
+
+	const child = ghostStoryBranch(descendants)
+
+	return {
+		children: child ? [child] : [],
+		ghost: true,
+		kind: `element`,
+		relation: segment.relation,
+		tagName: segment.tagName,
+	}
+}
+
+function matchedActualPath(
+	closestPath: string[],
+	selectorPath: SelectorPath,
+	matchedSegments: number,
+): string[] {
+	if (matchedSegments === 0) return []
+
+	let actualIndex = 0
+
+	for (
+		let selectorIndex = 1;
+		selectorIndex < matchedSegments;
+		selectorIndex++
+	) {
+		const segment = selectorPath[selectorIndex]
+
+		if (!segment) break
+
+		actualIndex =
+			segment.relation === `child`
+				? actualIndex + 1
+				: closestPath.indexOf(segment.tagName, actualIndex + 1)
+	}
+
+	return closestPath.slice(0, actualIndex + 1)
+}
+
+function insertGhostStoryBranch(
+	possibility: RenderStoryEvidencePossibility,
+	selectorPath: SelectorPath,
+): DisplayStoryChild[] {
+	const roots = displayStoryChildren(possibility.roots)
+	const ghost = ghostStoryBranch(
+		selectorPath.slice(possibility.matchedSegments),
+	)
+
+	if (!ghost) return roots
+
+	const parentPath = matchedActualPath(
+		possibility.closestPath,
+		selectorPath,
+		possibility.matchedSegments,
+	)
+
+	if (parentPath.length === 0) return [...roots, ghost]
+
+	let inserted = false
+	const visit = (
+		child: DisplayStoryChild,
+		ancestors: string[],
+	): DisplayStoryChild => {
+		if (child.kind === `opaque`) return child
+
+		const path = [...ancestors, child.tagName]
+		const children = child.children.map((nestedChild) =>
+			visit(nestedChild, path),
+		)
+
+		if (
+			!inserted &&
+			path.length === parentPath.length &&
+			path.every((segment, index) => parentPath[index] === segment)
+		) {
+			children.push(ghost)
+			inserted = true
+		}
+
+		return { ...child, children }
+	}
+
+	return roots.map((root) => visit(root, []))
+}
+
+function formatStoryTree(
+	children: DisplayStoryChild[],
+	closestPath: string[],
+	styler: CheckOutputStyler,
+): string[] {
+	const output: string[] = []
+
+	const visit = (
+		child: DisplayStoryChild,
+		parentPath: string[],
+		prefix: string,
+		isLast: boolean,
+		isRoot: boolean,
+	): void => {
+		const branch = isRoot
+			? ``
+			: child.kind === `element` &&
+				  child.ghost &&
+				  child.relation === `descendant`
+				? isLast
+					? `└┄ `
+					: `├┄ `
+				: isLast
+					? `└─ `
+					: `├─ `
+
+		if (child.kind === `opaque`) {
+			output.push(
+				`${styler.dim(prefix)}${styler.dim(branch)}${styler.dim(`… ${child.reason}`)}`,
+			)
+			return
+		}
+
+		const path = [...parentPath, child.tagName]
+		const isNearest =
+			!child.ghost &&
+			path.length === closestPath.length &&
+			path.every((segment, index) => closestPath[index] === segment)
+		const paintBranch = child.ghost
+			? styler.bad
+			: isNearest
+				? styler.warning
+				: styler.dim
+		const tag = child.ghost
+			? styler.bad(child.tagName)
+			: isNearest
+				? styler.warning(child.tagName)
+				: child.tagName
+		const marker =
+			child.ghost && child.children.length === 0
+				? styler.bad(`  ✕ you are here`)
+				: isNearest
+					? styler.warning(`  ← closest rendered path`)
+					: ``
+
+		output.push(`${styler.dim(prefix)}${paintBranch(branch)}${tag}${marker}`)
+
+		const continuation = isRoot ? `` : isLast ? `   ` : `│  `
+
+		for (const [index, nestedChild] of child.children.entries()) {
+			visit(
+				nestedChild,
+				path,
+				`${prefix}${continuation}`,
+				index === child.children.length - 1,
+				false,
+			)
+		}
+	}
+
+	for (const [index, child] of children.entries()) {
+		visit(child, [], ``, index === children.length - 1, children.length === 1)
+	}
+
+	return output
+}
+
+function formatRenderStoryEvidence(
+	diagnostic: LasertagCliDiagnostic,
+	styler: CheckOutputStyler,
+): string | undefined {
+	const evidence = diagnostic.storyEvidence
+
+	if (!evidence || evidence.possibilities.length === 0) return
+
+	const output = [
+		styler.bold(`Where this selector expected to land`),
+		``,
+		`  ${styler.bad(diagnostic.selector)}`,
+		``,
+		`${styler.bold(`Render story possibilities`)}  ${styler.dim(`${evidence.possibilities.length} closest`)}`,
+	]
+
+	for (const [index, possibility] of evidence.possibilities.entries()) {
+		const story = insertGhostStoryBranch(possibility, evidence.selectorPath)
+
+		output.push(
+			``,
+			`${styler.dim(index === evidence.possibilities.length - 1 ? `└─` : `├─`)} ${styler.bold(`Possibility ${index + 1}`)}  ${styler.dim(`closest path matches`)} ${styler.warning(`${possibility.matchedSegments}/${evidence.selectorPath.length}`)} ${styler.dim(`selector steps`)}`,
+			...formatStoryTree(story, possibility.closestPath, styler).map(
+				(line) => `   ${line}`,
+			),
+		)
+	}
+
+	return output.join(`\n`)
+}
+
 function groupDiagnosticsByFile(
 	diagnostics: LasertagCliDiagnostic[],
 ): DiagnosticFileGroup[] {
@@ -575,6 +820,17 @@ function formatWarningTreeDiagnostic(
 	} else {
 		output.push(
 			`${styler.dim(continuation)}${styler.dim(`╰─`)} ${diagnostic.message}`,
+		)
+	}
+
+	const storyEvidence = formatRenderStoryEvidence(diagnostic, styler)
+
+	if (storyEvidence) {
+		output.push(
+			styler.dim(continuation.trimEnd()),
+			...storyEvidence
+				.split(`\n`)
+				.map((line) => `${styler.dim(continuation)}${line}`),
 		)
 	}
 
@@ -768,6 +1024,9 @@ async function runCheck(
 	const files = discoverCssModuleFiles(targets, environment)
 	const fileSystem = checkFileSystemFromEnvironment(environment)
 	const checkResult = await runLasertagCheck(files, {
+		...(options[`show-story`] && options.format === `stylish`
+			? { includeStoryEvidence: true }
+			: {}),
 		...(environment.checkWorkerCount
 			? { workerCount: environment.checkWorkerCount }
 			: {}),
