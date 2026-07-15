@@ -53,6 +53,8 @@ const DEFAULT_IGNORE_PATTERNS = [
 	`**/tests/refractor/corpus/providers/**`,
 ]
 const FORMAT_OPTIONS = [`stylish`, `json`] as const
+const DEFAULT_MAX_DETAIL_FILES = 10
+const CHECK_SUMMARY_WIDTH = 56
 
 const rootOptionsSchema = z.object({
 	help: z.boolean().default(false),
@@ -61,6 +63,13 @@ const rootOptionsSchema = z.object({
 
 const checkOptionsSchema = z.object({
 	format: z.enum(FORMAT_OPTIONS).default(`stylish`),
+	"max-files": z
+		.string()
+		.refine(
+			(value) => value === `all` || /^[1-9]\d*$/.test(value),
+			`expected "all" or a positive integer`,
+		)
+		.default(String(DEFAULT_MAX_DETAIL_FILES)),
 })
 
 const vsixOptionsSchema = z.object({
@@ -73,7 +82,6 @@ type RootOptions = z.infer<typeof rootOptionsSchema>
 type CheckOptions = z.infer<typeof checkOptionsSchema>
 type FixOptions = Record<never, never>
 type VsixOptions = z.infer<typeof vsixOptionsSchema>
-type LasertagOutputFormat = CheckOptions[`format`]
 
 export type LasertagCliMode = `check` | `fix` | `help` | `version` | `vsix`
 
@@ -146,6 +154,12 @@ const checkRouteOptions = options(
 			description: `output format`,
 			flag: `f`,
 			example: `--format json`,
+			required: false,
+		},
+		"max-files": {
+			description: `maximum affected files shown in stylish output`,
+			example: `--max-files all`,
+			parse: parseStringOption,
 			required: false,
 		},
 	},
@@ -310,10 +324,15 @@ function expandTabs(text: string): string {
 	return text.replaceAll(`\t`, `    `)
 }
 
+type FormattedWarningRegion = {
+	lineNumberWidth: number
+	text: string
+}
+
 function formatWarningRegion(
 	diagnostic: LasertagCliDiagnostic,
 	sourceText: string,
-): string | undefined {
+): FormattedWarningRegion | undefined {
 	if (!diagnostic.range) return
 
 	const lines = warningRegionLines(
@@ -353,7 +372,10 @@ function formatWarningRegion(
 		)
 	}
 
-	return output.join(`\n`)
+	return {
+		lineNumberWidth,
+		text: output.join(`\n`),
+	}
 }
 
 function formatStylishDiagnostic(
@@ -376,35 +398,195 @@ function formatStylishDiagnostic(
 		? formatWarningRegion(diagnostic, cssSource)
 		: undefined
 
-	return region ? `${message}\n${region}` : message
+	return region ? `${message}\n${region.text}` : message
+}
+
+type DiagnosticFileGroup = {
+	cssPath: string
+	diagnostics: LasertagCliDiagnostic[]
+}
+
+function groupDiagnosticsByFile(
+	diagnostics: LasertagCliDiagnostic[],
+): DiagnosticFileGroup[] {
+	const diagnosticsByFile = new Map<string, LasertagCliDiagnostic[]>()
+
+	for (const diagnostic of diagnostics) {
+		const fileDiagnostics = diagnosticsByFile.get(diagnostic.cssPath)
+
+		if (fileDiagnostics) {
+			fileDiagnostics.push(diagnostic)
+		} else {
+			diagnosticsByFile.set(diagnostic.cssPath, [diagnostic])
+		}
+	}
+
+	return [...diagnosticsByFile]
+		.map(([cssPath, fileDiagnostics]) => ({
+			cssPath,
+			diagnostics: fileDiagnostics.toSorted(
+				(left, right) => left.line - right.line || left.column - right.column,
+			),
+		}))
+		.toSorted((left, right) =>
+			left.cssPath < right.cssPath ? -1 : left.cssPath > right.cssPath ? 1 : 0,
+		)
+}
+
+function formatWarningTreeDiagnostic(
+	diagnostic: LasertagCliDiagnostic,
+	sourceText: string,
+	isLast: boolean,
+): string {
+	const branch = isLast ? `└─` : `├─`
+	const continuation = isLast ? `   ` : `│  `
+	const region = formatWarningRegion(diagnostic, sourceText)
+	const output = [
+		`${branch} ${diagnostic.line}:${diagnostic.column}  ${diagnostic.code}`,
+	]
+
+	if (region) {
+		output.push(
+			...region.text.split(`\n`).map((line) => `${continuation}${line}`),
+			`${continuation}${` `.repeat(region.lineNumberWidth + 1)}╰─ ${diagnostic.message}`,
+		)
+	} else {
+		output.push(`${continuation}╰─ ${diagnostic.message}`)
+	}
+
+	if (!isLast) output.push(`│`)
+
+	return output.join(`\n`)
+}
+
+function formatDiagnosticFileGroup(
+	group: DiagnosticFileGroup,
+	cwd: string,
+	readCssSource: (cssPath: string) => string,
+): string {
+	const warningCount = group.diagnostics.length
+	const output = [
+		`${displayPath(cwd, group.cssPath)}  ${warningCount} ${plural(warningCount, `warning`)}`,
+	]
+	const sourceText = readCssSource(group.cssPath)
+
+	for (const [index, diagnostic] of group.diagnostics.entries()) {
+		output.push(
+			formatWarningTreeDiagnostic(
+				diagnostic,
+				sourceText,
+				index === group.diagnostics.length - 1,
+			),
+		)
+	}
+
+	return output.join(`\n`)
+}
+
+function formatCheckSummary({
+	affectedFileCount,
+	detailFileCount,
+	detailWarningCount,
+	fileCount,
+	hiddenFileCount,
+	hiddenWarningCount,
+	warningCount,
+}: {
+	affectedFileCount: number
+	detailFileCount: number
+	detailWarningCount: number
+	fileCount: number
+	hiddenFileCount: number
+	hiddenWarningCount: number
+	warningCount: number
+}): string {
+	const rows: Array<[label: string, count: number, description: string]> = [
+		[`CSS modules`, fileCount, `checked`],
+		[
+			`Detail`,
+			detailWarningCount,
+			`${plural(detailWarningCount, `warning`)} in ${detailFileCount} ${plural(detailFileCount, `file`)} shown`,
+		],
+	]
+
+	if (hiddenFileCount > 0) {
+		rows.push([
+			`Hidden`,
+			hiddenWarningCount,
+			`${plural(hiddenWarningCount, `warning`)} in ${hiddenFileCount} ${plural(hiddenFileCount, `file`)}`,
+		])
+	}
+
+	const labelWidth = Math.max(...rows.map(([label]) => label.length))
+	const countWidth = Math.max(...rows.map(([, count]) => String(count).length))
+	const output = [
+		`─`.repeat(CHECK_SUMMARY_WIDTH),
+		``,
+		`▲ Check found ${warningCount} ${plural(warningCount, `warning`)} in ${affectedFileCount} ${plural(affectedFileCount, `file`)}`,
+		``,
+		...rows.map(
+			([label, count, description]) =>
+				`  ${label.padStart(labelWidth)}  ${String(count).padStart(countWidth)} ${description}`,
+		),
+	]
+
+	if (hiddenFileCount > 0) {
+		output.push(``, `  Show everything with lasertag check --max-files=all`)
+	}
+
+	return output.join(`\n`)
 }
 
 function formatDiagnostics(
 	diagnostics: LasertagCliDiagnostic[],
-	format: LasertagOutputFormat,
+	options: CheckOptions,
 	files: string[],
 	cwd: string,
 	readCssSource: (cssPath: string) => string,
 ): string {
-	if (format === `json`) {
+	if (options.format === `json`) {
 		return JSON.stringify({ diagnostics, files }, null, 2)
 	}
 
 	if (diagnostics.length === 0) {
-		const noun = files.length === 1 ? `file` : `files`
-
-		return `lasertag check: no dead CSS found in ${files.length} ${noun}.`
+		return `✓ No dead CSS found in ${files.length} ${plural(files.length, `file`)}.`
 	}
 
-	return diagnostics
-		.map((diagnostic) =>
-			formatStylishDiagnostic(
-				diagnostic,
-				cwd,
-				readCssSource(diagnostic.cssPath),
-			),
+	const groups = groupDiagnosticsByFile(diagnostics)
+	const detailFileCount =
+		options[`max-files`] === `all`
+			? groups.length
+			: Math.min(Number.parseInt(options[`max-files`], 10), groups.length)
+	const detailGroups = groups.slice(0, detailFileCount)
+	const hiddenGroups = groups.slice(detailFileCount)
+	const detailWarningCount = detailGroups.reduce(
+		(count, group) => count + group.diagnostics.length,
+		0,
+	)
+	const hiddenWarningCount = diagnostics.length - detailWarningCount
+	const output = detailGroups.map((group) =>
+		formatDiagnosticFileGroup(group, cwd, readCssSource),
+	)
+
+	if (hiddenGroups.length > 0) {
+		output.push(
+			`… ${hiddenGroups.length} more affected ${plural(hiddenGroups.length, `file`)} containing ${hiddenWarningCount} ${plural(hiddenWarningCount, `warning`)}`,
 		)
-		.join(`\n\n`)
+	}
+
+	output.push(
+		formatCheckSummary({
+			affectedFileCount: groups.length,
+			detailFileCount,
+			detailWarningCount,
+			fileCount: files.length,
+			hiddenFileCount: hiddenGroups.length,
+			hiddenWarningCount,
+			warningCount: diagnostics.length,
+		}),
+	)
+
+	return output.join(`\n\n`)
 }
 
 function createDiagnostic(
@@ -468,9 +650,7 @@ async function runCheck(
 		)
 	}
 
-	io.log(
-		formatDiagnostics(diagnostics, options.format, files, cwd, readCssSource),
-	)
+	io.log(formatDiagnostics(diagnostics, options, files, cwd, readCssSource))
 
 	return {
 		diagnostics,

@@ -116,6 +116,7 @@ pass `missingAttachment: "opaque"` for validation's conservative behavior.
 ```sh
 pnpm lasertag check
 pnpm lasertag check --format=json "src/**/*.module.css"
+pnpm lasertag check --max-files=all
 pnpm lasertag check "src/**/*.module.css,examples/**/*.module.css"
 ```
 
@@ -124,6 +125,56 @@ put multiple globs in one quoted, comma-separated value. By default Lasertag
 ignores `node_modules`, `dist`, `build`, and `coverage`. A diagnostic or file
 failure produces a nonzero exit code, which makes `check` suitable for CI. Use
 `pnpm lasertag --help` for the current command syntax.
+
+### Check output
+
+The default `stylish` output groups warnings under their CSS Module. It shows
+up to ten affected files in path order; `--max-files=all` shows every affected
+file, and `--max-files=<number>` selects another positive limit. The cap only
+affects human-readable detail: `--format=json` always returns every diagnostic.
+
+This is the reference appearance for a check with warnings:
+
+```text
+src/components/AppPanel.module.css  2 warnings
+├─ 12:2  dead-selector
+│  12 │   > footer {}
+│     │   ^^^^^^^^^^^
+│     ╰─ Selector "app-panel.class > footer" does not match any supported render story path.
+│
+└─ 28:2  impossible-local-class
+   28 │   .secondaryAction {}
+      │   ^^^^^^^^^^^^^^^^
+      ╰─ Local class ".secondaryAction" is unreachable; lasertag CSS modules expose only "css.class".
+
+src/components/MenuPanel.module.css  1 warning
+└─ 41:3  dead-selector
+   41 │     > menu-divider {}
+      │     ^^^^^^^^^^^^^^^^^
+      ╰─ Selector "menu-panel.class > menu-divider" does not match any supported render story path.
+
+… 4 more affected files containing 7 warnings
+
+────────────────────────────────────────────────────────
+
+▲ Check found 23 warnings in 14 files
+
+  CSS modules  187 checked
+       Detail   16 warnings in 10 files shown
+       Hidden    7 warnings in 4 files
+
+  Show everything with lasertag check --max-files=all
+```
+
+The hierarchy is intentionally restrained: file paths lead, tree rails connect
+each warning to its source region and explanation, and the summary accounts for
+both visible and hidden detail. Interactive color may emphasize status and
+carets, but the structure must remain legible without color. A clean check stays
+brief:
+
+```text
+✓ No dead CSS found in 187 files.
+```
 
 `fix` mutates matched stylesheets, removing selectors reported as
 `dead-selector` or `impossible-local-class`:
