@@ -1,10 +1,4 @@
 app-root.class {
 	display: grid;
 	gap: 0.5rem;
-	> fake-thing {
-		> super-fake {}
-	}
-	/* @lasertag-expect-error: adf */
-	> fine-thing {}
-	> real-thing {}
 }

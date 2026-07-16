@@ -20,7 +20,7 @@ export type RenderStoryTreeEntry = {
 	decoration?: RenderStoryTreeDecoration
 	description?: string
 	expanded?: boolean
-	icon?: `circle-slash` | `error` | `info` | `list-tree` | `pass` | `question`
+	icon?: `circle-slash` | `info` | `list-tree` | `pass` | `question` | `warning`
 	label: string
 	location?: RenderStoryViewLocation
 	tooltip?: string
@@ -39,7 +39,7 @@ function renderNode(node: RenderStoryViewNode): RenderStoryTreeEntry {
 			: node.support === `none`
 				? `circle-slash`
 				: node.support === `unreachable`
-					? `error`
+					? `warning`
 					: node.support === `expected-unreachable`
 						? `info`
 						: `pass`

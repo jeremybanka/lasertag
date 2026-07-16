@@ -196,7 +196,7 @@ class RenderStoryTreeProvider {
 		if (entry.icon) {
 			const color =
 				entry.decoration === `unreachable`
-					? new vscode.ThemeColor(`list.errorForeground`)
+					? new vscode.ThemeColor(`list.warningForeground`)
 					: entry.decoration === `unsupported`
 						? new vscode.ThemeColor(`disabledForeground`)
 						: new vscode.ThemeColor(`foreground`)
@@ -283,7 +283,7 @@ class RenderStoryDecorationProvider {
 
 		if (uri.path.startsWith(`/unreachable/`)) {
 			return {
-				color: new vscode.ThemeColor(`list.errorForeground`),
+				color: new vscode.ThemeColor(`list.warningForeground`),
 				propagate: false,
 				tooltip: `Styled, but unreachable`,
 			}

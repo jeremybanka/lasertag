@@ -21,8 +21,8 @@ file changes. If both source siblings exist, Lasertag reports an ambiguity error
   selected; inactive circle-slash or question branches have no known matching
   style and open their JSX or Astro source.
 - Inserts styled selectors that no render possibility can reach at the closest
-  matching location inside each tree. Error-colored branches use an error icon;
-  regular-color branches with an info icon show the user's
+  matching location inside each tree. Warning-colored branches use a warning
+  icon; regular-color branches with an info icon show the user's
   `@lasertag-expect-error` explanation as subdued secondary text. Every inserted
   branch opens its selector in the CSS Module.
 - Offers a quick fix and a command to remove diagnosed selectors safely from

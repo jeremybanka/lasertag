@@ -233,8 +233,8 @@ actions jump directly between the component and its styles.
 
 Selectors that are styled but unreachable are inserted into each possibility
 after their closest matching real branch. Shared unreachable prefixes are merged
-into one branch. Unexpected continuations use the editor's error color and error
-icon. A selector suppressed by
+into one branch. Unexpected continuations use the editor's warning color and
+warning icon. A selector suppressed by
 `@lasertag-expect-error` uses normal text with an info icon and shows the user's
 explanation in VS Code's subdued secondary-text treatment. It still opens its
 CSS location. The view materializes at most 48 possibilities so heavily

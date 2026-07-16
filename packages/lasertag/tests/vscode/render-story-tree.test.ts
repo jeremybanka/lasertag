@@ -74,7 +74,7 @@ describe(`VSCode render story tree`, () => {
 		])
 	})
 
-	it(`keeps unreachable selectors in the story with error or expected styling`, () => {
+	it(`keeps unreachable selectors in the story with warning or expected styling`, () => {
 		const view: LasertagRenderStoryView = {
 			componentName: `AppPanel`,
 			cssLocation,
@@ -119,7 +119,7 @@ describe(`VSCode render story tree`, () => {
 					children: [
 						{
 							decoration: `unreachable`,
-							icon: `error`,
+							icon: `warning`,
 							label: `footer`,
 						},
 						{
