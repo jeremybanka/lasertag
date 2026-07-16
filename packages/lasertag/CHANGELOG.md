@@ -1,5 +1,11 @@
 # lasertag
 
+## 0.5.2
+
+### Patch Changes
+
+- e82407f: Add a VS Code Render Story Activity Bar view with expanded complete parallel possibilities, aligned status icons and colors, CSS and source navigation, merged unreachable selector branches at their closest story location, and inline expect-error explanations.
+
 ## 0.5.1
 
 ### Patch Changes
