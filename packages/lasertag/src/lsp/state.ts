@@ -452,7 +452,10 @@ const siblingRenderSourceSelectors = selectorFamily<
 	key: `siblingRenderSource`,
 })
 
-const renderStorySelectors = selectorFamily<RenderStoryAnalysis, string>({
+const unscopedRenderStorySelectors = selectorFamily<
+	RenderStoryAnalysis,
+	string
+>({
 	get:
 		(sourcePath) =>
 		({ get }) => {
@@ -463,13 +466,11 @@ const renderStorySelectors = selectorFamily<RenderStoryAnalysis, string>({
 			try {
 				return {
 					kind: `ready`,
-					renderStory: scopeRenderStoryToCssClassRoots(
-						analyzeRenderStory({
-							sourcePath,
-							sourceText,
-						}),
-						{ missingAttachment: `opaque` },
-					),
+					renderStory: analyzeRenderStory({
+						scopeToCssClassRoots: false,
+						sourcePath,
+						sourceText,
+					}),
 				}
 			} catch (error) {
 				return {
@@ -477,6 +478,24 @@ const renderStorySelectors = selectorFamily<RenderStoryAnalysis, string>({
 					message: messageFromError(error),
 				}
 			}
+		},
+	key: `unscopedRenderStory`,
+})
+
+const renderStorySelectors = selectorFamily<RenderStoryAnalysis, string>({
+	get:
+		(sourcePath) =>
+		({ get }) => {
+			const analysis = get(unscopedRenderStorySelectors, sourcePath)
+
+			return analysis.kind === `ready`
+				? {
+						kind: `ready`,
+						renderStory: scopeRenderStoryToCssClassRoots(analysis.renderStory, {
+							missingAttachment: `opaque`,
+						}),
+					}
+				: analysis
 		},
 	key: `renderStory`,
 })
@@ -736,6 +755,7 @@ function createSilo(): Silo {
 		fileTextSelectors,
 		documentUriSelectors,
 		siblingRenderSourceSelectors,
+		unscopedRenderStorySelectors,
 		renderStorySelectors,
 		cssSelectorAnalysisSelectors,
 		cssReachabilityAnalysisSelectors,
@@ -1096,7 +1116,7 @@ export function createLasertagLspState(
 				uri: silo.getState(documentUriSelectors, source.sourcePath),
 			}
 			const renderStoryAnalysis = silo.getState(
-				renderStorySelectors,
+				unscopedRenderStorySelectors,
 				source.sourcePath,
 			)
 

@@ -597,6 +597,54 @@ import css from "./AppPanel.module.css"
 		})
 	})
 
+	it(`shows return alternatives outside the CSS ownership root`, () => {
+		const fileSystem = createMemoryFileSystem({
+			[cssPath]: createCssSource(`header`),
+			[tsxPath]: `
+				import css from "./AppPanel.module.css"
+
+				export function AppPanel() {
+					if (false) return <bad-stuff />
+
+					return Math.random() < 0.5 ? (
+						<app-panel className={css.class}><header /></app-panel>
+					) : (
+						<app-panel-alt><other-stuff /></app-panel-alt>
+					)
+				}
+			`,
+		})
+		const state = createLasertagLspState(fileSystem.environment)
+		const view = state.getRenderStoryView(cssPath)
+
+		expect(view).toMatchObject({
+			kind: `ready`,
+			possibilities: [
+				{
+					roots: [{ label: `bad-stuff`, support: `none` }],
+				},
+				{
+					roots: [
+						{
+							children: [{ label: `header`, support: `supported` }],
+							label: `app-panel`,
+							support: `supported`,
+						},
+					],
+				},
+				{
+					roots: [
+						{
+							children: [{ label: `other-stuff`, support: `none` }],
+							label: `app-panel-alt`,
+							support: `none`,
+						},
+					],
+				},
+			],
+		})
+	})
+
 	it(`keeps a CSS Module in sidebar context when its render source is missing`, () => {
 		const fileSystem = createMemoryFileSystem({
 			[cssPath]: createCssSource(`header`),

@@ -16,6 +16,7 @@ export type AnalyzeAstroOptions = {
 	sourceText: string
 	filePath?: string
 	componentName?: string
+	scopeToCssClassRoots?: boolean
 }
 
 function opaque(reason: string): OpaqueStoryNode {
@@ -157,9 +158,13 @@ export function analyzeAstroRenderStory(
 		throw new Error(`Could not parse Astro render story: ${detail}`)
 	}
 
-	return scopeRenderStoryToCssClassRoots({
+	const renderStory = {
 		componentName: componentNameFromOptions(options),
 		roots: result.ast.children.flatMap(analyzeNode),
 		warnings: [],
-	})
+	}
+
+	return options.scopeToCssClassRoots === false
+		? renderStory
+		: scopeRenderStoryToCssClassRoots(renderStory)
 }
