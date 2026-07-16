@@ -65,6 +65,89 @@ describe(`render story evidence`, () => {
 		})
 	})
 
+	it(`collapses structurally equivalent sibling subtrees`, () => {
+		const renderStory: RenderStory = {
+			componentName: `AppPanel`,
+			roots: [
+				element(`app-panel`, [
+					{
+						attributes: [{ name: `aria-label`, value: `First` }],
+						children: [element(`span`)],
+						kind: `element`,
+						range: { end: 10, start: 1 },
+						tagName: `hello-world`,
+					},
+					{
+						attributes: [{ name: `aria-label`, value: `Second` }],
+						children: [element(`span`)],
+						kind: `element`,
+						range: { end: 30, start: 20 },
+						tagName: `hello-world`,
+					},
+					element(`unaccounted-for`),
+				]),
+			],
+			warnings: [],
+		}
+		const selectorPath: SelectorPath = [
+			{ relation: `self`, tagName: `app-panel` },
+			{ relation: `child`, tagName: `bogus-tag` },
+		]
+		const evidence = createRenderStoryEvidence(renderStory, [selectorPath])
+
+		expect(evidence?.possibilities[0]?.roots).toMatchObject([
+			{
+				children: [
+					{
+						children: [{ tagName: `span` }],
+						tagName: `hello-world`,
+					},
+					{ tagName: `unaccounted-for` },
+				],
+				tagName: `app-panel`,
+			},
+		])
+	})
+
+	it(`collapses structurally equivalent possibilities`, () => {
+		const renderStory: RenderStory = {
+			componentName: `AppPanel`,
+			roots: [
+				{
+					alternatives: [
+						[
+							{
+								attributes: [{ name: `aria-label`, value: `First` }],
+								children: [],
+								kind: `element`,
+								range: { end: 10, start: 1 },
+								tagName: `app-panel`,
+							},
+						],
+						[
+							{
+								attributes: [{ name: `aria-label`, value: `Second` }],
+								children: [],
+								kind: `element`,
+								range: { end: 30, start: 20 },
+								tagName: `app-panel`,
+							},
+						],
+					],
+					kind: `choice`,
+				},
+			],
+			warnings: [],
+		}
+		const selectorPath: SelectorPath = [
+			{ relation: `self`, tagName: `app-panel` },
+			{ relation: `child`, tagName: `bogus-tag` },
+		]
+		const evidence = createRenderStoryEvidence(renderStory, [selectorPath])
+
+		expect(evidence?.possibilities).toHaveLength(1)
+	})
+
 	it(`keeps opaque alternatives visible without treating them as elements`, () => {
 		const renderStory: RenderStory = {
 			componentName: `AppPanel`,

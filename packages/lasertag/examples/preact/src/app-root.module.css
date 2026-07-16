@@ -6,4 +6,5 @@ app-root.class {
 	> hello-world {
 		border: 1px solid var(--fg-color);
 	}
+	> bogus-tag {}
 }

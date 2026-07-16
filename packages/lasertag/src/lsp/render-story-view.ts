@@ -12,6 +12,7 @@ import type {
 	StoryNode,
 } from "../refractor/diagnostics.ts"
 import { findLasertagExpectErrorExplanation } from "../refractor/expect-error.ts"
+import { materializeRenderStory } from "../refractor/materialize-render-story.ts"
 import { findClosestRenderStoryPath } from "../refractor/render-story-evidence.ts"
 
 export const LASERTAG_RENDER_STORY_REQUEST = `lasertag/renderStory`
@@ -90,54 +91,6 @@ function location(
 		...range,
 		uri: pathToFileURL(filePath).href,
 	}
-}
-
-function appendPossibilities(
-	left: StoryChild[][],
-	right: StoryChild[][],
-	limit: number,
-): StoryChild[][] {
-	const possibilities: StoryChild[][] = []
-
-	for (const leftChildren of left) {
-		for (const rightChildren of right) {
-			possibilities.push([...leftChildren, ...rightChildren])
-
-			if (possibilities.length >= limit) return possibilities
-		}
-	}
-
-	return possibilities
-}
-
-function materializeChild(child: StoryChild, limit: number): StoryChild[][] {
-	if (child.kind === `opaque`) return [[child]]
-	if (child.kind === `choice`) {
-		return child.alternatives
-			.flatMap((alternative) => materializeChildren(alternative, limit))
-			.slice(0, limit)
-	}
-
-	return materializeChildren(child.children, limit).map((children) => [
-		{ ...child, children },
-	])
-}
-
-function materializeChildren(
-	children: StoryChild[],
-	limit: number,
-): StoryChild[][] {
-	let possibilities: StoryChild[][] = [[]]
-
-	for (const child of children) {
-		possibilities = appendPossibilities(
-			possibilities,
-			materializeChild(child, limit),
-			limit,
-		)
-	}
-
-	return possibilities
 }
 
 function selectorPathMatchesNodePath(
@@ -432,7 +385,7 @@ function insertUnreachableStyle(
 export function createRenderStoryView(
 	options: CreateRenderStoryViewOptions,
 ): Extract<LasertagRenderStoryView, { kind: `ready` }> {
-	const materialized = materializeChildren(
+	const materialized = materializeRenderStory(
 		options.renderStory.roots,
 		MAX_RENDER_STORY_POSSIBILITIES + 1,
 	)

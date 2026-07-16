@@ -5,59 +5,13 @@ import type {
 	SelectorPath,
 	StoryChild,
 } from "./diagnostics.ts"
+import { materializeRenderStory } from "./materialize-render-story.ts"
 
 const DEFAULT_MAX_POSSIBILITIES = 3
 const MAX_MATERIALIZED_POSSIBILITIES = 48
 
 type ScoredPossibility = RenderStoryEvidencePossibility & {
 	distance: number
-}
-
-function combineChildren(
-	left: StoryChild[][],
-	right: StoryChild[][],
-	limit: number,
-): StoryChild[][] {
-	const combined: StoryChild[][] = []
-
-	for (const leftChildren of left) {
-		for (const rightChildren of right) {
-			combined.push([...leftChildren, ...rightChildren])
-			if (combined.length >= limit) return combined
-		}
-	}
-
-	return combined
-}
-
-function materializeChild(child: StoryChild, limit: number): StoryChild[][] {
-	if (child.kind === `opaque`) return [[child]]
-	if (child.kind === `choice`) {
-		return child.alternatives
-			.flatMap((alternative) => materializeChildren(alternative, limit))
-			.slice(0, limit)
-	}
-
-	return materializeChildren(child.children, limit).map((children) => [
-		{ ...child, children },
-	])
-}
-
-function materializeChildren(
-	children: StoryChild[],
-	limit: number,
-): StoryChild[][] {
-	let possibilities: StoryChild[][] = [[]]
-
-	for (const child of children) {
-		possibilities = combineChildren(
-			possibilities,
-			materializeChild(child, limit),
-			limit,
-		)
-	}
-
-	return possibilities
 }
 
 function elementPaths(children: StoryChild[]): string[][] {
@@ -189,7 +143,7 @@ function evidenceForPath(
 	selectorPath: SelectorPath,
 	maxPossibilities: number,
 ): RenderStoryEvidence {
-	const scored = materializeChildren(
+	const scored = materializeRenderStory(
 		renderStory.roots,
 		MAX_MATERIALIZED_POSSIBILITIES,
 	).map((roots): ScoredPossibility => {
@@ -202,14 +156,6 @@ function evidenceForPath(
 			(left, right) =>
 				right.matchedSegments - left.matchedSegments ||
 				left.distance - right.distance,
-		)
-		.filter(
-			(possibility, index, all) =>
-				all.findIndex(
-					(candidate) =>
-						JSON.stringify(candidate.roots) ===
-						JSON.stringify(possibility.roots),
-				) === index,
 		)
 		.slice(0, maxPossibilities)
 		.map(({ distance: _, ...possibility }) => possibility)
