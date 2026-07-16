@@ -87,6 +87,7 @@ type VscodeModule = {
 	TreeItem: new (label: string, collapsibleState?: number) => TreeItem
 	TreeItemCollapsibleState: {
 		Collapsed: number
+		Expanded: number
 		None: number
 	}
 	TextEditorRevealType: {
@@ -183,7 +184,9 @@ class RenderStoryTreeProvider {
 		const item = new vscode.TreeItem(
 			entry.label,
 			entry.children.length > 0
-				? vscode.TreeItemCollapsibleState.Collapsed
+				? entry.expanded
+					? vscode.TreeItemCollapsibleState.Expanded
+					: vscode.TreeItemCollapsibleState.Collapsed
 				: vscode.TreeItemCollapsibleState.None,
 		)
 
@@ -192,9 +195,11 @@ class RenderStoryTreeProvider {
 
 		if (entry.icon) {
 			const color =
-				entry.icon === `warning`
-					? new vscode.ThemeColor(`list.warningForeground`)
-					: undefined
+				entry.decoration === `unreachable`
+					? new vscode.ThemeColor(`list.errorForeground`)
+					: entry.decoration === `unsupported`
+						? new vscode.ThemeColor(`disabledForeground`)
+						: new vscode.ThemeColor(`foreground`)
 
 			item.iconPath = new vscode.ThemeIcon(entry.icon, color)
 		}
@@ -261,17 +266,24 @@ class RenderStoryDecorationProvider {
 	provideFileDecoration(uri: Uri): unknown {
 		if (uri.scheme !== `lasertag-story`) return
 
-		if (uri.path.startsWith(`/supported/`)) {
+		if (uri.path.startsWith(`/regular/`)) {
 			return {
-				color: new vscode.ThemeColor(`charts.green`),
+				color: new vscode.ThemeColor(`foreground`),
 				propagate: false,
-				tooltip: `Styled branch`,
+			}
+		}
+
+		if (uri.path.startsWith(`/unsupported/`)) {
+			return {
+				color: new vscode.ThemeColor(`disabledForeground`),
+				propagate: false,
+				tooltip: `Unstyled branch`,
 			}
 		}
 
 		if (uri.path.startsWith(`/unreachable/`)) {
 			return {
-				color: new vscode.ThemeColor(`list.warningForeground`),
+				color: new vscode.ThemeColor(`list.errorForeground`),
 				propagate: false,
 				tooltip: `Styled, but unreachable`,
 			}

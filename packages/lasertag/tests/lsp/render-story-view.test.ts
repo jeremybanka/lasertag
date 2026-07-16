@@ -64,6 +64,16 @@ function findNode(
 	}
 }
 
+function findNodes(
+	nodes: RenderStoryViewNode[],
+	predicate: (node: RenderStoryViewNode) => boolean,
+): RenderStoryViewNode[] {
+	return nodes.flatMap((node) => [
+		...(predicate(node) ? [node] : []),
+		...findNodes(node.children, predicate),
+	])
+}
+
 describe(`render story sidebar view`, () => {
 	it(`materializes parallel stories and links supported nodes to CSS`, () => {
 		const cssSource = `
@@ -96,27 +106,87 @@ describe(`render story sidebar view`, () => {
 			tooltip: `No matching style; open the render source`,
 		})
 		expect(avatar?.location?.uri).toBe(`file://${sourcePath}`)
-		expect(view.unreachableStyles).toMatchObject([
+		const expectedFooters = findNodes(roots, (node) => node.label === `footer`)
+
+		expect(expectedFooters).toHaveLength(2)
+		expect(expectedFooters).toMatchObject([
 			{
-				expected: true,
-				selector: `account-panel.class > footer`,
+				expectErrorExplanation: `rendered by an external portal`,
+				support: `expected-unreachable`,
 			},
+			{
+				expectErrorExplanation: `rendered by an external portal`,
+				support: `expected-unreachable`,
+			},
+		])
+		expect(expectedFooters[0]?.location?.uri).toBe(`file://${cssPath}`)
+	})
+
+	it(`inserts unreachable styles after the closest real selector prefix`, () => {
+		const view = createView(`
+			account-panel.class {
+				> profile-header {
+					> avatars {}
+				}
+			}
+		`)
+		const roots = view.possibilities.flatMap(({ roots }) => roots)
+		const unreachableAvatars = findNodes(
+			roots,
+			(node) => node.kind === `selector` && node.label === `avatars`,
+		)
+		const actualProfileHeader = findNodes(
+			roots,
+			(node) => node.kind === `element` && node.label === `profile-header`,
+		)[0]
+		const insertedProfileHeader = findNodes(
+			roots,
+			(node) => node.kind === `selector` && node.label === `profile-header`,
+		)[0]
+
+		expect(unreachableAvatars).toHaveLength(2)
+		expect(unreachableAvatars).toMatchObject([
+			{ support: `unreachable` },
+			{ support: `unreachable` },
+		])
+		expect(actualProfileHeader?.children).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ kind: `selector`, label: `avatars` }),
+			]),
+		)
+		expect(insertedProfileHeader?.children).toMatchObject([
+			{ kind: `selector`, label: `avatars` },
 		])
 	})
 
-	it(`marks unsuppressed unreachable styles as warnings`, () => {
+	it(`merges nested unreachable selectors at their shared inserted root`, () => {
 		const view = createView(`
 			account-panel.class {
-				> footer {}
+				> fake-thing {
+					> super-fake {}
+				}
 			}
 		`)
 
-		expect(view.unreachableStyles).toMatchObject([
-			{
-				expected: false,
-				selector: `account-panel.class > footer`,
-			},
-		])
+		for (const possibility of view.possibilities) {
+			const root = possibility.roots[0]
+			const fakeThings = root?.children.filter(
+				(node) => node.kind === `selector` && node.label === `fake-thing`,
+			)
+
+			expect(fakeThings).toHaveLength(1)
+			expect(fakeThings?.[0]).toMatchObject({
+				children: [
+					{
+						children: [],
+						kind: `selector`,
+						label: `super-fake`,
+					},
+				],
+				kind: `selector`,
+				label: `fake-thing`,
+			})
+		}
 	})
 
 	it(`caps combinatorial render stories`, () => {

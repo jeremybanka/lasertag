@@ -15,7 +15,7 @@ const sourceLocation = {
 }
 
 describe(`VSCode render story tree`, () => {
-	it(`groups parallel possibilities and colors only supported nodes`, () => {
+	it(`expands parallel possibilities with aligned support icons and colors`, () => {
 		const view: LasertagRenderStoryView = {
 			componentName: `AppPanel`,
 			cssLocation,
@@ -43,7 +43,6 @@ describe(`VSCode render story tree`, () => {
 			],
 			sourceLocation,
 			truncated: false,
-			unreachableStyles: [],
 		}
 		const tree = createRenderStoryTree(view)
 
@@ -53,78 +52,91 @@ describe(`VSCode render story tree`, () => {
 					{
 						children: [
 							{
+								decoration: `unsupported`,
+								icon: `circle-slash`,
 								label: `avatar`,
 								location: sourceLocation,
 							},
 						],
-						decoration: `supported`,
+						decoration: `regular`,
+						expanded: true,
+						icon: `pass`,
 						label: `app-panel`,
 						location: cssLocation,
 					},
 				],
+				decoration: `regular`,
 				description: `AppPanel`,
+				expanded: true,
+				icon: `list-tree`,
 				label: `Possibility 1`,
 			},
 		])
-		expect(tree[0]?.children[0]?.children[0]).not.toHaveProperty(`decoration`)
 	})
 
-	it(`distinguishes warning and expected unreachable styles`, () => {
+	it(`keeps unreachable selectors in the story with error or expected styling`, () => {
 		const view: LasertagRenderStoryView = {
 			componentName: `AppPanel`,
 			cssLocation,
 			kind: `ready`,
-			possibilities: [],
-			sourceLocation,
-			truncated: false,
-			unreachableStyles: [
+			possibilities: [
 				{
-					expected: false,
-					location: cssLocation,
-					path: [
-						{ relation: `self`, tagName: `app-panel` },
-						{ relation: `child`, tagName: `footer` },
+					roots: [
+						{
+							children: [
+								{
+									children: [],
+									kind: `selector`,
+									label: `footer`,
+									location: cssLocation,
+									support: `unreachable`,
+								},
+								{
+									children: [],
+									expectErrorExplanation: `rendered by a portal`,
+									kind: `selector`,
+									label: `… portal-card`,
+									location: cssLocation,
+									support: `expected-unreachable`,
+								},
+							],
+							kind: `element`,
+							label: `app-panel`,
+							location: cssLocation,
+							support: `supported`,
+						},
 					],
-					selector: `app-panel.class > footer`,
-				},
-				{
-					expected: true,
-					location: cssLocation,
-					path: [
-						{ relation: `self`, tagName: `app-panel` },
-						{ relation: `descendant`, tagName: `portal-card` },
-					],
-					selector: `app-panel.class portal-card`,
 				},
 			],
+			sourceLocation,
+			truncated: false,
 		}
-		const group = createRenderStoryTree(view)[0]
+		const possibility = createRenderStoryTree(view)[0]
 
-		expect(group).toMatchObject({
+		expect(possibility).toMatchObject({
 			children: [
 				{
 					children: [
 						{
 							decoration: `unreachable`,
+							icon: `error`,
 							label: `footer`,
 						},
-					],
-					label: `app-panel`,
-				},
-				{
-					children: [
 						{
-							label: `… portal-card *`,
+							decoration: `regular`,
+							description: `rendered by a portal`,
+							icon: `info`,
+							label: `… portal-card`,
 						},
 					],
+					decoration: `regular`,
+					icon: `pass`,
 					label: `app-panel`,
 				},
 			],
-			description: `2`,
-			icon: `warning`,
-			label: `Unreachable styles`,
+			expanded: true,
+			label: `Possibility 1`,
 		})
-		expect(group?.children[1]?.children[0]).not.toHaveProperty(`decoration`)
 	})
 
 	it(`shows analysis availability without inventing a story`, () => {

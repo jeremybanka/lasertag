@@ -225,16 +225,20 @@ calling an editor command.
 When a `.module.css` file or its same-named `.tsx` or `.astro` neighbor is
 active, the extension contributes a Lasertag Activity Bar view named **Render
 Story**. Each numbered top-level item is one complete render possibility.
-Branches with matching CSS are green and open the most specific matching
-selector; branches without styles open their render-source tag. The view-title
+The story is expanded by default, and every row has an aligned semantic icon.
+Branches with matching CSS use a regular-color pass icon and open the most
+specific matching selector; branches without styles use an inactive
+circle-slash or question icon and open their render-source tag. The view-title
 actions jump directly between the component and its styles.
 
-Selectors that are styled but unreachable in every possibility appear in a
-nested **Unreachable styles** section. Unexpected entries use the editor's
-warning color. A selector suppressed by `@lasertag-expect-error` uses normal
-text with a trailing `*`, and still opens its CSS location. The view materializes
-at most 48 possibilities so heavily conditional components cannot make the
-editor unresponsive.
+Selectors that are styled but unreachable are inserted into each possibility
+after their closest matching real branch. Shared unreachable prefixes are merged
+into one branch. Unexpected continuations use the editor's error color and error
+icon. A selector suppressed by
+`@lasertag-expect-error` uses normal text with an info icon and shows the user's
+explanation in VS Code's subdued secondary-text treatment. It still opens its
+CSS location. The view materializes at most 48 possibilities so heavily
+conditional components cannot make the editor unresponsive.
 
 ## Standalone Language Server
 

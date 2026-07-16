@@ -81,6 +81,17 @@ function findExpectErrorDirectives(sourceText: string): ExpectErrorDirective[] {
 	return directives
 }
 
+export function findLasertagExpectErrorExplanation(
+	sourceText: string,
+	targetOffset: number,
+): string | undefined {
+	const targetLine = lineAtOffset(sourceText, targetOffset)
+
+	return findExpectErrorDirectives(sourceText).find(
+		(directive) => directive.targetLine === targetLine,
+	)?.explanation
+}
+
 function directiveDiagnostic(
 	code: `expect-error-explanation-too-short` | `unused-expect-error`,
 	message: string,

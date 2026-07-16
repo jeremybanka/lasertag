@@ -16,12 +16,15 @@ file changes. If both source siblings exist, Lasertag reports an ambiguity error
   sibling component's render story.
 - Adds a Lasertag Activity Bar view while a CSS Module or its same-named render
   source is active. **Render Story** shows each parallel possibility as its own
-  nested tree: green branches have matching styles and open those styles when
-  selected; unstyled branches open their JSX or Astro source.
-- Collects styled selectors that no render possibility can reach under
-  **Unreachable styles**. Warning-colored entries are unexpected; normal entries
-  ending in `*` are suppressed by `@lasertag-expect-error`. Every entry opens its
-  selector in the CSS Module.
+  nested tree, expanded by default. Every row has an aligned semantic icon.
+  Regular-color pass branches have matching styles and open those styles when
+  selected; inactive circle-slash or question branches have no known matching
+  style and open their JSX or Astro source.
+- Inserts styled selectors that no render possibility can reach at the closest
+  matching location inside each tree. Error-colored branches use an error icon;
+  regular-color branches with an info icon show the user's
+  `@lasertag-expect-error` explanation as subdued secondary text. Every inserted
+  branch opens its selector in the CSS Module.
 - Offers a quick fix and a command to remove diagnosed selectors safely from
   selector lists or whole rules.
 

@@ -11,6 +11,8 @@ import type {
 	StoryChild,
 	StoryNode,
 } from "../refractor/diagnostics.ts"
+import { findLasertagExpectErrorExplanation } from "../refractor/expect-error.ts"
+import { findClosestRenderStoryPath } from "../refractor/render-story-evidence.ts"
 
 export const LASERTAG_RENDER_STORY_REQUEST = `lasertag/renderStory`
 export const LASERTAG_RENDER_STORY_CHANGED_NOTIFICATION = `lasertag/renderStoryChanged`
@@ -33,10 +35,11 @@ export type RenderStoryViewLocation = {
 
 export type RenderStoryViewNode = {
 	children: RenderStoryViewNode[]
-	kind: `element` | `opaque`
+	expectErrorExplanation?: string
+	kind: `element` | `opaque` | `selector`
 	label: string
 	location?: RenderStoryViewLocation
-	support: `none` | `supported`
+	support: `expected-unreachable` | `none` | `supported` | `unreachable`
 	tooltip?: string
 }
 
@@ -46,6 +49,7 @@ export type RenderStoryViewPossibility = {
 
 export type RenderStoryViewUnreachableStyle = {
 	expected: boolean
+	expectErrorExplanation?: string
 	location: RenderStoryViewLocation
 	path: SelectorPath
 	selector: string
@@ -68,7 +72,6 @@ export type LasertagRenderStoryView =
 			possibilities: RenderStoryViewPossibility[]
 			sourceLocation: RenderStoryViewLocation
 			truncated: boolean
-			unreachableStyles: RenderStoryViewUnreachableStyle[]
 	  }
 
 export type CreateRenderStoryViewOptions = {
@@ -272,16 +275,158 @@ function unreachableStyles(
 				analysis.reachability === `unreachable`,
 		)
 		.flatMap((analysis) =>
-			analysis.paths.map(({ path }) => ({
-				expected: !hasDeadSelectorDiagnostic(
+			analysis.paths.map(({ path }) => {
+				const expected = !hasDeadSelectorDiagnostic(
 					analysis,
 					options.reachabilityAnalysis,
-				),
-				location: location(options.cssPath, analysis.range),
-				path,
-				selector: analysis.selector,
-			})),
+				)
+				const expectErrorExplanation = expected
+					? findLasertagExpectErrorExplanation(
+							options.cssSource,
+							analysis.range.start,
+						)
+					: undefined
+
+				return {
+					expected,
+					...(expectErrorExplanation === undefined
+						? {}
+						: { expectErrorExplanation }),
+					location: location(options.cssPath, analysis.range),
+					path,
+					selector: analysis.selector,
+				}
+			}),
 		)
+}
+
+function matchedActualPath(
+	closestPath: string[],
+	selectorPath: SelectorPath,
+	matchedSegments: number,
+): string[] {
+	if (matchedSegments === 0) return []
+
+	let actualIndex = 0
+
+	for (
+		let selectorIndex = 1;
+		selectorIndex < matchedSegments;
+		selectorIndex += 1
+	) {
+		const segment = selectorPath[selectorIndex]
+
+		if (!segment) break
+
+		actualIndex =
+			segment.relation === `child`
+				? actualIndex + 1
+				: closestPath.indexOf(segment.tagName, actualIndex + 1)
+	}
+
+	return closestPath.slice(0, actualIndex + 1)
+}
+
+function unreachableBranch(
+	style: RenderStoryViewUnreachableStyle,
+	segments: SelectorPath,
+): RenderStoryViewNode | undefined {
+	const [segment, ...descendants] = segments
+
+	if (!segment) return
+
+	const child = unreachableBranch(style, descendants)
+	const terminal = child === undefined
+	const label = `${segment.relation === `descendant` ? `… ` : ``}${segment.tagName}`
+
+	return {
+		children: child ? [child] : [],
+		...(terminal && style.expectErrorExplanation !== undefined
+			? { expectErrorExplanation: style.expectErrorExplanation }
+			: {}),
+		kind: `selector`,
+		label,
+		location: style.location,
+		support: style.expected ? `expected-unreachable` : `unreachable`,
+		tooltip: style.expected
+			? `${style.selector}\nExpected with @lasertag-expect-error: ${style.expectErrorExplanation ?? ``}`
+			: `${style.selector}\nStyled, but unreachable in this render story`,
+	}
+}
+
+function mergeSelectorBranch(
+	children: RenderStoryViewNode[],
+	branch: RenderStoryViewNode,
+): RenderStoryViewNode[] {
+	const matchingIndex = children.findIndex(
+		(child) => child.kind === `selector` && child.label === branch.label,
+	)
+
+	if (matchingIndex === -1) return [...children, branch]
+
+	const matching = children[matchingIndex]
+
+	if (!matching) return [...children, branch]
+
+	const mergedChildren = branch.children.reduce(
+		(current, descendant) => mergeSelectorBranch(current, descendant),
+		matching.children,
+	)
+	const merged = { ...branch, ...matching, children: mergedChildren }
+
+	return children.map((child, index) =>
+		index === matchingIndex ? merged : child,
+	)
+}
+
+function insertUnreachableStyle(
+	roots: RenderStoryViewNode[],
+	storyRoots: StoryChild[],
+	style: RenderStoryViewUnreachableStyle,
+): RenderStoryViewNode[] {
+	const closest = findClosestRenderStoryPath(storyRoots, style.path)
+	const branch = unreachableBranch(
+		style,
+		style.path.slice(closest.matchedSegments),
+	)
+
+	if (!branch) return roots
+	const insertedBranch = branch
+
+	const parentPath = matchedActualPath(
+		closest.closestPath,
+		style.path,
+		closest.matchedSegments,
+	)
+
+	if (parentPath.length === 0) return mergeSelectorBranch(roots, branch)
+
+	let inserted = false
+
+	function visit(
+		node: RenderStoryViewNode,
+		ancestors: string[],
+	): RenderStoryViewNode {
+		if (node.kind !== `element`) return node
+
+		const path = [...ancestors, node.label]
+		const children = node.children.map((child) => visit(child, path))
+
+		if (
+			!inserted &&
+			path.length === parentPath.length &&
+			path.every((segment, index) => parentPath[index] === segment)
+		) {
+			const mergedChildren = mergeSelectorBranch(children, insertedBranch)
+			inserted = true
+
+			return { ...node, children: mergedChildren }
+		}
+
+		return { ...node, children }
+	}
+
+	return roots.map((root) => visit(root, []))
 }
 
 export function createRenderStoryView(
@@ -292,11 +437,17 @@ export function createRenderStoryView(
 		MAX_RENDER_STORY_POSSIBILITIES + 1,
 	)
 	const truncated = materialized.length > MAX_RENDER_STORY_POSSIBILITIES
+	const styles = unreachableStyles(options).toSorted(
+		(left, right) => left.path.length - right.path.length,
+	)
 	const possibilities = materialized
 		.slice(0, MAX_RENDER_STORY_POSSIBILITIES)
 		.map(
 			(roots): RenderStoryViewPossibility => ({
-				roots: roots.map((root) => createViewNode(root, [], options)),
+				roots: styles.reduce(
+					(viewRoots, style) => insertUnreachableStyle(viewRoots, roots, style),
+					roots.map((root) => createViewNode(root, [], options)),
+				),
 			}),
 		)
 
@@ -307,6 +458,5 @@ export function createRenderStoryView(
 		possibilities,
 		sourceLocation: location(options.sourcePath),
 		truncated,
-		unreachableStyles: unreachableStyles(options),
 	}
 }
