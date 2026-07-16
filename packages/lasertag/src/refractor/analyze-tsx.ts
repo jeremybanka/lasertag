@@ -22,6 +22,7 @@ export type AnalyzeTsxOptions = {
 	filePath?: string
 	componentName?: string
 	maxComponentDepth?: number
+	scopeToCssClassRoots?: boolean
 	typescriptSdkPath?: string
 }
 
@@ -837,16 +838,22 @@ function analyzeIndexedComponent(
 	sourceFile: ts.SourceFile,
 	index: ComponentIndex,
 	componentName: string,
-	options: Pick<AnalyzeTsxOptions, "maxComponentDepth">,
+	options: Pick<
+		AnalyzeTsxOptions,
+		"maxComponentDepth" | "scopeToCssClassRoots"
+	>,
 ): RenderStory {
 	const warnings: RenderStoryWarning[] = []
 	const context = createAnalyzeContext(sourceFile, index, warnings, options)
-
-	return scopeRenderStoryToCssClassRoots({
+	const renderStory = {
 		componentName,
 		roots: analyzeComponent(context, componentName, []),
 		warnings,
-	})
+	}
+
+	return options.scopeToCssClassRoots === false
+		? renderStory
+		: scopeRenderStoryToCssClassRoots(renderStory)
 }
 
 export function analyzeTsxRenderStory(
@@ -867,12 +874,15 @@ export function analyzeTsxRenderStory(
 		}
 
 		const context = createAnalyzeContext(sourceFile, index, warnings, options)
-
-		return scopeRenderStoryToCssClassRoots({
+		const renderStory = {
 			componentName,
 			roots: analyzeComponent(context, componentName, []),
 			warnings,
-		})
+		}
+
+		return options.scopeToCssClassRoots === false
+			? renderStory
+			: scopeRenderStoryToCssClassRoots(renderStory)
 	})
 }
 

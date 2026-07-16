@@ -8,6 +8,7 @@ export type AnalyzeRenderSourceOptions = {
 	sourcePath: string
 	sourceText: string
 	componentName?: string
+	scopeToCssClassRoots?: boolean
 	typescriptSdkPath?: string
 }
 
@@ -24,6 +25,9 @@ export function analyzeRenderStory(
 			...(options.componentName
 				? { componentName: options.componentName }
 				: {}),
+			...(options.scopeToCssClassRoots === undefined
+				? {}
+				: { scopeToCssClassRoots: options.scopeToCssClassRoots }),
 		})
 	}
 
@@ -35,6 +39,9 @@ export function analyzeRenderStory(
 				...(options.componentName
 					? { componentName: options.componentName }
 					: {}),
+				...(options.scopeToCssClassRoots === undefined
+					? {}
+					: { scopeToCssClassRoots: options.scopeToCssClassRoots }),
 				...(options.typescriptSdkPath
 					? { typescriptSdkPath: options.typescriptSdkPath }
 					: {}),

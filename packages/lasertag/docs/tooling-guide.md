@@ -108,6 +108,9 @@ for integrations that construct render stories themselves. It defaults to
 `css.class`; pass `bindingName` and `exportName` to recognize another CSS Module
 binding and export. Its low-level default preserves a story with no attachment;
 pass `missingAttachment: "opaque"` for validation's conservative behavior.
+The source adapters scope by default; pass `scopeToCssClassRoots: false` when a
+tool needs the component's complete story, including return alternatives outside
+the CSS Module's ownership root.
 
 ## CLI Workflows
 
@@ -229,7 +232,10 @@ The story is expanded by default, and every row has an aligned semantic icon.
 Branches with matching CSS use a regular-color pass icon and open the most
 specific matching selector; branches without styles use an inactive
 circle-slash or question icon and open their render-source tag. The view-title
-actions jump directly between the component and its styles.
+actions jump directly between the component and its styles. The sidebar shows
+the complete component story, so return alternatives outside `css.class` remain
+visible as unsupported branches instead of empty possibilities; reachability
+analysis remains scoped to CSS ownership.
 
 Selectors that are styled but unreachable are inserted into each possibility
 after their closest matching real branch. Shared unreachable prefixes are merged
