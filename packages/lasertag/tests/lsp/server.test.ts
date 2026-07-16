@@ -567,6 +567,48 @@ import css from "./AppPanel.module.css"
 		])
 	})
 
+	it(`resolves sidebar stories from either side of a component pair`, () => {
+		const fileSystem = createMemoryFileSystem({
+			[cssPath]: createCssSource(`header`),
+			[tsxPath]: createTsxSource(`header`),
+		})
+		const state = createLasertagLspState(fileSystem.environment)
+
+		expect(state.getRenderStoryView(cssPath)).toMatchObject({
+			componentName: `AppPanel`,
+			kind: `ready`,
+			possibilities: [
+				{
+					roots: [
+						{
+							label: `app-panel`,
+							support: `supported`,
+						},
+					],
+				},
+			],
+		})
+		expect(state.getRenderStoryView(tsxPath)).toMatchObject({
+			componentName: `AppPanel`,
+			kind: `ready`,
+		})
+		expect(state.getRenderStoryView(`/project/README.md`)).toEqual({
+			kind: `outside-context`,
+		})
+	})
+
+	it(`keeps a CSS Module in sidebar context when its render source is missing`, () => {
+		const fileSystem = createMemoryFileSystem({
+			[cssPath]: createCssSource(`header`),
+		})
+		const state = createLasertagLspState(fileSystem.environment)
+
+		expect(state.getRenderStoryView(cssPath)).toMatchObject({
+			kind: `unavailable`,
+			message: `No same-named .tsx or .astro render source found.`,
+		})
+	})
+
 	it(`reuses an unchanged disk render source across analysis views`, () => {
 		const fileSystem = createMemoryFileSystem({
 			[astroPath]: createAstroSource(`header`),

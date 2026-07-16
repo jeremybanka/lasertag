@@ -81,6 +81,7 @@ describe(`lasertag vsix builder`, () => {
 			"package.json": JSON.stringify({ version: `9.8.7-test` }),
 			"src/lsp/server.ts": ``,
 			"src/vscode/extension.ts": `import "missing-vsix-runtime"`,
+			"src/vscode/LasertagActivity.svg": ``,
 			"src/vscode/LasertagIcon.png": ``,
 			"src/vscode/README.md": `# Lasertag`,
 		})
@@ -108,6 +109,7 @@ describe(`lasertag vsix builder`, () => {
 				export function deactivate() {}
 			`,
 			"src/vscode/README.md": `# Lasertag`,
+			"src/vscode/LasertagActivity.svg": ``,
 			"src/vscode/LasertagIcon.png": ``,
 			"src/lsp/server.ts": `console.log("server")`,
 		})
@@ -124,7 +126,11 @@ describe(`lasertag vsix builder`, () => {
 		const manifest = JSON.parse(
 			readFileSync(path.join(result.buildRoot, `package.json`), `utf-8`),
 		) as {
-			contributes: { configuration: { properties: Record<string, unknown> } }
+			contributes: {
+				configuration: { properties: Record<string, unknown> }
+				views: Record<string, Array<{ id: string }>>
+				viewsContainers: { activitybar: Array<{ id: string }> }
+			}
 			main: string
 			version: string
 		}
@@ -151,11 +157,20 @@ describe(`lasertag vsix builder`, () => {
 			default: ``,
 			type: `string`,
 		})
+		expect(manifest.contributes.viewsContainers.activitybar).toContainEqual(
+			expect.objectContaining({ id: `lasertag` }),
+		)
+		expect(manifest.contributes.views.lasertag).toContainEqual(
+			expect.objectContaining({ id: `lasertag.renderStory` }),
+		)
 		expect(existsSync(path.join(result.buildRoot, `dist/extension.mjs`))).toBe(
 			true,
 		)
 		expect(
 			existsSync(path.join(result.buildRoot, `dist/extension.mjs.map`)),
+		).toBe(true)
+		expect(
+			existsSync(path.join(result.buildRoot, `dist/LasertagActivity.svg`)),
 		).toBe(true)
 		expect(existsSync(path.join(astroCompilerPath, `dist/astro.wasm`))).toBe(
 			true,

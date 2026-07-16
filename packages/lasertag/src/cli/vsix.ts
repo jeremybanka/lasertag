@@ -12,6 +12,11 @@ import {
 	LASERTAG_RESTART_SERVER_COMMAND,
 	LASERTAG_RESTART_SERVER_TITLE,
 } from "../lsp/code-actions.ts"
+import {
+	LASERTAG_OPEN_RENDER_SOURCE_COMMAND,
+	LASERTAG_OPEN_STYLES_COMMAND,
+	LASERTAG_RENDER_STORY_VIEW_ID,
+} from "../vscode/render-story-tree.ts"
 
 export type LasertagVsixBuildResult = {
 	buildRoot: string
@@ -114,6 +119,7 @@ function createVscodeManifest(version: string) {
 			"onLanguage:astro",
 			"onLanguage:css",
 			"onLanguage:typescriptreact",
+			`onView:${LASERTAG_RENDER_STORY_VIEW_ID}`,
 			"workspaceContains:**/*.module.css",
 		],
 		extensionKind: ["workspace"],
@@ -130,7 +136,49 @@ function createVscodeManifest(version: string) {
 					command: LASERTAG_RESTART_SERVER_COMMAND,
 					title: LASERTAG_RESTART_SERVER_TITLE,
 				},
+				{
+					command: LASERTAG_OPEN_STYLES_COMMAND,
+					icon: `$(symbol-color)`,
+					title: `Lasertag: Open Styles`,
+				},
+				{
+					command: LASERTAG_OPEN_RENDER_SOURCE_COMMAND,
+					icon: `$(file-code)`,
+					title: `Lasertag: Open Render Source`,
+				},
 			],
+			viewsContainers: {
+				activitybar: [
+					{
+						id: `lasertag`,
+						icon: `dist/LasertagActivity.svg`,
+						title: `Lasertag`,
+					},
+				],
+			},
+			views: {
+				lasertag: [
+					{
+						id: LASERTAG_RENDER_STORY_VIEW_ID,
+						name: `Render Story`,
+						when: `lasertag.inContext`,
+					},
+				],
+			},
+			menus: {
+				"view/title": [
+					{
+						command: LASERTAG_OPEN_STYLES_COMMAND,
+						group: `navigation@1`,
+						when: `view == ${LASERTAG_RENDER_STORY_VIEW_ID} && lasertag.inContext`,
+					},
+					{
+						command: LASERTAG_OPEN_RENDER_SOURCE_COMMAND,
+						group: `navigation@2`,
+						when: `view == ${LASERTAG_RENDER_STORY_VIEW_ID} && lasertag.inContext`,
+					},
+				],
+			},
 			configuration: {
 				title: "Lasertag",
 				properties: {
@@ -320,6 +368,10 @@ export async function buildLasertagVsix(
 	await cp(
 		path.join(packageRoot, "src", "vscode", "LasertagIcon.png"),
 		path.join(packageDist, "LasertagIcon.png"),
+	)
+	await cp(
+		path.join(packageRoot, "src", "vscode", "LasertagActivity.svg"),
+		path.join(packageDist, "LasertagActivity.svg"),
 	)
 	await cp(
 		path.join(packageRoot, "src", "vscode", "README.md"),

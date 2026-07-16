@@ -166,7 +166,7 @@ function scorePath(
 	return { distance: 0, matchedSegments }
 }
 
-function closestPath(
+export function findClosestRenderStoryPath(
 	roots: StoryChild[],
 	selectorPath: SelectorPath,
 ): { closestPath: string[]; distance: number; matchedSegments: number } {
@@ -193,7 +193,7 @@ function evidenceForPath(
 		renderStory.roots,
 		MAX_MATERIALIZED_POSSIBILITIES,
 	).map((roots): ScoredPossibility => {
-		const closest = closestPath(roots, selectorPath)
+		const closest = findClosestRenderStoryPath(roots, selectorPath)
 
 		return { roots, ...closest }
 	})

@@ -40,6 +40,10 @@ import {
 	type SelectorPath,
 	type StoryChild,
 } from "../refractor/index.ts"
+import {
+	createRenderStoryView,
+	type LasertagRenderStoryView,
+} from "./render-story-view.ts"
 
 export {
 	isAstroPath,
@@ -1053,6 +1057,85 @@ export function createLasertagLspState(
 			return renderStoryAnalysis.kind === `ready`
 				? renderStoryAnalysis.renderStory
 				: undefined
+		},
+		getRenderStoryView(activePath: string): LasertagRenderStoryView {
+			const normalizedActivePath = normalizeFilePath(activePath)
+			const cssPath = isCssModulePath(normalizedActivePath)
+				? normalizedActivePath
+				: findSiblingCssModulePathFromConvention(normalizedActivePath)
+
+			if (!cssPath) return { kind: `outside-context` }
+
+			ensureCssDependencies(cssPath)
+
+			if (!silo.getState(fileSnapshotSelectors, cssPath).exists) {
+				return { kind: `outside-context` }
+			}
+
+			const cssLocation = {
+				end: 0,
+				start: 0,
+				uri: silo.getState(documentUriSelectors, cssPath),
+			}
+			const source = silo.getState(siblingRenderSourceSelectors, cssPath)
+
+			if (source.kind !== `ready`) {
+				return {
+					cssLocation,
+					kind: `unavailable`,
+					message:
+						source.kind === `ambiguous`
+							? source.message
+							: `No same-named .tsx or .astro render source found.`,
+				}
+			}
+
+			const sourceLocation = {
+				end: 0,
+				start: 0,
+				uri: silo.getState(documentUriSelectors, source.sourcePath),
+			}
+			const renderStoryAnalysis = silo.getState(
+				renderStorySelectors,
+				source.sourcePath,
+			)
+
+			if (renderStoryAnalysis.kind !== `ready`) {
+				return {
+					cssLocation,
+					kind: `unavailable`,
+					message:
+						renderStoryAnalysis.message ??
+						`Could not analyze the render story.`,
+					sourceLocation,
+				}
+			}
+
+			const cssAnalysis = silo.getState(cssSelectorAnalysisSelectors, cssPath)
+			const reachabilityAnalysis = silo.getState(
+				cssReachabilityAnalysisSelectors,
+				cssPath,
+			)
+
+			if (cssAnalysis.kind !== `ready` || !reachabilityAnalysis) {
+				return {
+					cssLocation,
+					kind: `unavailable`,
+					message:
+						cssAnalysis.kind === `ready`
+							? `Could not analyze CSS reachability.`
+							: (cssAnalysis.message ?? `Could not analyze the CSS Module.`),
+					sourceLocation,
+				}
+			}
+
+			return createRenderStoryView({
+				cssPath,
+				cssSource: silo.getState(fileTextSelectors, cssPath) ?? ``,
+				reachabilityAnalysis,
+				renderStory: renderStoryAnalysis.renderStory,
+				sourcePath: source.sourcePath,
+			})
 		},
 		getWatchedTsxPaths(): string[] {
 			return [...silo.getState(watchedTsxPathsAtom)]
