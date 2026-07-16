@@ -189,25 +189,66 @@ describe(`render story sidebar view`, () => {
 		}
 	})
 
+	it(`collapses structurally equivalent sibling subtrees`, () => {
+		const renderStory = scopeRenderStoryToCssClassRoots(
+			analyzeTsxRenderStory({
+				filePath: sourcePath,
+				sourceText: `
+					import css from "./AccountPanel.module.css"
+
+					export function AccountPanel() {
+						return (
+							<account-panel className={css.class}>
+								<hello-world aria-label="First"><span /></hello-world>
+								<hello-world aria-label="Second"><span /></hello-world>
+								<unaccounted-for />
+							</account-panel>
+						)
+					}
+				`,
+			}),
+			{ missingAttachment: `opaque` },
+		)
+		const cssSource = `account-panel.class > bogus-tag {}`
+		const selectorAnalyses = analyzeCssModuleSelectors(cssSource)
+		const view = createRenderStoryView({
+			cssPath,
+			cssSource,
+			reachabilityAnalysis: analyzeCssReachability({
+				cssSource,
+				renderStory,
+				selectorAnalyses,
+			}),
+			renderStory,
+			sourcePath,
+		})
+		const root = view.possibilities[0]?.roots[0]
+
+		expect(root?.children.map(({ label }) => label)).toEqual([
+			`hello-world`,
+			`unaccounted-for`,
+			`bogus-tag`,
+		])
+	})
+
 	it(`caps combinatorial render stories`, () => {
-		const choice = {
-			alternatives: [
-				[],
-				[
-					{
-						children: [],
-						kind: `element` as const,
-						tagName: `optional-item`,
-					},
-				],
-			],
-			kind: `choice` as const,
-		}
 		const renderStory: RenderStory = {
 			componentName: `ManyWorlds`,
 			roots: [
 				{
-					children: Array.from({ length: 6 }, () => choice),
+					children: Array.from({ length: 6 }, (_, index) => ({
+						alternatives: [
+							[],
+							[
+								{
+									children: [],
+									kind: `element` as const,
+									tagName: `optional-item-${index}`,
+								},
+							],
+						],
+						kind: `choice` as const,
+					})),
 					kind: `element`,
 					tagName: `many-worlds`,
 				},
