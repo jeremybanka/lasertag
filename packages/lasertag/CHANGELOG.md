@@ -1,5 +1,11 @@
 # lasertag
 
+## 0.5.4
+
+### Patch Changes
+
+- bcc46d0: Improve Solid JSX render-story analysis by lowering imported control-flow, boundary, suspense, hydration, and dynamic components into their possible DOM branches.
+
 ## 0.5.3
 
 ### Patch Changes
