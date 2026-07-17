@@ -1,10 +1,10 @@
-# Solid Support Plan
+# Solid Support
 
-Solid support should build on the existing TSX render-story extractor. Solid
+Solid support builds on the existing TSX render-story extractor. Solid
 uses TSX, and the TypeScript AST for ordinary markup is already the shape
 refractor understands.
 
-The future work is not:
+The architecture is not:
 
 ```text
 Solid source -> new reachability model
@@ -16,7 +16,7 @@ It is:
 Solid TSX source -> richer RenderStory
 ```
 
-CSS selector analysis and reachability should stay unchanged.
+CSS selector analysis and reachability stay unchanged.
 
 ## Current Support
 
@@ -29,6 +29,10 @@ Ordinary Solid TSX is broadly compatible today:
   `undefined` are handled by the generic TSX analyzer
 - local same-file components are expanded
 - imported components remain opaque boundaries
+- imported `Show`, `For`, `Index`, `Switch`/`Match`, `ErrorBoundary`,
+  `Suspense`, and `SuspenseList` primitives are lowered into possible branches
+- `Dynamic` and `NoHydration` from `solid-js/web` are lowered when their DOM
+  structure is knowable
 
 lasertag also ships `lasertag/solid-jsx`, which adds type support for
 hyphenated custom elements in Solid JSX.
@@ -38,7 +42,7 @@ refractor's reachability check is concerned with tag structure rather than prop
 names. The framework-specific class attribute is therefore not a blocker for
 dead-selector detection.
 
-## Where Precision Is Missing
+## Solid-Aware Lowering
 
 Solid's control-flow primitives are JSX components, not syntax. To the generic
 TSX analyzer, these look like ordinary imported components:
@@ -53,16 +57,13 @@ TSX analyzer, these look like ordinary imported components:
 </For>
 ```
 
-Today that is safe but imprecise. The analyzer should treat those branches as
-opaque rather than falsely dead, but it cannot yet see that `<enabled-state>` or
-`<item-row>` are reachable.
-
-The improvement is a Solid-aware lowering pass for known control-flow
-components.
+The analyzer resolves these component tags back to their Solid imports and sees
+that `<enabled-state>` and `<item-row>` are reachable. Unknown or unsupported
+branches remain opaque rather than producing false dead-selector diagnostics.
 
 ## Import-Aware Lowering
 
-Solid-specific handling should be import-aware. We should only lower a JSX tag
+Solid-specific handling is import-aware. It only lowers a JSX tag
 as a Solid primitive when it resolves to a binding imported from the expected
 Solid package.
 
@@ -76,7 +77,7 @@ import { Show as When } from "solid-js"
 This avoids accidentally giving special meaning to a user-defined `<Show>` or
 `<For>` component.
 
-The component index should track imported bindings enough to answer:
+The component index tracks imported bindings enough to answer:
 
 - does this JSX tag refer to `Show` from `solid-js`?
 - does this alias refer to `For`, `Index`, `Switch`, or `Match`?
@@ -88,23 +89,24 @@ The component index should track imported bindings enough to answer:
 
 `<Show>` represents an optional branch plus an optional fallback branch.
 
-Useful lowering:
+Lowering behavior:
 
 - children are reachable when `when` is truthy
 - `fallback={...}` is reachable when `when` is falsy
 - render-function children can be analyzed by parsing the returned JSX
 
-If children or fallback cannot be reduced confidently, insert an opaque branch.
+If children or fallback cannot be reduced confidently, the analyzer inserts an
+opaque branch.
 
 ### `For`
 
 `<For>` represents a repeated branch plus an optional empty-state branch.
 
-Useful lowering:
+Lowering behavior:
 
 - render-function children are reachable repeated content
 - `fallback={...}` is reachable when the collection is empty
-- non-function children should be treated conservatively
+- non-function children are treated conservatively
 
 The story model does not need to represent cardinality. If a repeated branch can
 exist once, its selector paths are reachable.
@@ -122,54 +124,52 @@ item. For render-story purposes, it can use the same lowering shape:
 `<Switch>` is a union of its reachable `<Match>` children plus an optional
 fallback.
 
-Useful lowering:
+Lowering behavior:
 
 - each imported Solid `<Match>` child contributes its children as possible
   branches
 - `fallback={...}` contributes another possible branch
-- non-`Match` children should become opaque or be analyzed conservatively
+- non-`Match` children become opaque
 
-`<Match>` outside a recognized `<Switch>` should remain opaque unless there is a
-clear reason to lower it independently.
+`<Match>` outside a recognized `<Switch>` remains opaque.
 
 ### `Dynamic`
 
 `<Dynamic>` from `solid-js/web` is usually a dynamic component boundary.
 
-Useful lowering:
+Lowering behavior:
 
 - `component="my-element"` can become an element node with that tag name
 - `component={SomeLocalComponent}` can expand the local component if it is in the
   same file
-- unknown dynamic values should remain opaque
+- unknown dynamic values remain opaque
 
 ### Portal-Like Components
 
-Portal-style rendering should be handled carefully because it changes DOM
+Portal-style rendering is handled carefully because it changes DOM
 placement. If content is rendered outside the component's local subtree, it
 should not make descendant selectors under the local root reachable.
 
-The first version should treat portals as opaque or out-of-tree, not as normal
-children.
+The analyzer treats portals as opaque, not as normal children.
 
 ## Implementation Shape
 
-The TSX analyzer should gain a small framework-lowering layer:
+The TSX analyzer uses a small framework-lowering layer:
 
 1. collect import bindings while building the component index
 2. keep the generic JSX element path for intrinsic tags and local components
-3. before treating an imported component as opaque, ask registered framework
-   lowerers whether they can produce `StoryChild[]`
-4. ship a Solid lowerer for `Show`, `For`, `Index`, `Switch`, `Match`, and
-   selected `solid-js/web` primitives
+3. before treating an imported component as opaque, ask the Solid lowerer
+   whether it can produce `StoryChild[]`
+4. lower supported Solid primitives before treating other imported components
+   as opaque
 
-The lowerer should use existing expression analysis for JSX expressions,
+The lowerer uses existing expression analysis for JSX expressions,
 callback bodies, fallback props, arrays, and conditional branches. Any uncertain
-case should return an opaque node.
+case returns an opaque node.
 
-## Tests
+## Test Coverage
 
-Solid support should start with golden fixtures:
+Solid support is covered with golden fixtures and CSS reachability tests for:
 
 - `Show` with children only
 - `Show` with fallback
@@ -183,16 +183,15 @@ Solid support should start with golden fixtures:
 - `Dynamic` with a literal custom-element tag
 - unknown `Dynamic` value that remains opaque
 
-Each fixture should assert the extracted `RenderStory`, then CSS reachability
-tests should confirm that selectors under lowered branches are considered
-reachable.
+The fixtures assert the extracted `RenderStory`, and CSS reachability tests
+confirm that selectors under lowered branches are considered reachable.
 
 ## Non-Goals
 
 This does not require understanding Solid's runtime reactivity. lasertag only
 needs the possible DOM shapes, not when signals update.
 
-Cross-file expansion should stay out of scope. Imported Solid components from
+Cross-file expansion remains out of scope. Imported Solid components from
 other files should remain opaque unless a later project-graph feature provides
 explicit, cached expansion.
 

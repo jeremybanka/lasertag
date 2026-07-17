@@ -39,15 +39,24 @@ type ComponentDefinition = {
 	range: SourceRange
 }
 
+type ImportBinding = {
+	importedName: string
+	moduleName: string
+}
+
 type ComponentIndex = {
 	components: Map<string, ComponentDefinition>
 	exportedNames: Set<string>
+	imports: Map<string, ImportBinding>
+	namespaceImports: Map<string, string>
 	defaultExportName?: string
 }
 
 type AnalyzeContext = {
 	sourceFile: ts.SourceFile
 	components: Map<string, ComponentDefinition>
+	imports: Map<string, ImportBinding>
+	namespaceImports: Map<string, string>
 	warnings: RenderStoryWarning[]
 	maxComponentDepth: number
 }
@@ -232,13 +241,49 @@ function addExportAssignment(
 	index.exportedNames.add(statement.expression.text)
 }
 
+function addImportDeclaration(
+	index: ComponentIndex,
+	statement: ts.ImportDeclaration,
+) {
+	if (!ts.isStringLiteralLikeNode(statement.moduleSpecifier)) return
+
+	const importClause = statement.importClause
+
+	if (!importClause) return
+
+	const moduleName = statement.moduleSpecifier.text
+	const namedBindings = importClause.namedBindings
+
+	if (namedBindings && ts.isNamedImports(namedBindings)) {
+		for (const element of namedBindings.elements) {
+			if (element.isTypeOnly) continue
+
+			index.imports.set(element.name.text, {
+				importedName: (element.propertyName ?? element.name).text,
+				moduleName,
+			})
+		}
+	}
+
+	if (namedBindings && ts.isNamespaceImport(namedBindings)) {
+		index.namespaceImports.set(namedBindings.name.text, moduleName)
+	}
+}
+
 function collectComponentIndex(sourceFile: ts.SourceFile): ComponentIndex {
 	const index: ComponentIndex = {
 		components: new Map(),
 		exportedNames: new Set(),
+		imports: new Map(),
+		namespaceImports: new Map(),
 	}
 
 	for (const statement of sourceFile.statements) {
+		if (ts.isImportDeclaration(statement)) {
+			addImportDeclaration(index, statement)
+			continue
+		}
+
 		if (ts.isFunctionDeclaration(statement)) {
 			addFunctionComponent(sourceFile, index, statement)
 			continue
@@ -496,6 +541,7 @@ function analyzeJsxAttributeValue(
 function analyzeJsxAttributes(
 	context: AnalyzeContext,
 	attributes: ts.JsxAttributes,
+	excludedNames: ReadonlySet<string> = new Set(),
 ): StoryAttribute[] {
 	return attributes.properties.flatMap((attribute) => {
 		if (ts.isJsxSpreadAttribute(attribute)) return []
@@ -504,7 +550,7 @@ function analyzeJsxAttributes(
 			attribute.name.getText(context.sourceFile),
 		)
 
-		if (name === `key` || name === `ref`) return []
+		if (name === `key` || name === `ref` || excludedNames.has(name)) return []
 
 		return [
 			{
@@ -522,8 +568,13 @@ function createStoryNode(
 	children: StoryChild[],
 	range: SourceRange,
 	attributes: ts.JsxAttributes,
+	excludedAttributeNames?: ReadonlySet<string>,
 ): StoryNode {
-	const storyAttributes = analyzeJsxAttributes(context, attributes)
+	const storyAttributes = analyzeJsxAttributes(
+		context,
+		attributes,
+		excludedAttributeNames,
+	)
 	const baseNode: StoryNode = {
 		kind: `element`,
 		tagName,
@@ -542,6 +593,330 @@ function isIntrinsicJsxTag(tagName: string): boolean {
 
 function isFragmentJsxTag(tagName: string): boolean {
 	return tagName === `Fragment` || tagName === `React.Fragment`
+}
+
+type ComponentJsxNode = ts.JsxElement | ts.JsxSelfClosingElement
+
+function jsxAttributes(node: ComponentJsxNode): ts.JsxAttributes {
+	return ts.isJsxElement(node)
+		? node.openingElement.attributes
+		: node.attributes
+}
+
+function jsxChildren(node: ComponentJsxNode): ts.NodeArray<ts.JsxChild> | [] {
+	return ts.isJsxElement(node) ? node.children : []
+}
+
+function findJsxAttribute(
+	context: AnalyzeContext,
+	node: ComponentJsxNode,
+	name: string,
+): ts.JsxAttribute | undefined {
+	for (const attribute of jsxAttributes(node).properties) {
+		if (ts.isJsxSpreadAttribute(attribute)) continue
+		if (attribute.name.getText(context.sourceFile) === name) return attribute
+	}
+}
+
+function resolveImportBinding(
+	context: AnalyzeContext,
+	tagName: string,
+): ImportBinding | undefined {
+	const directBinding = context.imports.get(tagName)
+
+	if (directBinding) return directBinding
+
+	const separatorIndex = tagName.indexOf(`.`)
+
+	if (separatorIndex < 1 || tagName.indexOf(`.`, separatorIndex + 1) >= 0) {
+		return
+	}
+
+	const namespaceName = tagName.slice(0, separatorIndex)
+	const moduleName = context.namespaceImports.get(namespaceName)
+
+	if (!moduleName) return
+
+	return {
+		importedName: tagName.slice(separatorIndex + 1),
+		moduleName,
+	}
+}
+
+function analyzeJsxAttributeRenderValue(
+	context: AnalyzeContext,
+	attribute: ts.JsxAttribute,
+	stack: string[],
+): StoryChild[] {
+	const initializer = attribute.initializer
+
+	if (!initializer || ts.isStringLiteral(initializer)) return []
+
+	if (ts.isJsxExpression(initializer)) {
+		if (!initializer.expression) return []
+
+		const functionBody = functionBodyFromExpression(initializer.expression)
+
+		return functionBody
+			? analyzeFunctionBody(context, functionBody, stack)
+			: analyzeExpression(context, initializer.expression, stack)
+	}
+
+	return [
+		opaque(
+			`unsupported JSX attribute render branch`,
+			context.sourceFile,
+			initializer,
+		),
+	]
+}
+
+function analyzeSolidTransparentChildren(
+	context: AnalyzeContext,
+	node: ComponentJsxNode,
+	stack: string[],
+): StoryChild[] {
+	return jsxChildren(node).flatMap((child) => {
+		if (ts.isJsxExpression(child) && child.expression) {
+			const functionBody = functionBodyFromExpression(child.expression)
+
+			if (functionBody) return analyzeFunctionBody(context, functionBody, stack)
+		}
+
+		return analyzeJsxChild(context, child, stack)
+	})
+}
+
+function analyzeSolidRepeatedChildren(
+	context: AnalyzeContext,
+	node: ComponentJsxNode,
+	stack: string[],
+): StoryChild[] {
+	const children = jsxChildren(node)
+	const meaningfulChildren = children.filter(
+		(child) =>
+			!ts.isJsxText(child) && !(ts.isJsxExpression(child) && !child.expression),
+	)
+
+	if (meaningfulChildren.length === 0) {
+		return [
+			opaque(`Solid loop without a render function`, context.sourceFile, node),
+		]
+	}
+
+	return meaningfulChildren.flatMap((child) => {
+		if (ts.isJsxExpression(child) && child.expression) {
+			const functionBody = functionBodyFromExpression(child.expression)
+
+			if (functionBody) return analyzeFunctionBody(context, functionBody, stack)
+		}
+
+		return [
+			opaque(
+				`Solid loop without an inline render function`,
+				context.sourceFile,
+				child,
+			),
+		]
+	})
+}
+
+function analyzeSolidFallback(
+	context: AnalyzeContext,
+	node: ComponentJsxNode,
+	stack: string[],
+): StoryChild[] | undefined {
+	const fallback = findJsxAttribute(context, node, `fallback`)
+
+	return fallback
+		? analyzeJsxAttributeRenderValue(context, fallback, stack)
+		: undefined
+}
+
+function analyzeSolidSwitchAlternatives(
+	context: AnalyzeContext,
+	children: readonly ts.JsxChild[],
+	stack: string[],
+): StoryChild[][] {
+	return children.flatMap((child): StoryChild[][] => {
+		if (ts.isJsxText(child)) return []
+		if (ts.isJsxExpression(child) && !child.expression) return []
+
+		if (ts.isJsxFragment(child)) {
+			return analyzeSolidSwitchAlternatives(context, child.children, stack)
+		}
+
+		if (ts.isJsxElement(child) || ts.isJsxSelfClosingElement(child)) {
+			const tagName = getJsxTagText(
+				context.sourceFile,
+				ts.isJsxElement(child) ? child.openingElement.tagName : child.tagName,
+			)
+			const binding = resolveImportBinding(context, tagName)
+
+			if (
+				binding?.moduleName === `solid-js` &&
+				binding.importedName === `Match`
+			) {
+				return [analyzeSolidTransparentChildren(context, child, stack)]
+			}
+		}
+
+		return [
+			[opaque(`non-Match child in Solid Switch`, context.sourceFile, child)],
+		]
+	})
+}
+
+function dynamicComponentValue(
+	context: AnalyzeContext,
+	attribute: ts.JsxAttribute,
+):
+	| { kind: `literal`; tagName: string }
+	| { kind: `local`; name: string }
+	| undefined {
+	const initializer = attribute.initializer
+
+	if (initializer && ts.isStringLiteral(initializer)) {
+		return { kind: `literal`, tagName: initializer.text }
+	}
+
+	if (!initializer || !ts.isJsxExpression(initializer)) return
+
+	let expression = initializer.expression
+
+	while (
+		expression &&
+		(ts.isParenthesizedExpression(expression) ||
+			ts.isAsExpression(expression) ||
+			ts.isSatisfiesExpression(expression) ||
+			ts.isNonNullExpression(expression) ||
+			ts.isTypeAssertion(expression))
+	) {
+		expression = expression.expression
+	}
+
+	if (expression && ts.isStringLiteralLikeNode(expression)) {
+		return { kind: `literal`, tagName: expression.text }
+	}
+
+	if (
+		expression &&
+		ts.isIdentifier(expression) &&
+		context.components.has(expression.text)
+	) {
+		return { kind: `local`, name: expression.text }
+	}
+}
+
+function lowerSolidComponent(
+	context: AnalyzeContext,
+	tagName: string,
+	node: ComponentJsxNode,
+	stack: string[],
+): StoryChild[] | undefined {
+	const binding = resolveImportBinding(context, tagName)
+
+	if (!binding) return
+
+	if (binding.moduleName === `solid-js`) {
+		if (binding.importedName === `Show`) {
+			return [
+				choice(
+					[
+						analyzeSolidTransparentChildren(context, node, stack),
+						analyzeSolidFallback(context, node, stack) ?? [],
+					],
+					context.sourceFile,
+					node,
+				),
+			]
+		}
+
+		if (binding.importedName === `For` || binding.importedName === `Index`) {
+			return [
+				choice(
+					[
+						analyzeSolidRepeatedChildren(context, node, stack),
+						analyzeSolidFallback(context, node, stack) ?? [],
+					],
+					context.sourceFile,
+					node,
+				),
+			]
+		}
+
+		if (binding.importedName === `Switch`) {
+			const alternatives = analyzeSolidSwitchAlternatives(
+				context,
+				jsxChildren(node),
+				stack,
+			)
+
+			alternatives.push(analyzeSolidFallback(context, node, stack) ?? [])
+
+			return [choice(alternatives, context.sourceFile, node)]
+		}
+
+		if (
+			binding.importedName === `ErrorBoundary` ||
+			binding.importedName === `Suspense`
+		) {
+			return [
+				choice(
+					[
+						analyzeSolidTransparentChildren(context, node, stack),
+						analyzeSolidFallback(context, node, stack) ?? [],
+					],
+					context.sourceFile,
+					node,
+				),
+			]
+		}
+
+		if (binding.importedName === `SuspenseList`) {
+			return analyzeSolidTransparentChildren(context, node, stack)
+		}
+
+		return
+	}
+
+	if (
+		binding.moduleName === `solid-js/web` &&
+		binding.importedName === `Dynamic`
+	) {
+		const componentAttribute = findJsxAttribute(context, node, `component`)
+		const componentValue = componentAttribute
+			? dynamicComponentValue(context, componentAttribute)
+			: undefined
+
+		if (componentValue?.kind === `local`) {
+			return analyzeComponent(context, componentValue.name, stack)
+		}
+
+		if (componentValue?.kind === `literal`) {
+			return [
+				createStoryNode(
+					context,
+					componentValue.tagName,
+					ts.isJsxElement(node)
+						? analyzeJsxChildren(context, node.children, stack)
+						: [],
+					rangeOf(context.sourceFile, componentAttribute ?? node),
+					jsxAttributes(node),
+					new Set([`component`]),
+				),
+			]
+		}
+
+		return [opaque(`unknown Solid Dynamic component`, context.sourceFile, node)]
+	}
+
+	if (
+		binding.moduleName === `solid-js/web` &&
+		binding.importedName === `NoHydration`
+	) {
+		return analyzeSolidTransparentChildren(context, node, stack)
+	}
 }
 
 function analyzeJsxElement(
@@ -599,9 +974,13 @@ function analyzeJsxSelfClosingElement(
 function analyzeComponentTag(
 	context: AnalyzeContext,
 	tagName: string,
-	node: ts.Node,
+	node: ComponentJsxNode,
 	stack: string[],
 ): StoryChild[] {
+	const loweredChildren = lowerSolidComponent(context, tagName, node, stack)
+
+	if (loweredChildren) return loweredChildren
+
 	if (!isComponentName(tagName) || tagName.includes(`.`)) {
 		return [opaque(`dynamic JSX component`, context.sourceFile, node)]
 	}
@@ -613,34 +992,40 @@ function analyzeComponentTag(
 	return analyzeComponent(context, tagName, stack)
 }
 
+function analyzeJsxChild(
+	context: AnalyzeContext,
+	child: ts.JsxChild,
+	stack: string[],
+): StoryChild[] {
+	if (ts.isJsxText(child)) return []
+
+	if (ts.isJsxExpression(child)) {
+		return child.expression
+			? analyzeExpression(context, child.expression, stack)
+			: []
+	}
+
+	if (ts.isJsxElement(child)) {
+		return analyzeJsxElement(context, child, stack)
+	}
+
+	if (ts.isJsxSelfClosingElement(child)) {
+		return analyzeJsxSelfClosingElement(context, child, stack)
+	}
+
+	if (ts.isJsxFragment(child)) {
+		return analyzeJsxChildren(context, child.children, stack)
+	}
+
+	return [opaque(`unsupported JSX child`, context.sourceFile, child)]
+}
+
 function analyzeJsxChildren(
 	context: AnalyzeContext,
 	children: ts.NodeArray<ts.JsxChild>,
 	stack: string[],
 ): StoryChild[] {
-	return children.flatMap((child) => {
-		if (ts.isJsxText(child)) return []
-
-		if (ts.isJsxExpression(child)) {
-			return child.expression
-				? analyzeExpression(context, child.expression, stack)
-				: []
-		}
-
-		if (ts.isJsxElement(child)) {
-			return analyzeJsxElement(context, child, stack)
-		}
-
-		if (ts.isJsxSelfClosingElement(child)) {
-			return analyzeJsxSelfClosingElement(context, child, stack)
-		}
-
-		if (ts.isJsxFragment(child)) {
-			return analyzeJsxChildren(context, child.children, stack)
-		}
-
-		return [opaque(`unsupported JSX child`, context.sourceFile, child)]
-	})
+	return children.flatMap((child) => analyzeJsxChild(context, child, stack))
 }
 
 function isChildrenExpression(expression: ts.Expression): boolean {
@@ -829,6 +1214,8 @@ function createAnalyzeContext(
 	return {
 		sourceFile,
 		components: index.components,
+		imports: index.imports,
+		namespaceImports: index.namespaceImports,
 		warnings,
 		maxComponentDepth: options.maxComponentDepth ?? DEFAULT_MAX_COMPONENT_DEPTH,
 	}

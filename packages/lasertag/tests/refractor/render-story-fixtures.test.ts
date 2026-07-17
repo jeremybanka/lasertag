@@ -209,3 +209,83 @@ describe(`broad render story extraction`, () => {
 		})
 	})
 })
+
+describe(`Solid JSX lowering`, () => {
+	it(`does not lower similarly named user and third-party components`, () => {
+		const sourceText = `
+			import { For } from "somewhere-else"
+
+			function Show() {
+				return <local-show />
+			}
+
+			export function ImportAwarePanel() {
+				return (
+					<import-aware-panel>
+						<Show />
+						<For each={[]}>{() => <not-transparent />}</For>
+					</import-aware-panel>
+				)
+			}
+		`
+
+		expect(
+			stripSourceRanges(
+				analyzeTsxRenderStory(
+					{
+						filePath: `/project/src/ImportAwarePanel.tsx`,
+						sourceText,
+					},
+					typescriptSession,
+				),
+			),
+		).toMatchObject({
+			roots: [
+				{
+					children: [
+						{ kind: `element`, tagName: `local-show` },
+						{
+							kind: `opaque`,
+							reason: `imported or external component`,
+						},
+					],
+					kind: `element`,
+					tagName: `import-aware-panel`,
+				},
+			],
+		})
+	})
+
+	it(`keeps Match opaque outside a Solid Switch`, () => {
+		const sourceText = `
+			import { Match } from "solid-js"
+
+			export function StandaloneMatchPanel() {
+				return <standalone-match-panel><Match when={true}><matched-state /></Match></standalone-match-panel>
+			}
+		`
+
+		expect(
+			stripSourceRanges(
+				analyzeTsxRenderStory(
+					{
+						filePath: `/project/src/StandaloneMatchPanel.tsx`,
+						sourceText,
+					},
+					typescriptSession,
+				),
+			),
+		).toMatchObject({
+			roots: [
+				{
+					children: [
+						{
+							kind: `opaque`,
+							reason: `imported or external component`,
+						},
+					],
+				},
+			],
+		})
+	})
+})

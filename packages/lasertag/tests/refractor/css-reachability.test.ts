@@ -330,6 +330,63 @@ describe(`render story css reachability`, () => {
 		])
 	})
 
+	it(`treats Solid control-flow components as transparent branches`, () => {
+		const result = validateCssReachability({
+			tsxPath: `/project/src/AppPanel.tsx`,
+			cssPath: `/project/src/AppPanel.module.css`,
+			tsxSource: `
+				import { ErrorBoundary, For, Match, Show, Suspense, SuspenseList, Switch } from "solid-js"
+				import { NoHydration } from "solid-js/web"
+				import css from "./AppPanel.module.css"
+
+				export function AppPanel(props: { items: string[], ready: boolean }) {
+					return (
+						<app-panel class={css.class}>
+							<Show when={props.ready} fallback={<loading-state />}>
+								<ready-state />
+							</Show>
+							<For each={props.items} fallback={<empty-state />}>
+								{(item) => <item-row>{item}</item-row>}
+							</For>
+							<Switch>
+								<Match when={props.ready}><matched-state /></Match>
+							</Switch>
+							<ErrorBoundary fallback={() => <error-state />}>
+								<stable-state />
+							</ErrorBoundary>
+							<SuspenseList>
+								<Suspense fallback={<pending-state />}><loaded-state /></Suspense>
+							</SuspenseList>
+							<NoHydration><static-state /></NoHydration>
+						</app-panel>
+					)
+				}
+			`,
+			cssSource: `
+				app-panel.class {
+					> ready-state {}
+					> loading-state {}
+					> item-row {}
+					> empty-state {}
+					> matched-state {}
+					> error-state {}
+					> stable-state {}
+					> pending-state {}
+					> loaded-state {}
+					> static-state {}
+					> impossible-state {}
+				}
+			`,
+		})
+
+		expect(result.diagnostics).toMatchObject([
+			{
+				code: `dead-selector`,
+				selector: `app-panel.class > impossible-state`,
+			},
+		])
+	})
+
 	it(`reports nested local classes as impossible under the lasertag module contract`, () => {
 		const result = validateCssReachability({
 			tsxPath: `/project/src/AppPanel.tsx`,

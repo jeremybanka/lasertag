@@ -1,0 +1,139 @@
+{
+	"componentName": "SolidPanel",
+	"roots": [
+		{
+			"kind": "element",
+			"tagName": "solid-panel",
+			"children": [
+				{
+					"alternatives": [
+						[
+							{
+								"kind": "element",
+								"tagName": "enabled-state",
+								"children": []
+							}
+						],
+						[
+							{
+								"kind": "element",
+								"tagName": "disabled-state",
+								"children": []
+							}
+						]
+					],
+					"kind": "choice"
+				},
+				{
+					"alternatives": [
+						[
+							{
+								"kind": "element",
+								"tagName": "namespace-state",
+								"children": []
+							}
+						],
+						[]
+					],
+					"kind": "choice"
+				},
+				{
+					"alternatives": [
+						[
+							{
+								"kind": "element",
+								"tagName": "item-row",
+								"children": [
+									{
+										"kind": "element",
+										"tagName": "span",
+										"children": [
+											{
+												"kind": "opaque",
+												"reason": "unsupported render expression"
+											}
+										]
+									}
+								]
+							}
+						],
+						[
+							{
+								"kind": "element",
+								"tagName": "empty-state",
+								"children": []
+							}
+						]
+					],
+					"kind": "choice"
+				},
+				{
+					"alternatives": [
+						[
+							{
+								"kind": "element",
+								"tagName": "indexed-row",
+								"children": []
+							}
+						],
+						[]
+					],
+					"kind": "choice"
+				},
+				{
+					"alternatives": [
+						[
+							{
+								"kind": "element",
+								"tagName": "alpha-state",
+								"children": []
+							}
+						],
+						[
+							{
+								"kind": "element",
+								"tagName": "beta-state",
+								"children": []
+							}
+						],
+						[
+							{
+								"kind": "element",
+								"tagName": "unknown-state",
+								"children": []
+							}
+						]
+					],
+					"kind": "choice"
+				},
+				{
+					"kind": "element",
+					"tagName": "custom-card",
+					"children": [
+						{
+							"kind": "element",
+							"tagName": "p",
+							"children": []
+						}
+					],
+					"attributes": [
+						{
+							"name": "id",
+							"value": "featured"
+						}
+					]
+				},
+				{
+					"kind": "element",
+					"tagName": "local-card",
+					"children": []
+				},
+				{
+					"kind": "opaque",
+					"reason": "unknown Solid Dynamic component"
+				}
+			]
+		}
+	],
+	"warnings": []
+}
