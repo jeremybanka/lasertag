@@ -1,5 +1,11 @@
 # lasertag
 
+## 0.5.3
+
+### Patch Changes
+
+- 860ed37: Collapse structurally equivalent sibling subtrees and duplicate possibilities in CLI and editor render story views.
+
 ## 0.5.2
 
 ### Patch Changes
