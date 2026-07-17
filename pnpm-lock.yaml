@@ -59,8 +59,8 @@ importers:
         specifier: 3.9.2
         version: 3.9.2
       atom.io:
-        specifier: 0.50.0
-        version: 0.50.0(@typescript-eslint/parser@8.64.0(eslint@10.7.0(jiti@2.7.0)))(@typescript-eslint/utils@8.64.0(eslint@10.7.0(jiti@2.7.0)))(eslint@10.7.0(jiti@2.7.0))(solid-js@1.9.14)
+        specifier: 0.50.1
+        version: 0.50.1(@typescript-eslint/parser@8.64.0(eslint@10.7.0(jiti@2.7.0)))(eslint@10.7.0(jiti@2.7.0))(solid-js@1.9.14)
       comline:
         specifier: 0.5.1
         version: 0.5.1(zod@4.4.3)
@@ -1809,14 +1809,13 @@ packages:
   asynckit@0.4.0:
     resolution: {integrity: sha512-Oei9OH4tRh0YqU3GxhX79dM/mwVgvbZJaSNaRk+bshkj0S5cfHcgYakreBjrHwatXKbz+IoIdYLxrKim2MjW0Q==}
 
-  atom.io@0.50.0:
-    resolution: {integrity: sha512-tjNPOR8yasALLt3cfA7muuyjss/xM+EJWN/Cyh+6D0FUS5G7wXMNj2ieXKcgG2J+K4JJPqf2/FHX/Wf04rZU5A==}
+  atom.io@0.50.1:
+    resolution: {integrity: sha512-yEYoDsTRpk/+SNOlWJgrNf5onPxGoYKFseVIrcEaWJ6JSLOV7h20y24ccNbc4uR10tqKxzo7BCPRlFNZDzHPwA==}
     peerDependencies:
       '@floating-ui/react': '>=0.25.0'
       '@floating-ui/react-dom': '>=2.0.0'
       '@testing-library/react': '>=14.0.0'
       '@typescript-eslint/parser': '>=8.0.0'
-      '@typescript-eslint/utils': '>=8.0.0'
       eslint: '>=9.0.0'
       happy-dom: '>=17.4.4'
       motion: '>=11.0.0'
@@ -1832,8 +1831,6 @@ packages:
       '@testing-library/react':
         optional: true
       '@typescript-eslint/parser':
-        optional: true
-      '@typescript-eslint/utils':
         optional: true
       eslint:
         optional: true
@@ -5038,10 +5035,9 @@ snapshots:
 
   asynckit@0.4.0: {}
 
-  atom.io@0.50.0(@typescript-eslint/parser@8.64.0(eslint@10.7.0(jiti@2.7.0)))(@typescript-eslint/utils@8.64.0(eslint@10.7.0(jiti@2.7.0)))(eslint@10.7.0(jiti@2.7.0))(solid-js@1.9.14):
+  atom.io@0.50.1(@typescript-eslint/parser@8.64.0(eslint@10.7.0(jiti@2.7.0)))(eslint@10.7.0(jiti@2.7.0))(solid-js@1.9.14):
     optionalDependencies:
       '@typescript-eslint/parser': 8.64.0(eslint@10.7.0(jiti@2.7.0))
-      '@typescript-eslint/utils': 8.64.0(eslint@10.7.0(jiti@2.7.0))
       eslint: 10.7.0(jiti@2.7.0)
       solid-js: 1.9.14
 
