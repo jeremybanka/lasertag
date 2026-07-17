@@ -154,6 +154,8 @@ Supported in the MVP:
 - `null`, `false`, and `undefined` as empty render branches
 - arrays and simple array literals as sibling groups
 - simple `.map(...)` callbacks as repeated branches when the callback returns JSX
+- selected framework control components, such as Solid's `Show`, `For`, `Switch`,
+  and `Match`
 
 Useful next step:
 
@@ -161,8 +163,6 @@ Useful next step:
 - helper functions that return JSX and are called from JSX expressions
 - switch statements and early returns
 - React/Preact fragments imported under aliases
-- selected framework control components, such as Solid's `Show`, `For`, `Switch`,
-  and `Match`
 
 Unsupported or opaque at first:
 
@@ -456,8 +456,6 @@ Good initial fixtures:
   deleting unreachable CSS?
 - How much attribute analysis is worth supporting, especially for
   `[data-state="open"]` and ARIA selectors?
-- Should Solid control components be first-class in the MVP, or should framework
-  adapters come after the core React-shaped JSX subset works?
 - Should this live as an ESLint rule first, or should the LSP/CLI shape force the
   core API from day one?
 

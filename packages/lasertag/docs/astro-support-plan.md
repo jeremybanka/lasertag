@@ -120,12 +120,7 @@ lasertag already ships custom-element intrinsic types for:
 - `lasertag/solid-jsx`
 
 Preact generally follows the same JSX shape as React for lasertag's purposes.
-Solid is also compatible for direct TSX markup, though Solid's control-flow
-components such as `<Show>` and `<For>` are component tags rather than native
-syntax. Today those are treated as component boundaries unless they are defined
-locally in the same file. That is conservative and safe: selectors underneath
-those branches become unknown rather than falsely dead.
-
-Future framework-specific improvements should be expressed as source-analysis
-plugins that produce richer `RenderStory` branches, leaving CSS reachability
-unchanged.
+Solid is compatible for direct TSX markup, and refractor recognizes imported
+Solid control-flow components such as `<Show>` and `<For>` as possible render
+branches. Other imported framework components remain conservative opaque
+boundaries.

@@ -1,0 +1,45 @@
+import * as Solid from "solid-js"
+import { For, Index, Match, Show as When, Switch } from "solid-js"
+import { Dynamic } from "solid-js/web"
+
+function LocalCard() {
+	return <local-card />
+}
+
+export function SolidPanel(props: {
+	enabled: boolean
+	items: string[]
+	kind: string
+}) {
+	return (
+		<solid-panel>
+			<When when={props.enabled} fallback={<disabled-state />}>
+				<enabled-state />
+			</When>
+			<Solid.Show when={props.enabled}>
+				{() => <namespace-state />}
+			</Solid.Show>
+			<For each={props.items} fallback={<empty-state />}>
+				{(item) => (
+					<item-row>
+						<span>{item}</span>
+					</item-row>
+				)}
+			</For>
+			<Index each={props.items}>{() => <indexed-row />}</Index>
+			<Switch fallback={<unknown-state />}>
+				<Match when={props.kind === "alpha"}>
+					<alpha-state />
+				</Match>
+				<Match when={props.kind === "beta"}>
+					{() => <beta-state />}
+				</Match>
+			</Switch>
+			<Dynamic component="custom-card" id="featured">
+				<p />
+			</Dynamic>
+			<Dynamic component={LocalCard} />
+			<Dynamic component={props.kind} />
+		</solid-panel>
+	)
+}

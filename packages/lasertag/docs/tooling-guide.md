@@ -39,6 +39,13 @@ and local components into a render story. `children` render slots, imported
 components, and render expressions it cannot resolve become opaque paths.
 Unsupported selector shapes are unknown too.
 
+For Solid TSX, Refractor recognizes imports from `solid-js` and lowers `Show`,
+`For`, `Index`, `Switch`/`Match`, `ErrorBoundary`, `Suspense`, and
+`SuspenseList` into their possible child branches. It also recognizes `Dynamic`
+and `NoHydration` from `solid-js/web`. Aliased and namespace imports work;
+similarly named user components are not given Solid semantics. Dynamic values
+and portal-style, out-of-tree rendering remain opaque.
+
 Render-story ownership starts at the outermost rendered nodes whose `class` or
 `class:list` expression uses `css.class`. Wrappers and unrelated sibling roots
 are excluded before selector reachability runs. When Refractor cannot discover
