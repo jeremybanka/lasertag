@@ -94,7 +94,7 @@ export default defineConfig({
 	server: {
 		port: 4321,
 		host: `0.0.0.0`,
-		allowedHosts: [`eris.local`, `lasertag`],
+		allowedHosts: [`eris.local`, `lasertagcss`],
 	},
 	vite: {
 		plugins: [exhibitTextPlugin()],

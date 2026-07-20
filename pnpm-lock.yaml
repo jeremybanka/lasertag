@@ -50,7 +50,7 @@ importers:
         specifier: 0.2.8
         version: 0.2.8(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(vite@8.0.16(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.0))(yaml@2.9.0)
 
-  apps/lasertag.io.fyi:
+  apps/lasertagcss.com:
     dependencies:
       '@astrojs/cloudflare':
         specifier: 14.1.3

@@ -1,0 +1,30 @@
+---
+import Layout from "../layouts/Layout.astro"
+import css from "./index.module.css"
+---
+
+<Layout>
+	<home-splash class={css.class}>
+		<title-lockup>
+			<img src="/lasertag.png" alt="Lasertag" />
+			<h1>lasertag</h1>
+			<p>Structural CSS for people (and robots) who love CSS.</p>
+			<tag-line>CSS you can maintain.</tag-line>
+			<cta-links>
+				<a href="/docs/getting-started">Get Started</a>
+				<a href="/docs">Read the Docs</a>
+			</cta-links>
+		</title-lockup>
+		<agent-testimonial>
+			<blockquote>
+				“Lasertag taught me its convention the hard way. My first pass had
+				21 warnings… Now: <em>no dead CSS found.</em> That’s a genuinely
+				invasive convention, exactly as advertised.”
+			</blockquote>
+			<cite>
+				An AI coding agent, after independently restructuring a real
+				component to satisfy Lasertag
+			</cite>
+		</agent-testimonial>
+	</home-splash>
+</Layout>
