@@ -217,7 +217,7 @@ importers:
         specifier: 'catalog:'
         version: 1.0.0(@types/node@26.6.4)(@vitest/ui@5.0.1)(esbuild@0.28.2)(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.1)
 
-  apps/lasertag.io.fyi:
+  apps/lasertagcss.com:
     dependencies:
       '@astrojs/cloudflare':
         specifier: 14.1.3
