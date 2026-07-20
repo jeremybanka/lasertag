@@ -1,0 +1,20 @@
+---
+import packageJson from "lasertag/package.json"
+
+import Layout from "../layouts/Layout.astro"
+import css from "./index.module.css"
+---
+
+<Layout>
+	<home-splash class={css.class}>
+		<title-lockup>
+			<img src="/lasertag.png" alt="Lasertag" />
+			<h1>lasertag</h1>
+			<npm-description>{packageJson.description}</npm-description>
+			<cta-links>
+				<a href="/docs/getting-started">Get Started</a>
+				<a href="/docs">Read the Docs</a>
+			</cta-links>
+		</title-lockup>
+	</home-splash>
+</Layout>

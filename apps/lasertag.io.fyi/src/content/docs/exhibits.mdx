@@ -1,0 +1,22 @@
+import Exhibit from "c/Exhibit.astro";
+
+# exhibits
+
+Exhibits keep documentation examples in standalone source files so they can be
+highlighted, copied, and eventually checked as real code.
+
+## full files
+
+Use a source path to render the complete exhibit.
+
+<Exhibit src="getting-started/AppHeaderBar.tsx" />
+
+## named regions
+
+Append a region name to show only the code between matching exhibit markers.
+
+<Exhibit
+	src="getting-started/AppHeaderBar.tsx#component"
+	label="component region"
+	soft
+/>
