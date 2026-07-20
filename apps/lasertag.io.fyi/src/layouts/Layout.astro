@@ -1,0 +1,67 @@
+---
+import { ClientRouter } from "astro:transitions"
+import packageJson from "lasertag/package.json"
+
+import GlobalEffects from "../components/GlobalEffects.astro"
+import "../globals.css"
+import css from "./Layout.module.css"
+
+type Props = {
+	description?: string
+	title?: string
+}
+
+const {
+	description = `Docs for lasertag: ${packageJson.description}`,
+	title = `lasertag | structural CSS`,
+} = Astro.props
+---
+
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width" />
+		<link rel="icon" type="image/png" href="/favicon.png" />
+		<link rel="apple-touch-icon" href="/apple-icon.png" />
+		<meta name="theme-color" content="#070707" />
+		<meta name="description" content={description} />
+		<meta name="generator" content={Astro.generator} />
+		<title>{title}</title>
+		<ClientRouter />
+	</head>
+	<body>
+		<app-shell class={css.class}>
+			<header>
+				<nav>
+					<left-side>
+						<a href="/">
+							<img src="/lasertag.png" alt="" transition:persist />
+							<brand-name>lasertag</brand-name>.io.fyi
+						</a>
+					</left-side>
+					<gap-between />
+					<right-side>
+						<a href="/docs">docs</a>
+						<span />
+						<a href="https://github.com/jeremybanka/lasertag">github</a>
+					</right-side>
+				</nav>
+			</header>
+
+			<main>
+				<banner-message><span>🕊️ Free Palestine 🇵🇸</span></banner-message>
+				<slot />
+			</main>
+
+			<footer>
+				<span>
+					<a href="https://www.npmjs.com/package/lasertag">
+						<code>{packageJson.version}</code>
+					</a>
+				</span>
+				<span>♥️ <a href="https://github.com/jeremybanka">jeremybanka</a></span>
+			</footer>
+		</app-shell>
+		<GlobalEffects />
+	</body>
+</html>

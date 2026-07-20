@@ -1,0 +1,14 @@
+{
+	"extends": "astro/tsconfigs/strict",
+	"include": [".astro/types.d.ts", "**/*"],
+	"exclude": ["dist"],
+	"compilerOptions": {
+		"allowImportingTsExtensions": true,
+		"jsx": "react-jsx",
+		"jsxImportSource": "preact",
+		"paths": {
+			"c/*": ["./src/components/*"]
+		},
+		"types": ["lasertag/css-modules", "lasertag/preact-jsx"]
+	}
+}

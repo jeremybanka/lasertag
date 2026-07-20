@@ -1,0 +1,149 @@
+* {
+	box-sizing: border-box;
+	color: var(--fg-color);
+	font-family: Uruz, system-ui, sans-serif;
+	font-size: 17px;
+	font-weight: 500;
+	line-height: 21px;
+	margin: 0;
+	padding: 0;
+}
+
+body {
+	background-color: var(--bg-shade-2);
+}
+
+:root {
+	--brand-color: #f11;
+	--color-dark: #111;
+	--color-light: #fff;
+	--fg-color: var(--color-light);
+	--fg-hard-1: #fff;
+	--fg-soft-1: #ccc;
+	--fg-soft-2: #aaa;
+	--fg-soft-3: #888;
+	--bg-color: var(--color-dark);
+	--bg-tint-1: #171717;
+	--bg-tint-2: #1c1c1c;
+	--bg-tint-3: #222;
+	--bg-shade-1: #0a0a0a;
+	--bg-shade-2: #070707;
+	--bg-shade-3: #000;
+	--bg-shadow-1: #0005;
+	--bg-shadow-2: #0007;
+	--bg-hard-1: var(--bg-shade-1);
+	--bg-hard-2: var(--bg-shade-2);
+	--bg-soft-1: var(--bg-tint-1);
+	--bg-soft-2: var(--bg-tint-2);
+	--bg-soft-3: var(--bg-tint-3);
+	--bg-soft-glass-1: #333a;
+	--bg-soft-glass-2: #333c;
+	--bg-soft-glass-3: #333e;
+	--fill-hard-blend-mode: multiply;
+	--fill-hard-opacity: 0.33;
+	--fill-soft-blend-mode: screen;
+	--fill-soft-opacity: 0.25;
+	--hyperlink-color: #09f;
+	--hyperlink-hover-color: #0df;
+	--hyperlink-visited-color: #99f;
+	--code-color: var(--fg-hard-1);
+	--code-comment-color: var(--fg-soft-3);
+	--code-keyword-color: var(--fg-soft-1);
+	--code-punctuation-color: var(--fg-soft-2);
+	--code-type-color: rgb(252 111 203);
+	--code-function-color: rgb(221 149 255);
+	--code-value-color: gold;
+	color-scheme: light dark;
+	min-height: 100svh;
+	scroll-behavior: smooth;
+	scroll-padding-top: 6em;
+
+	@media screen and (min-width: 960px) {
+		scroll-padding-top: 4.5em;
+	}
+
+	@media (prefers-color-scheme: light) {
+		--color-dark: #333;
+		--color-light: #f9f9f9;
+		--fg-color: var(--color-dark);
+		--fg-hard-1: #222;
+		--fg-soft-1: #666;
+		--fg-soft-2: #777;
+		--fg-soft-3: #888;
+		--bg-color: var(--color-light);
+		--bg-tint-1: #fdfdfd;
+		--bg-tint-2: #fff;
+		--bg-shade-1: #f6f6f6;
+		--bg-shade-2: #f0f0f0;
+		--bg-shade-3: #e8e8e8;
+		--bg-shadow-1: #e8e8e8;
+		--bg-shadow-2: #e0e0e0;
+		--bg-hard-1: var(--bg-tint-1);
+		--bg-hard-2: var(--bg-tint-2);
+		--bg-soft-1: var(--bg-shade-1);
+		--bg-soft-2: var(--bg-shade-2);
+		--bg-soft-3: var(--bg-shade-3);
+		--bg-soft-glass-1: #fff8;
+		--bg-soft-glass-2: #fffa;
+		--bg-soft-glass-3: #fffc;
+		--fill-hard-blend-mode: soft-light;
+		--fill-hard-opacity: 0.75;
+		--fill-soft-blend-mode: multiply;
+		--fill-soft-opacity: 0.75;
+		--hyperlink-color: #08f;
+		--hyperlink-hover-color: #04f;
+		--code-type-color: rgb(243 12 162);
+		--code-function-color: rgb(160 1 233);
+		--code-value-color: rgb(160 136 0);
+	}
+}
+
+@font-face {
+	font-family: Theia;
+	font-weight: 100;
+	src: url("/Theia0.3-100.otf") format("opentype");
+}
+@font-face {
+	font-family: Theia;
+	font-weight: 200;
+	src: url("/Theia0.3-200.otf") format("opentype");
+}
+@font-face {
+	font-family: Theia;
+	font-weight: 300;
+	src: url("/Theia0.3-300.otf") format("opentype");
+}
+@font-face {
+	font-family: Theia;
+	font-weight: 400;
+	src: url("/Theia0.3-400.otf") format("opentype");
+}
+@font-face {
+	font-family: Theia;
+	font-weight: 500;
+	src: url("/Theia0.3-500.otf") format("opentype");
+}
+@font-face {
+	font-family: Uruz;
+	font-weight: 400;
+	src: url("/Uruz-4r.otf") format("opentype");
+}
+@font-face {
+	font-family: Uruz;
+	font-weight: 500;
+	src: url("/Uruz-5r.otf") format("opentype");
+}
+@font-face {
+	font-family: Uruz;
+	font-weight: 600;
+	src: url("/Uruz-6r.otf") format("opentype");
+}
+@font-face {
+	font-family: Uruz;
+	font-weight: 700;
+	src: url("/Uruz-7r.otf") format("opentype");
+}
+@font-face {
+	font-family: Manufab;
+	src: url("/ManufabGX.woff2") format("woff2");
+}

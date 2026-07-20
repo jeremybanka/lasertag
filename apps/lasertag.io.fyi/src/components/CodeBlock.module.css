@@ -1,0 +1,114 @@
+code-block.class {
+	box-sizing: border-box;
+	display: flex;
+	flex-flow: column;
+	margin-top: 1.5em;
+	overflow: visible;
+	overflow-x: auto;
+	position: relative;
+	width: 100%;
+	border: 1px solid #5555;
+	border-radius: 4px;
+
+	> back-fill {
+		position: absolute;
+		inset: 0;
+		z-index: 0;
+
+		&:global(.hard) {
+			background-color: var(--bg-hard-1);
+			mix-blend-mode: var(--fill-hard-blend-mode);
+			opacity: var(--fill-hard-opacity);
+		}
+		&:global(.soft) {
+			background-color: var(--bg-soft-1);
+			mix-blend-mode: var(--fill-soft-blend-mode);
+			opacity: var(--fill-soft-opacity);
+		}
+	}
+
+	> file-name {
+		align-items: center;
+		display: flex;
+		justify-content: space-between;
+		z-index: 1;
+
+		> span {
+			color: var(--fg-soft-1);
+			font-size: 15px;
+			font-weight: 500;
+			line-height: 20px;
+			padding: 0 8px;
+		}
+		> button {
+			align-items: center;
+			background: transparent;
+			border: 1px solid transparent;
+			border-radius: 3px;
+			cursor: pointer;
+			display: flex;
+			height: 25px;
+			justify-content: center;
+			width: 25px;
+
+			> svg {
+				fill: var(--fg-color);
+				height: 16px;
+				width: 16px;
+			}
+			&:hover {
+				border-color: var(--hyperlink-color);
+				> svg {
+					fill: var(--hyperlink-color);
+				}
+			}
+		}
+	}
+
+	> pre:global(.prismjs) {
+		border-radius: 0 0 3px 3px;
+		line-height: 1em;
+		overflow: auto;
+		padding: 0.5em 1em 1em;
+		z-index: 1;
+
+		* {
+			font-family: Theia, monospace;
+			font-size: 13px;
+			font-weight: 500;
+		}
+		> code {
+			color: var(--code-color) !important;
+			font-size: 13px !important;
+			line-height: 1em !important;
+			text-shadow: none !important;
+			span {
+				line-height: 17px !important;
+			}
+		}
+	}
+
+	span:global(.token.comment) {
+		color: var(--code-comment-color);
+	}
+	span:global(.token.keyword) {
+		color: var(--code-keyword-color);
+	}
+	span:global(.token.class-name),
+	span:global(.token.builtin),
+	span:global(.token.type) {
+		color: var(--code-type-color);
+	}
+	span:global(.token.function),
+	span:global(.token.tag) {
+		color: var(--code-function-color);
+	}
+	span:global(.token.string),
+	span:global(.token.number),
+	span:global(.token.boolean) {
+		color: var(--code-value-color);
+	}
+	span:global(.token.punctuation) {
+		color: var(--code-punctuation-color);
+	}
+}

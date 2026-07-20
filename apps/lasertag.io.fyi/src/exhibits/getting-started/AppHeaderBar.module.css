@@ -1,0 +1,12 @@
+app-header-bar.class {
+	display: flex;
+	justify-content: space-between;
+
+	> strong {
+		color: red;
+	}
+
+	> nav > a {
+		text-decoration: none;
+	}
+}

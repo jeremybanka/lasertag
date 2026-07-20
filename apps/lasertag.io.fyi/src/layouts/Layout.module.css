@@ -1,0 +1,168 @@
+app-shell.class {
+	display: flex;
+	flex-flow: column;
+	height: auto;
+	min-height: 100vh;
+	overflow-x: hidden;
+	position: relative;
+
+	code {
+		color: var(--fg-soft-1);
+		font-family: Theia, monospace !important;
+		font-size: 15px;
+		font-weight: 500;
+		padding: 1px 2px;
+	}
+	a,
+	a > code {
+		color: var(--hyperlink-color);
+		font-weight: 500;
+		text-decoration: inherit;
+		&:hover {
+			color: var(--hyperlink-hover-color);
+			text-decoration: underline;
+		}
+		&:visited {
+			color: var(--hyperlink-visited-color);
+		}
+	}
+
+	> * {
+		@media screen and (min-width: 960px) {
+			padding: 1em;
+		}
+	}
+
+	> header {
+		--nav-background: var(--bg-soft-glass-1);
+		--nav-box-shadow: 0 1px 10px 1px var(--bg-shadow-1);
+		backdrop-filter: blur(15px);
+		background: var(--nav-background);
+		border: 1px solid var(--bg-soft-glass-3);
+		border-radius: 2em;
+		box-shadow: var(--nav-box-shadow);
+		margin: 0.75em 0.25em 0.25em;
+		position: fixed;
+		top: 0;
+		width: calc(100% - 0.5em);
+		z-index: 120;
+
+		@media screen and (min-width: 960px) {
+			backdrop-filter: none;
+			background: none;
+			border: none;
+			box-shadow: none;
+			margin: 0;
+			padding: 1em;
+			width: 100%;
+			> nav > left-side,
+			> nav > right-side {
+				backdrop-filter: blur(15px);
+				background: var(--nav-background);
+				border: 1px solid var(--bg-soft-glass-3);
+				border-radius: 2em;
+				box-shadow: var(--nav-box-shadow);
+				padding: 0 20px;
+			}
+		}
+
+		> nav {
+			display: flex;
+			flex-flow: row;
+			gap: 1em;
+			height: 50px;
+			> gap-between {
+				flex-grow: 1;
+			}
+			> left-side,
+			> right-side {
+				align-items: center;
+				display: flex;
+				gap: 16px;
+				height: 100%;
+				> a {
+					align-items: center;
+					display: inline-flex;
+					font-family: Theia;
+					height: 100%;
+				}
+			}
+			> left-side {
+				padding-left: 20px;
+				> a {
+					margin-left: -10px;
+					> img {
+						background: white;
+						border-radius: 22%;
+						height: 40px;
+						margin-right: 6px;
+						width: 40px;
+					}
+					> brand-name {
+						color: var(--brand-color);
+						font-family: Theia;
+					}
+				}
+			}
+			> right-side {
+				justify-content: flex-end;
+				padding-right: 20px;
+				> span {
+					background: var(--bg-soft-glass-3);
+					height: 100%;
+					width: 1px;
+				}
+			}
+		}
+	}
+
+	> main {
+		background-color: var(--bg-color);
+		display: flex;
+		flex-flow: column;
+		flex-grow: 1;
+		margin-top: 2em;
+		position: relative;
+		&::before {
+			background: url("/noise.svg") repeat center / 1024px;
+			content: "";
+			inset: 0;
+			mix-blend-mode: soft-light;
+			pointer-events: none;
+			position: absolute;
+		}
+		> banner-message {
+			display: flex;
+			justify-content: center;
+			left: 0;
+			pointer-events: none;
+			position: absolute;
+			top: -33px;
+			user-select: none;
+			width: calc(100% - 0.5em);
+			z-index: 130;
+			> span {
+				background: var(--bg-soft-glass-1);
+				border-radius: 10px;
+				box-shadow: 0 1px 10px 1px var(--bg-shadow-1);
+				color: var(--fg-soft-3);
+				font-size: 15px;
+				padding: 2px 12px;
+			}
+		}
+	}
+
+	> footer {
+		background: var(--bg-shade-2);
+		display: flex;
+		flex-flow: row;
+		justify-content: space-between;
+		padding: 20px 10px;
+		position: relative;
+		z-index: 100;
+		> span > a,
+		> span > a > code {
+			color: var(--fg-soft-1);
+		}
+	}
+}
