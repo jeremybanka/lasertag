@@ -8,6 +8,7 @@
 		"change": "changeset",
 		"check": "vp check --no-fmt && tsc --noEmit",
 		"check:eslint": "vp run -r check:eslint",
+		"dev": "vp run -r dev",
 		"fmt": "dprint fmt",
 		"fmt:check": "dprint check",
 		"lint": "vp lint",
