@@ -10,7 +10,10 @@ import type {
 	SourceRange,
 } from "./diagnostics.ts"
 import { applyLasertagExpectErrorDirectives } from "./expect-error.ts"
-import { canReachSelectorPath } from "./reachability.ts"
+import {
+	canCrossOwnershipBoundary,
+	canReachSelectorPath,
+} from "./reachability.ts"
 import { createRenderStoryEvidence } from "./render-story-evidence.ts"
 import { scopeRenderStoryToCssClassRoots } from "./render-story-root.ts"
 import type { TypescriptAstSession } from "./typescript-ast.ts"
@@ -72,6 +75,10 @@ function impossibleLocalClassMessage(className: string): string {
 	return `Local class ".${className}" is unreachable; lasertag CSS modules expose only "css.class".`
 }
 
+function ownershipBoundaryMessage(selector: string): string {
+	return `Selector "${selector}" may match DOM owned by children or an external component.`
+}
+
 function combineReachability(results: Reachability[]): Reachability {
 	if (results.includes(`reachable`)) return `reachable`
 	if (results.includes(`unknown`)) return `unknown`
@@ -128,6 +135,9 @@ export function analyzeCssReachability({
 		const reachability = combineReachability(
 			paths.map((path) => path.reachability),
 		)
+		const crossesOwnershipBoundary = result.paths.some((selectorPath) =>
+			canCrossOwnershipBoundary(renderStory, selectorPath),
+		)
 
 		selectorReachability.push({
 			paths,
@@ -136,6 +146,15 @@ export function analyzeCssReachability({
 			resultKind: result.kind,
 			selector: selectorAnalysis.selector,
 		})
+
+		if (crossesOwnershipBoundary) {
+			diagnostics.push({
+				code: `selector-crosses-ownership-boundary`,
+				message: ownershipBoundaryMessage(selectorAnalysis.selector),
+				selector: selectorAnalysis.selector,
+				range: selectorAnalysis.range,
+			})
+		}
 
 		if (reachability === `unreachable`) {
 			const storyEvidence = includeStoryEvidence

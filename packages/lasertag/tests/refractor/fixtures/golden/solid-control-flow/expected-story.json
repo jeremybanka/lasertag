@@ -130,6 +130,7 @@
 				},
 				{
 					"kind": "opaque",
+					"ownership": "foreign",
 					"reason": "unknown Solid Dynamic component"
 				}
 			]

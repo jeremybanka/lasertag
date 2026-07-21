@@ -568,7 +568,7 @@ function getCompoundClasses(compound: string): string[] {
 function getCompoundTagName(compound: string): string | undefined {
 	const stripped = stripNonStructuralSections(compound).trim()
 
-	if (stripped.startsWith(`*`)) return
+	if (stripped.startsWith(`*`)) return `*`
 
 	if (!/^[-_a-zA-Z]/.test(stripped)) return
 

@@ -498,7 +498,7 @@ import css from "./AppPanel.module.css"
 		})
 	})
 
-	it(`traces opaque Astro branches that make a selector inconclusive`, () => {
+	it(`traces foreign opaque Astro branches that make a selector inconclusive`, () => {
 		const fileSystem = createMemoryFileSystem({
 			[astroPath]: `<app-panel class={css.class}>{content}</app-panel>`,
 		})
@@ -506,7 +506,12 @@ import css from "./AppPanel.module.css"
 
 		state.openDocument(createDocumentInput(cssPath, createCssSource(`footer`)))
 
-		expect(state.getDiagnostics(cssPath)).toEqual([])
+		expect(state.getDiagnostics(cssPath)).toMatchObject([
+			{
+				code: `selector-crosses-ownership-boundary`,
+				severity: DiagnosticSeverity.Warning,
+			},
+		])
 		const trace = state.getAnalysisTrace(cssPath)
 
 		expect(trace).toMatchObject({
@@ -532,7 +537,7 @@ import css from "./AppPanel.module.css"
 				sourcePath: astroPath,
 			},
 			summary: {
-				diagnosticCount: 0,
+				diagnosticCount: 1,
 				elementCount: 1,
 				opaqueCount: 1,
 				unknownSelectorCount: 1,
@@ -541,7 +546,7 @@ import css from "./AppPanel.module.css"
 		expect(trace.selectorReachability).toEqual(
 			expect.arrayContaining([
 				expect.objectContaining({
-					diagnosticCodes: [],
+					diagnosticCodes: [`selector-crosses-ownership-boundary`],
 					reachability: `unknown`,
 					resultKind: `path`,
 					selector: `app-panel.class > footer`,

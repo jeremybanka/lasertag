@@ -2,7 +2,14 @@ import type { StoryChild } from "./diagnostics.ts"
 
 function structuralChildValue(child: StoryChild): unknown {
 	if (child.kind === `opaque`) {
-		return { kind: child.kind, reason: child.reason }
+		return {
+			kind: child.kind,
+			reason: child.reason,
+			...(child.expectedRootTagName
+				? { expectedRootTagName: child.expectedRootTagName }
+				: {}),
+			...(child.ownership ? { ownership: child.ownership } : {}),
+		}
 	}
 
 	if (child.kind === `choice`) {
@@ -15,6 +22,7 @@ function structuralChildValue(child: StoryChild): unknown {
 	return {
 		children: structuralChildrenValue(child.children),
 		kind: child.kind,
+		...(child.ownership ? { ownership: child.ownership } : {}),
 		tagName: child.tagName,
 	}
 }
