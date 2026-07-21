@@ -1,5 +1,11 @@
 # lasertag
 
+## 0.6.1
+
+### Patch Changes
+
+- 2de12cd: Fix expect-error directives on selector-list branches and add explained, diagnostic-scoped disable and enable regions with redundant-directive diagnostics.
+
 ## 0.6.0
 
 ### Minor Changes
