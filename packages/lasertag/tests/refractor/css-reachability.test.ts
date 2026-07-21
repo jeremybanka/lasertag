@@ -57,6 +57,144 @@ describe(`render story css reachability`, () => {
 		).toEqual([`app-panel.class > footer`])
 	})
 
+	it(`suppresses separate selector-list branches without reporting used directives as unused`, () => {
+		expect(
+			diagnosticSummaries(
+				`export function AppPanel() { return <app-panel className={css.class} /> }`,
+				`app-panel.class {
+	/* @lasertag-expect-error: this is general styling for common layouts */
+	> h1,
+	/* @lasertag-expect-error: this is general styling for common layouts */
+	> h2,
+	> h3 {
+		padding: 0 15px;
+		overflow-x: scroll;
+		overflow-y: hidden;
+	}
+}`,
+			),
+		).toEqual([
+			{
+				code: `dead-selector`,
+				selector: `app-panel.class > h3`,
+			},
+		])
+	})
+
+	it(`disables one diagnostic code until its matching enable directive`, () => {
+		expect(
+			diagnosticSummaries(
+				`export function AppPanel() { return <app-panel className={css.class}><header /></app-panel> }`,
+				`app-panel.class {
+	> aside {}
+	/* @lasertag-disable dead-selector */
+	> footer {}
+	.legacy {}
+	/* @lasertag-enable dead-selector */
+	> nav {}
+}`,
+			),
+		).toEqual([
+			{
+				code: `dead-selector`,
+				selector: `app-panel.class > aside`,
+			},
+			{
+				code: `impossible-local-class`,
+				selector: `app-panel.class .legacy`,
+			},
+			{
+				code: `dead-selector`,
+				selector: `app-panel.class > nav`,
+			},
+		])
+	})
+
+	it(`supports overlapping disable regions for different diagnostic codes`, () => {
+		expect(
+			diagnosticCodes(
+				`export function AppPanel() { return <app-panel className={css.class} /> }`,
+				`app-panel.class {
+	/* @lasertag-disable dead-selector */
+	/* @lasertag-disable impossible-local-class */
+	> footer {}
+	.legacy {}
+	/* @lasertag-enable dead-selector */
+	.legacy-again {}
+	/* @lasertag-enable impossible-local-class */
+}`,
+			),
+		).toEqual([])
+	})
+
+	it(`disables a diagnostic code through the end of the file without an enable`, () => {
+		expect(
+			diagnosticCodes(
+				`export function AppPanel() { return <app-panel className={css.class} /> }`,
+				`app-panel.class {
+	/* @lasertag-disable dead-selector */
+	> footer {}
+}`,
+			),
+		).toEqual([])
+	})
+
+	it(`reports a disable directive that suppresses no matching diagnostics`, () => {
+		expect(
+			diagnosticSummaries(
+				`export function AppPanel() { return <app-panel className={css.class}><header /></app-panel> }`,
+				`app-panel.class {
+	/* @lasertag-disable dead-selector */
+	> header {}
+	/* @lasertag-enable dead-selector */
+}`,
+			),
+		).toEqual([
+			{
+				code: `unused-disable`,
+				selector: `/* @lasertag-disable dead-selector */`,
+			},
+		])
+	})
+
+	it(`reports a disable directive when its diagnostic code is already disabled`, () => {
+		expect(
+			diagnosticSummaries(
+				`export function AppPanel() { return <app-panel className={css.class} /> }`,
+				`app-panel.class {
+	/* @lasertag-disable dead-selector */
+	/* @lasertag-disable dead-selector */
+	> footer {}
+	/* @lasertag-enable dead-selector */
+}`,
+			),
+		).toEqual([
+			{
+				code: `unused-disable`,
+				selector: `/* @lasertag-disable dead-selector */`,
+			},
+		])
+	})
+
+	it(`reports an enable directive outside a matching disable region`, () => {
+		expect(
+			diagnosticSummaries(
+				`export function AppPanel() { return <app-panel className={css.class} /> }`,
+				`app-panel.class {
+	/* @lasertag-disable impossible-local-class */
+	/* @lasertag-enable dead-selector */
+	.legacy {}
+	/* @lasertag-enable impossible-local-class */
+}`,
+			),
+		).toEqual([
+			{
+				code: `unused-enable`,
+				selector: `/* @lasertag-enable dead-selector */`,
+			},
+		])
+	})
+
 	it(`reports an unused lasertag expect-error directive`, () => {
 		const cssSource = `app-panel.class {
 	/* @lasertag-expect-error: header is conditionally rendered */

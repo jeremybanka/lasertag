@@ -295,7 +295,11 @@ function splitSelectorList(
 			parenDepth === 0 &&
 			bracketDepth === 0
 		) {
-			const partRange = trimRange(selector, partStart, index)
+			const partRange = trimRange(
+				selector,
+				skipWhitespaceAndComments(selector, partStart),
+				index,
+			)
 			const text = selector.slice(partRange.start, partRange.end)
 
 			if (text.length > 0) {

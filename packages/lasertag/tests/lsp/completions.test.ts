@@ -68,18 +68,25 @@ function completion(sourceText: string, label: string) {
 }
 
 describe(`lasertag lsp selector completions`, () => {
-	it.each([
-		`/`,
-		`/*`,
-		`/* `,
-		`/* @`,
-		`/* @lasertag-exp`,
-		`/* @lasertag-expect-error: `,
-	])(`suggests an expect-error snippet after typing %s`, (typedComment) => {
-		expect(labels(`app-panel.class {\n\t${typedComment}`)).toEqual([
-			`@lasertag-expect-error`,
-		])
-	})
+	it.each([`/* @lasertag-exp`, `/* @lasertag-expect-error: `])(
+		`suggests an expect-error snippet after typing %s`,
+		(typedComment) => {
+			expect(labels(`app-panel.class {\n\t${typedComment}`)).toEqual([
+				`@lasertag-expect-error`,
+			])
+		},
+	)
+
+	it.each([`/`, `/*`, `/* `, `/* @`, `/* @lasertag-`])(
+		`suggests every diagnostic directive after typing %s`,
+		(typedComment) => {
+			expect(labels(`app-panel.class {\n\t${typedComment}`)).toEqual([
+				`@lasertag-disable`,
+				`@lasertag-enable`,
+				`@lasertag-expect-error`,
+			])
+		},
+	)
 
 	it(`replaces the partial comment and places the cursor in the explanation`, () => {
 		const sourceText = `app-panel.class {\n\t/* @laser`
@@ -98,6 +105,27 @@ describe(`lasertag lsp selector completions`, () => {
 			},
 		})
 	})
+
+	it.each([`disable`, `enable`] as const)(
+		`completes a diagnostic-scoped %s directive`,
+		(directive) => {
+			const sourceText = `app-panel.class {\n\t/* @lasertag-${directive}`
+			const item = completion(sourceText, `@lasertag-${directive}`)
+
+			expect(item).toMatchObject({
+				filterText: `/* @lasertag-${directive} `,
+				insertTextFormat: InsertTextFormat.Snippet,
+				kind: CompletionItemKind.Snippet,
+				textEdit: {
+					newText: `/* @lasertag-${directive} \${1|dead-selector,impossible-local-class,selector-crosses-ownership-boundary|} */`,
+					range: {
+						end: { character: 14 + directive.length, line: 1 },
+						start: { character: 1, line: 1 },
+					},
+				},
+			})
+		},
+	)
 
 	it(`does not suggest the expect-error snippet for unrelated comment text`, () => {
 		expect(labels(`app-panel.class {\n\t/* regular`)).not.toContain(
