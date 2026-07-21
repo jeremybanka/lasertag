@@ -12,11 +12,20 @@ type ExpectErrorDirective = {
 	targetLine: number
 }
 
-type RegionDirective = {
+type DisableDirective = {
 	diagnosticCode: string
-	kind: `disable` | `enable`
+	explanation: string
+	kind: `disable`
 	range: SourceRange
 }
+
+type EnableDirective = {
+	diagnosticCode: string
+	kind: `enable`
+	range: SourceRange
+}
+
+type RegionDirective = DisableDirective | EnableDirective
 
 type LasertagDirective = ExpectErrorDirective | RegionDirective
 
@@ -71,17 +80,31 @@ function parseRegionDirective(
 	start: number,
 	end: number,
 ): RegionDirective | undefined {
-	for (const [directive, kind] of [
-		[DISABLE_DIRECTIVE, `disable`],
-		[ENABLE_DIRECTIVE, `enable`],
-	] as const) {
-		if (!hasDirectivePrefix(commentBody, directive)) continue
+	if (hasDirectivePrefix(commentBody, DISABLE_DIRECTIVE)) {
+		const remainder = commentBody.slice(DISABLE_DIRECTIVE.length)
+		const match = remainder.match(/^\s*\[([a-z][a-z0-9-]*)\](?:\s+(.*))?$/)
 
-		const diagnosticCode = commentBody.slice(directive.length).trim()
+		if (!match?.[1]) return
 
-		if (!/^[a-z][a-z0-9-]*$/.test(diagnosticCode)) return
+		return {
+			diagnosticCode: match[1],
+			explanation: match[2]?.trim() ?? ``,
+			kind: `disable`,
+			range: { end, start },
+		}
+	}
 
-		return { diagnosticCode, kind, range: { end, start } }
+	if (!hasDirectivePrefix(commentBody, ENABLE_DIRECTIVE)) return
+
+	const remainder = commentBody.slice(ENABLE_DIRECTIVE.length)
+	const match = remainder.match(/^\s*\[([a-z][a-z0-9-]*)\]$/)
+
+	if (!match?.[1]) return
+
+	return {
+		diagnosticCode: match[1],
+		kind: `enable`,
+		range: { end, start },
 	}
 }
 
@@ -146,6 +169,7 @@ export function findLasertagExpectErrorExplanation(
 
 function directiveDiagnostic(
 	code:
+		| `disable-explanation-too-short`
 		| `expect-error-explanation-too-short`
 		| `unused-disable`
 		| `unused-enable`
@@ -222,7 +246,7 @@ function applyRegionDirectives(
 	diagnostics: CssReachabilityDiagnostic[],
 	directives: RegionDirective[],
 ): CssReachabilityDiagnostic[] {
-	const activeDisables = new Map<string, RegionDirective>()
+	const activeDisables = new Map<string, DisableDirective>()
 	const directiveDiagnostics: CssReachabilityDiagnostic[] = []
 	const suppressedDiagnostics = new Set<CssReachabilityDiagnostic>()
 
@@ -247,7 +271,7 @@ function applyRegionDirectives(
 			directiveDiagnostics.push(
 				directiveDiagnostic(
 					`unused-disable`,
-					`Unused "${DISABLE_DIRECTIVE} ${diagnosticCode}" directive; no "${diagnosticCode}" diagnostics occur before it is enabled.`,
+					`Unused "${DISABLE_DIRECTIVE} [${diagnosticCode}]" directive; no "${diagnosticCode}" diagnostics occur before it is enabled.`,
 					disableDirective,
 					sourceText,
 				),
@@ -263,7 +287,7 @@ function applyRegionDirectives(
 				directiveDiagnostics.push(
 					directiveDiagnostic(
 						`unused-enable`,
-						`Unused "${ENABLE_DIRECTIVE} ${directive.diagnosticCode}" directive; "${directive.diagnosticCode}" diagnostics are not disabled.`,
+						`Unused "${ENABLE_DIRECTIVE} [${directive.diagnosticCode}]" directive; "${directive.diagnosticCode}" diagnostics are not disabled.`,
 						directive,
 						sourceText,
 					),
@@ -275,11 +299,22 @@ function applyRegionDirectives(
 			continue
 		}
 
+		if (directive.explanation.length < MINIMUM_EXPLANATION_LENGTH) {
+			directiveDiagnostics.push(
+				directiveDiagnostic(
+					`disable-explanation-too-short`,
+					`A "${DISABLE_DIRECTIVE}" directive must include an explanation of at least three characters after the diagnostic code.`,
+					directive,
+					sourceText,
+				),
+			)
+		}
+
 		if (activeDisables.has(directive.diagnosticCode)) {
 			directiveDiagnostics.push(
 				directiveDiagnostic(
 					`unused-disable`,
-					`Unused "${DISABLE_DIRECTIVE} ${directive.diagnosticCode}" directive; "${directive.diagnosticCode}" diagnostics are already disabled.`,
+					`Unused "${DISABLE_DIRECTIVE} [${directive.diagnosticCode}]" directive; "${directive.diagnosticCode}" diagnostics are already disabled.`,
 					directive,
 					sourceText,
 				),

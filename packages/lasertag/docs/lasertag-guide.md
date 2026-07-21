@@ -166,16 +166,16 @@ To suppress one diagnostic type across a larger region, pair diagnostic-scoped `
 
 ```css
 app-canvas.class {
-	/* @lasertag-disable dead-selector */
+	/* @lasertag-disable [dead-selector] inserted by the canvas runtime */
 	> canvas {}
 	> canvas-overlay {}
-	/* @lasertag-enable dead-selector */
+	/* @lasertag-enable [dead-selector] */
 
 	> footer {}
 }
 ```
 
-The supported reachability diagnostic codes are `dead-selector`, `impossible-local-class`, and `selector-crosses-ownership-boundary`. Regions for different codes may overlap, and a disable without a matching enable remains active through the end of the file. Lasertag reports `unused-disable` on a disable that suppresses no matching diagnostics and `unused-enable` on an enable outside an active region for the same code.
+Put the diagnostic code in brackets. A disable also requires an explanation of at least three characters after the closing bracket; an enable does not accept an explanation. The supported reachability diagnostic codes are `dead-selector`, `impossible-local-class`, and `selector-crosses-ownership-boundary`. Regions for different codes may overlap, and a disable without a matching enable remains active through the end of the file. Lasertag reports `disable-explanation-too-short` when the explanation is missing or too short, `unused-disable` when a disable suppresses no matching diagnostics, and `unused-enable` when an enable appears outside an active region for the same code.
 
 ## Type Support
 

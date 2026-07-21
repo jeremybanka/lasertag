@@ -113,11 +113,14 @@ describe(`lasertag lsp selector completions`, () => {
 			const item = completion(sourceText, `@lasertag-${directive}`)
 
 			expect(item).toMatchObject({
-				filterText: `/* @lasertag-${directive} `,
+				filterText: `/* @lasertag-${directive} [`,
 				insertTextFormat: InsertTextFormat.Snippet,
 				kind: CompletionItemKind.Snippet,
 				textEdit: {
-					newText: `/* @lasertag-${directive} \${1|dead-selector,impossible-local-class,selector-crosses-ownership-boundary|} */`,
+					newText:
+						directive === `disable`
+							? `/* @lasertag-disable [\${1|dead-selector,impossible-local-class,selector-crosses-ownership-boundary|}] $2 */`
+							: `/* @lasertag-enable [\${1|dead-selector,impossible-local-class,selector-crosses-ownership-boundary|}] */`,
 					range: {
 						end: { character: 14 + directive.length, line: 1 },
 						start: { character: 1, line: 1 },

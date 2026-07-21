@@ -38,10 +38,12 @@ const REGION_DIRECTIVE_COMPLETIONS = [
 	{
 		directive: `@lasertag-disable`,
 		diagnosticCodePlaceholder: `\${1|dead-selector,impossible-local-class,selector-crosses-ownership-boundary|}`,
+		explanationPlaceholder: ` $2`,
 	},
 	{
 		directive: `@lasertag-enable`,
 		diagnosticCodePlaceholder: `\${1|dead-selector,impossible-local-class,selector-crosses-ownership-boundary|}`,
+		explanationPlaceholder: ``,
 	},
 ] as const
 const REFINEMENT_COMPLETIONS = [
@@ -148,8 +150,12 @@ function regionDirectiveCompletionItems(
 	const replacementStart = lineStart + indentationLength
 
 	return REGION_DIRECTIVE_COMPLETIONS.flatMap(
-		({ diagnosticCodePlaceholder, directive }): CompletionItem[] => {
-			const commentStart = `/* ${directive} `
+		({
+			diagnosticCodePlaceholder,
+			directive,
+			explanationPlaceholder,
+		}): CompletionItem[] => {
+			const commentStart = `/* ${directive} [`
 
 			if (!commentStart.startsWith(typedComment)) return []
 
@@ -160,7 +166,7 @@ function regionDirectiveCompletionItems(
 					kind: CompletionItemKind.Snippet,
 					label: directive,
 					textEdit: {
-						newText: `${commentStart}${diagnosticCodePlaceholder} */`,
+						newText: `${commentStart}${diagnosticCodePlaceholder}]${explanationPlaceholder} */`,
 						range: {
 							end: offsetToPosition(sourceText, offset),
 							start: offsetToPosition(sourceText, replacementStart),

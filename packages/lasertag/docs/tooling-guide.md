@@ -280,8 +280,8 @@ The server provides:
 
 - `dead-selector`, `impossible-local-class`, and
   `selector-crosses-ownership-boundary` diagnostics in CSS Modules
-- `unused-disable` and `unused-enable` diagnostics for redundant suppression
-  regions
+- `disable-explanation-too-short`, `unused-disable`, and `unused-enable`
+  diagnostics for invalid or redundant suppression regions
 - an `ambiguous-render-source` error when both source siblings exist
 - render-aware selector, attribute, refinement, and diagnostic-directive completions
 - a cleanup code action whose edits remove dead or impossible selectors
