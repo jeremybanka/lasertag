@@ -18,6 +18,9 @@ aligned.
 The category is **structural CSS**. The product promise is **CSS you can
 maintain**.
 
+The formal definition is: **Lasertag is a statically enforced subset of CSS
+Modules.**
+
 ## The conviction
 
 CSS is not the problem. Unbounded relationships between structure, selectors,
@@ -31,6 +34,39 @@ mixed into their logical markup.
 Lasertag gives CSS the same component-shaped boundaries as JSX. It lets the
 browser remain the styling engine and makes the relationship between a
 component and its stylesheet statically understandable.
+
+## The formal model
+
+Lasertag is a statically enforced subset of CSS Modules.
+
+It does not introduce a new stylesheet language, runtime, module format, or
+bundler contract. A Lasertag stylesheet is a CSS Module with additional
+structural constraints that tooling can verify before the application runs.
+
+This gives Lasertag a simple compatibility rule:
+
+> Anything that supports CSS Modules can, by definition, support Lasertag.
+
+Frameworks and build tools do not need a Lasertag-specific rendering
+integration. They continue compiling and loading ordinary CSS Modules.
+Lasertag's editor, CLI, lint, and CI tooling enforce the narrower authoring
+contract alongside that existing pipeline.
+
+"Subset" is important. Lasertag gains confidence by intentionally ruling out
+valid CSS Module patterns that weaken structural guarantees—for example,
+exporting several styling classes from one component module or relying on
+selectors that cannot be related to the component's rendered tree. Every
+Lasertag module remains a CSS Module; not every CSS Module is Lasertag.
+
+The relationship should be communicated as:
+
+```text
+Lasertag ⊂ CSS Modules ⊂ CSS
+```
+
+This is the foundation of the no-lock-in story. Removing Lasertag's static
+checks leaves ordinary CSS Modules, not a proprietary runtime or a migration
+project.
 
 ## Why Lasertag
 
@@ -106,6 +142,10 @@ that tree correspond to the rendered component structure.
 Lasertag builds on CSS Modules rather than replacing them. It adds structural
 conventions, static guarantees, editor tooling, and dead-code detection to a
 workflow developers already understand.
+
+Formally, Lasertag is a statically enforced subset of CSS Modules. Anything
+that already supports CSS Modules has the necessary runtime and build-time
+foundation to support Lasertag.
 
 ### Performance fiends
 
@@ -248,6 +288,7 @@ Use these messages in this order. Do not lead with implementation machinery.
 4. **Use the full web platform with component-scale confidence.**
 5. **Know what every selector affects. Delete what nothing uses.**
 6. **Ship ordinary static CSS with no styling runtime.**
+7. **Run anywhere CSS Modules run.**
 
 ## Tagline territory
 
@@ -258,6 +299,8 @@ Primary:
 Supporting lines:
 
 - Structural CSS for JSX.
+- A statically enforced subset of CSS Modules.
+- If it supports CSS Modules, it supports Lasertag.
 - For people (and robots) who love CSS.
 - Love CSS again, at component scale.
 - Keep the cascade. Lose the uncertainty.
@@ -311,6 +354,7 @@ Marketing should demonstrate each important claim.
 | Dead CSS is easy to remove          | An editor or CLI diagnostic deleting a stale selector |
 | Changes have a narrow blast radius  | A component tree with matching nested selectors       |
 | There is no styling runtime         | Compiled output and bundle comparison                 |
+| CSS Module support is sufficient    | The same module built by representative frameworks    |
 | DevTools leads back to source       | A semantic/custom-element tree and source search      |
 | Growth is predictable               | A benchmark across increasing component counts        |
 | Agents need less irrelevant context | A controlled logical-edit prompt comparison           |
@@ -345,7 +389,8 @@ concrete.
 
 Lasertag is zero-runtime structural CSS for people (and robots) who love CSS:
 keep visual details in CSS, logical structure in components, and let static
-analysis prove they still match.
+analysis prove they still match. Formally, it is a statically enforced subset
+of CSS Modules, so it can run anywhere CSS Modules run.
 
 ### Short paragraph
 
@@ -354,7 +399,8 @@ with a CSS Module that mirrors its rendered structure, giving authors the full
 power of native CSS without mixing visual details into JSX. Static analysis
 finds structural mistakes and dead selectors in the editor and CI, with no
 styling runtime shipped to users—and gives humans and coding agents the same
-clear, checkable definition of done.
+clear, checkable definition of done. Because Lasertag is a subset of CSS
+Modules, existing CSS Module pipelines require no new runtime integration.
 
 ### Rival framing
 
