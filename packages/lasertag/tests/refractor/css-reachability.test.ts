@@ -31,6 +31,18 @@ function diagnosticSelectors(tsxSource: string, cssSource: string): string[] {
 	}).diagnostics.map((diagnostic) => diagnostic.selector)
 }
 
+function diagnosticSummaries(tsxSource: string, cssSource: string) {
+	return validateCssReachability({
+		tsxPath: `/project/src/AppPanel.tsx`,
+		cssPath: `/project/src/AppPanel.module.css`,
+		tsxSource,
+		cssSource,
+	}).diagnostics.map((diagnostic) => ({
+		code: String(diagnostic.code),
+		selector: diagnostic.selector,
+	}))
+}
+
 describe(`render story css reachability`, () => {
 	it(`suppresses diagnostics on the line after a lasertag expect-error directive`, () => {
 		expect(
@@ -1248,10 +1260,10 @@ describe(`module.css nesting and at-rule reachability`, () => {
 	})
 })
 
-describe(`module.css opaque render story boundaries`, () => {
-	it(`does not report descendants that may come from imported components`, () => {
+describe(`module.css ownership boundaries`, () => {
+	it(`reports a universal descendant selector that can enter an imported component`, () => {
 		expect(
-			diagnosticSelectors(
+			diagnosticSummaries(
 				`
 					import css from "./AppPanel.module.css"
 					import { UserMenu } from "./UserMenu.tsx"
@@ -1266,17 +1278,21 @@ describe(`module.css opaque render story boundaries`, () => {
 				`,
 				`
 					app-panel.class {
-						> button {}
-						button {}
+						* {}
 					}
 				`,
 			),
-		).toEqual([])
+		).toEqual([
+			{
+				code: `selector-crosses-ownership-boundary`,
+				selector: `app-panel.class *`,
+			},
+		])
 	})
 
-	it(`does not report descendants that may come from children`, () => {
+	it(`reports a direct universal child selector that can style children roots`, () => {
 		expect(
-			diagnosticSelectors(
+			diagnosticSummaries(
 				`
 					import css from "./AppPanel.module.css"
 
@@ -1290,17 +1306,166 @@ describe(`module.css opaque render story boundaries`, () => {
 				`,
 				`
 					app-panel.class {
-						> button {}
+						> * {}
+					}
+				`,
+			),
+		).toEqual([
+			{
+				code: `selector-crosses-ownership-boundary`,
+				selector: `app-panel.class > *`,
+			},
+		])
+	})
+
+	it(`reports a named descendant selector that can enter an imported component`, () => {
+		expect(
+			diagnosticSummaries(
+				`
+					import css from "./AppPanel.module.css"
+					import { UserMenu } from "./UserMenu.tsx"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<section>
+									<UserMenu />
+								</section>
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						> section {
+							button {}
+						}
+					}
+				`,
+			),
+		).toEqual([
+			{
+				code: `selector-crosses-ownership-boundary`,
+				selector: `app-panel.class > section button`,
+			},
+		])
+	})
+
+	it(`reports a selector that matches owned DOM but can also enter foreign DOM`, () => {
+		expect(
+			diagnosticSummaries(
+				`
+					import css from "./AppPanel.module.css"
+					import { UserMenu } from "./UserMenu.tsx"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<button />
+								<UserMenu />
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
 						button {}
+					}
+				`,
+			),
+		).toEqual([
+			{
+				code: `selector-crosses-ownership-boundary`,
+				selector: `app-panel.class button`,
+			},
+		])
+	})
+
+	it(`allows universal descendant selectors in dead-end components`, () => {
+		expect(
+			diagnosticSummaries(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<header>
+									<h1>Account</h1>
+								</header>
+								<button>Save</button>
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						* {}
 					}
 				`,
 			),
 		).toEqual([])
 	})
 
-	it(`does not report descendants that may come from render prop calls`, () => {
+	it(`allows a selector confined to an owned subtree beside a foreign component`, () => {
 		expect(
-			diagnosticSelectors(
+			diagnosticSummaries(
+				`
+					import css from "./AppPanel.module.css"
+					import { UserMenu } from "./UserMenu.tsx"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<header>
+									<h1>Account</h1>
+								</header>
+								<UserMenu />
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						> header {
+							* {}
+						}
+					}
+				`,
+			),
+		).toEqual([])
+	})
+
+	it(`treats components defined in the same file as owned`, () => {
+		expect(
+			diagnosticSummaries(
+				`
+					import css from "./AppPanel.module.css"
+
+					function LocalActions() {
+						return <action-list><button>Save</button></action-list>
+					}
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<LocalActions />
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						* {}
+					}
+				`,
+			),
+		).toEqual([])
+	})
+
+	it(`reports foreign output returned by a render prop`, () => {
+		expect(
+			diagnosticSummaries(
 				`
 					import css from "./AppPanel.module.css"
 
@@ -1316,17 +1481,21 @@ describe(`module.css opaque render story boundaries`, () => {
 				`,
 				`
 					app-panel.class {
-						> footer {}
 						footer button {}
 					}
 				`,
 			),
-		).toEqual([])
+		).toEqual([
+			{
+				code: `selector-crosses-ownership-boundary`,
+				selector: `app-panel.class footer button`,
+			},
+		])
 	})
 
-	it(`does not report descendants that may come from portal calls`, () => {
+	it(`does not treat portal output as a descendant ownership boundary`, () => {
 		expect(
-			diagnosticSelectors(
+			diagnosticSummaries(
 				`
 					import { createPortal } from "react-dom"
 					import css from "./AppPanel.module.css"
