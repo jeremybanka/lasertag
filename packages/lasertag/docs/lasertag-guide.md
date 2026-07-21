@@ -162,6 +162,21 @@ app-canvas.class {
 
 The explanation after the colon must contain at least three characters. Lasertag reports the directive when the following line has no reachability or ownership-boundary diagnostic, so `lasertag fix` and the editor cleanup action can remove stale comments.
 
+To suppress one diagnostic type across a larger region, pair diagnostic-scoped `@lasertag-disable` and `@lasertag-enable` comments:
+
+```css
+app-canvas.class {
+	/* @lasertag-disable [dead-selector] inserted by the canvas runtime */
+	> canvas {}
+	> canvas-overlay {}
+	/* @lasertag-enable [dead-selector] */
+
+	> footer {}
+}
+```
+
+Put the diagnostic code in brackets. A disable also requires an explanation of at least three characters after the closing bracket; an enable does not accept an explanation. The supported reachability diagnostic codes are `dead-selector`, `impossible-local-class`, and `selector-crosses-ownership-boundary`. Regions for different codes may overlap, and a disable without a matching enable remains active through the end of the file. Lasertag reports `disable-explanation-too-short` when the explanation is missing or too short, `unused-disable` when a disable suppresses no matching diagnostics, and `unused-enable` when an enable appears outside an active region for the same code.
+
 ## Type Support
 
 The `lasertag/css-modules` type export constrains CSS Modules to a single exported `class` member:

@@ -34,6 +34,18 @@ type SelectorPathContext = {
 const MODULE_CLASS_NAME = `class`
 const EXPECT_ERROR_DIRECTIVE = `@lasertag-expect-error`
 const EXPECT_ERROR_COMMENT_START = `/* ${EXPECT_ERROR_DIRECTIVE}: `
+const REGION_DIRECTIVE_COMPLETIONS = [
+	{
+		directive: `@lasertag-disable`,
+		diagnosticCodePlaceholder: `\${1|dead-selector,impossible-local-class,selector-crosses-ownership-boundary|}`,
+		explanationPlaceholder: ` $2`,
+	},
+	{
+		directive: `@lasertag-enable`,
+		diagnosticCodePlaceholder: `\${1|dead-selector,impossible-local-class,selector-crosses-ownership-boundary|}`,
+		explanationPlaceholder: ``,
+	},
+] as const
 const REFINEMENT_COMPLETIONS = [
 	`:hover`,
 	`:focus-visible`,
@@ -122,6 +134,48 @@ function expectErrorCompletionItem(
 			},
 		},
 	}
+}
+
+function regionDirectiveCompletionItems(
+	sourceText: string,
+	offset: number,
+): CompletionItem[] {
+	const lineStart = sourceText.lastIndexOf(`\n`, offset - 1) + 1
+	const linePrefix = sourceText.slice(lineStart, offset)
+	const indentationLength = linePrefix.length - linePrefix.trimStart().length
+	const typedComment = linePrefix.slice(indentationLength)
+
+	if (typedComment.length === 0) return []
+
+	const replacementStart = lineStart + indentationLength
+
+	return REGION_DIRECTIVE_COMPLETIONS.flatMap(
+		({
+			diagnosticCodePlaceholder,
+			directive,
+			explanationPlaceholder,
+		}): CompletionItem[] => {
+			const commentStart = `/* ${directive} [`
+
+			if (!commentStart.startsWith(typedComment)) return []
+
+			return [
+				{
+					filterText: commentStart,
+					insertTextFormat: InsertTextFormat.Snippet,
+					kind: CompletionItemKind.Snippet,
+					label: directive,
+					textEdit: {
+						newText: `${commentStart}${diagnosticCodePlaceholder}]${explanationPlaceholder} */`,
+						range: {
+							end: offsetToPosition(sourceText, offset),
+							start: offsetToPosition(sourceText, replacementStart),
+						},
+					},
+				},
+			]
+		},
+	)
 }
 
 function isWhitespace(character: string): boolean {
@@ -815,8 +869,16 @@ export function createCssModuleCompletionItems({
 	sourceText,
 }: CssModuleCompletionOptions): CompletionItem[] {
 	const expectErrorItem = expectErrorCompletionItem(sourceText, offset)
+	const regionDirectiveItems = regionDirectiveCompletionItems(
+		sourceText,
+		offset,
+	)
+	const directiveItems = [
+		...(expectErrorItem ? [expectErrorItem] : []),
+		...regionDirectiveItems,
+	]
 
-	if (expectErrorItem) return [expectErrorItem]
+	if (directiveItems.length > 0) return uniqueCompletionItems(directiveItems)
 
 	const context = completionContext(sourceText, offset)
 

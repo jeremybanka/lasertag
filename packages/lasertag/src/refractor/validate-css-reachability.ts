@@ -9,7 +9,7 @@ import type {
 	SelectorPath,
 	SourceRange,
 } from "./diagnostics.ts"
-import { applyLasertagExpectErrorDirectives } from "./expect-error.ts"
+import { applyLasertagSuppressionDirectives } from "./expect-error.ts"
 import {
 	canCrossOwnershipBoundary,
 	canReachSelectorPath,
@@ -175,7 +175,7 @@ export function analyzeCssReachability({
 		diagnostics:
 			cssSource === undefined
 				? diagnostics
-				: applyLasertagExpectErrorDirectives(cssSource, diagnostics),
+				: applyLasertagSuppressionDirectives(cssSource, diagnostics),
 		selectorReachability,
 	}
 }

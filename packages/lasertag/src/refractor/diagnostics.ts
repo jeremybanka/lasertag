@@ -66,9 +66,12 @@ export type Reachability = `reachable` | `unreachable` | `unknown`
 export type CssReachabilityDiagnostic = {
 	code:
 		| `dead-selector`
+		| `disable-explanation-too-short`
 		| `expect-error-explanation-too-short`
 		| `impossible-local-class`
 		| `selector-crosses-ownership-boundary`
+		| `unused-disable`
+		| `unused-enable`
 		| `unused-expect-error`
 	message: string
 	selector: string
