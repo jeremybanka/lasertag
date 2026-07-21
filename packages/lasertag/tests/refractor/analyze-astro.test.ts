@@ -111,6 +111,26 @@ import css from "./index.module.css"
 		])
 	})
 
+	it(`reports selectors that style an Astro component owned by another file`, () => {
+		const result = validateRenderSourceCssReachability({
+			cssSource: `app-panel.class {
+	> account-card {}
+}`,
+			sourcePath: `/project/src/AppPanel.astro`,
+			sourceText: `---
+import AccountCard from "./AccountCard.astro"
+---
+<app-panel class={css.class}><AccountCard /></app-panel>`,
+		})
+
+		expect(result.diagnostics).toMatchObject([
+			{
+				code: `selector-crosses-ownership-boundary`,
+				selector: `app-panel.class > account-card`,
+			},
+		])
+	})
+
 	it(`treats slots and unknown expressions as opaque render branches`, () => {
 		const story = analyzeAstroRenderStory({
 			sourceText: `<app-panel><slot />{content}</app-panel>`,

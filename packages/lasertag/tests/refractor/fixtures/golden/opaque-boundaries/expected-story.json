@@ -6,15 +6,19 @@
 			"tagName": "app-shell",
 			"children": [
 				{
+					"expectedRootTagName": "menu",
 					"kind": "opaque",
+					"ownership": "foreign",
 					"reason": "imported or external component"
 				},
 				{
 					"kind": "opaque",
+					"ownership": "foreign",
 					"reason": "imported or external component"
 				},
 				{
 					"kind": "opaque",
+					"ownership": "foreign",
 					"reason": "dynamic JSX component"
 				}
 			]

@@ -101,6 +101,36 @@ app-header-bar.class {
 }
 ```
 
+Nested selectors must stay within DOM owned by the component file. Imported
+components, render props, and `{children}` introduce ownership boundaries. A
+selector that can match their output is reported as
+`selector-crosses-ownership-boundary`, even when it also matches locally owned
+DOM:
+
+```tsx
+export const AppPanel = ({ children }) => (
+	<app-panel className={css.class}>
+		<header>
+			<h1>Account</h1>
+		</header>
+		{children}
+	</app-panel>
+)
+```
+
+```css
+app-panel.class {
+	/* Can style every element supplied through children. */
+	* {}
+}
+```
+
+Broad descendant selectors are valid in dead-end components whose matching
+subtree is entirely defined in the same file. Ownership analysis is
+path-sensitive, so an imported component in one branch does not prevent styling
+a separate, fully owned branch. Direct-child selectors can also cross a boundary
+when they style the root rendered by a foreign component or `{children}`.
+
 ## Tags Tell the Story
 
 Use a custom tag for the root of every exported component, named after that component in kebab case. `AppHeaderBar` should render `<app-header-bar className={css.class}>`; `ProjectList` should render `<project-list className={css.class}>`.
@@ -130,7 +160,7 @@ app-canvas.class {
 }
 ```
 
-The explanation after the colon must contain at least three characters. Lasertag reports the directive when the following line has no reachability error, so `lasertag fix` and the editor cleanup action can remove stale comments.
+The explanation after the colon must contain at least three characters. Lasertag reports the directive when the following line has no reachability or ownership-boundary diagnostic, so `lasertag fix` and the editor cleanup action can remove stale comments.
 
 ## Type Support
 

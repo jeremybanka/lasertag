@@ -429,7 +429,7 @@ describe(`render story css reachability`, () => {
 		])
 	})
 
-	it(`does not report dead selectors across opaque imported component branches`, () => {
+	it(`reports a selector that styles an imported component root`, () => {
 		const result = validateCssReachability({
 			tsxPath: `/project/src/AppPanel.tsx`,
 			cssPath: `/project/src/AppPanel.module.css`,
@@ -452,7 +452,12 @@ describe(`render story css reachability`, () => {
 			`,
 		})
 
-		expect(result.diagnostics).toEqual([])
+		expect(result.diagnostics).toMatchObject([
+			{
+				code: `selector-crosses-ownership-boundary`,
+				selector: `app-panel.class > user-menu`,
+			},
+		])
 	})
 
 	it(`skips unsupported selectors instead of reporting them as dead`, () => {
@@ -1107,7 +1112,7 @@ describe(`module.css selector unknowns and escapes`, () => {
 		).toEqual([])
 	})
 
-	it(`skips wildcard and tagless selectors`, () => {
+	it(`checks wildcard selectors and skips tagless selectors`, () => {
 		expect(
 			diagnosticSelectors(
 				`
@@ -1124,7 +1129,7 @@ describe(`module.css selector unknowns and escapes`, () => {
 					}
 				`,
 			),
-		).toEqual([])
+		).toEqual([`app-panel.class > *`])
 	})
 
 	it(`skips unsupported structural selectors`, () => {
@@ -1515,6 +1520,15 @@ describe(`module.css ownership boundaries`, () => {
 					}
 				`,
 			),
-		).toEqual([])
+		).toEqual([
+			{
+				code: `dead-selector`,
+				selector: `app-panel.class > footer`,
+			},
+			{
+				code: `dead-selector`,
+				selector: `app-panel.class footer button`,
+			},
+		])
 	})
 })

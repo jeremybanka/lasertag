@@ -19,9 +19,10 @@ export type AnalyzeAstroOptions = {
 	scopeToCssClassRoots?: boolean
 }
 
-function opaque(reason: string): OpaqueStoryNode {
+function foreignOpaque(reason: string): OpaqueStoryNode {
 	return {
 		kind: `opaque`,
+		ownership: `foreign`,
 		reason,
 	}
 }
@@ -58,7 +59,7 @@ function storyElement(
 
 	return {
 		children: hasInjectedHtml
-			? [...children, opaque(`set:html render branch`)]
+			? [...children, foreignOpaque(`set:html render branch`)]
 			: children,
 		kind: `element`,
 		tagName: node.name,
@@ -78,15 +79,18 @@ function analyzeComponent(
 	}
 
 	if (!/^[A-Z][A-Za-z0-9]*$/.test(node.name)) {
-		return [opaque(`dynamic Astro component`)]
+		return [foreignOpaque(`dynamic Astro component`)]
 	}
 
 	const attributes = storyAttributes(node.attributes)
 
 	return [
 		{
-			children: [opaque(`Astro component "${node.name}" implementation`)],
+			children: [
+				foreignOpaque(`Astro component "${node.name}" implementation`),
+			],
 			kind: `element`,
+			ownership: `foreign`,
 			tagName: toKebabCase(node.name),
 			...(attributes.length > 0 ? { attributes } : {}),
 		},
@@ -102,13 +106,16 @@ function analyzeExpression(
 
 	return children.length > 0
 		? children
-		: [opaque(`unknown Astro expression render branch`)]
+		: [foreignOpaque(`unknown Astro expression render branch`)]
 }
 
 function analyzeSlot(
 	node: Extract<AstroNode, { type: `element` }>,
 ): StoryChild[] {
-	return [...node.children.flatMap(analyzeNode), opaque(`slot render branch`)]
+	return [
+		...node.children.flatMap(analyzeNode),
+		foreignOpaque(`slot render branch`),
+	]
 }
 
 function analyzeNode(node: AstroNode): StoryChild[] {

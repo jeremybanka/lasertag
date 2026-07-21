@@ -17,7 +17,20 @@ function segmentMatches(
 	node: StoryNode,
 	segment: SelectorPathSegment,
 ): boolean {
-	return node.tagName === segment.tagName
+	return segment.tagName === `*` || node.tagName === segment.tagName
+}
+
+function opaqueBoundaryCanMatch(
+	node: Extract<StoryChild, { kind: `opaque` }>,
+	segment: SelectorPathSegment,
+): boolean {
+	if (node.ownership !== `foreign`) return false
+
+	return (
+		node.expectedRootTagName === undefined ||
+		segment.tagName === `*` ||
+		node.expectedRootTagName === segment.tagName
+	)
 }
 
 function canReachFromNode(
@@ -142,4 +155,106 @@ export function canReachSelectorPath(
 	return combineReachability(
 		story.roots.map((root) => canReachFromRoot(root, path)),
 	)
+}
+
+function canCrossFromNode(
+	node: StoryNode,
+	path: SelectorPath,
+	segmentIndex: number,
+): boolean {
+	if (segmentIndex >= path.length) return false
+
+	const segment = path[segmentIndex]
+
+	if (!segment) return false
+
+	return segment.relation === `child`
+		? canCrossDirectChildFromChildren(node.children, path, segmentIndex)
+		: segment.relation === `descendant`
+			? canCrossDescendantFromChildren(node.children, path, segmentIndex)
+			: false
+}
+
+function canCrossDirectChildFromChildren(
+	children: StoryChild[],
+	path: SelectorPath,
+	segmentIndex: number,
+): boolean {
+	const segment = path[segmentIndex]
+
+	if (!segment) return false
+
+	return children.some((child) => {
+		if (child.kind === `opaque`) {
+			return opaqueBoundaryCanMatch(child, segment)
+		}
+
+		if (child.kind === `choice`) {
+			return child.alternatives.some((alternative) =>
+				canCrossDirectChildFromChildren(alternative, path, segmentIndex),
+			)
+		}
+
+		if (!segmentMatches(child, segment)) return false
+		if (child.ownership === `foreign`) return true
+
+		return canCrossFromNode(child, path, segmentIndex + 1)
+	})
+}
+
+function canCrossDescendantFromChildren(
+	children: StoryChild[],
+	path: SelectorPath,
+	segmentIndex: number,
+): boolean {
+	const segment = path[segmentIndex]
+
+	if (!segment) return false
+
+	return children.some((child) => {
+		if (child.kind === `opaque`) return child.ownership === `foreign`
+		if (child.kind === `choice`) {
+			return child.alternatives.some((alternative) =>
+				canCrossDescendantFromChildren(alternative, path, segmentIndex),
+			)
+		}
+		if (child.ownership === `foreign`) return true
+
+		const throughMatch =
+			segmentMatches(child, segment) &&
+			canCrossFromNode(child, path, segmentIndex + 1)
+		const throughDescendant = canCrossDescendantFromChildren(
+			child.children,
+			path,
+			segmentIndex,
+		)
+
+		return throughMatch || throughDescendant
+	})
+}
+
+function canCrossFromRoot(root: StoryChild, path: SelectorPath): boolean {
+	if (root.kind === `opaque`) return false
+	if (root.kind === `choice`) {
+		return root.alternatives.some((alternative) =>
+			alternative.some((child) => canCrossFromRoot(child, path)),
+		)
+	}
+
+	const rootSegment = path[0]
+
+	if (!rootSegment || !segmentMatches(root, rootSegment)) return false
+	if (path.length < 2) return false
+	if (root.ownership === `foreign`) return true
+
+	return canCrossFromNode(root, path, 1)
+}
+
+export function canCrossOwnershipBoundary(
+	story: RenderStory,
+	path: SelectorPath,
+): boolean {
+	if (path.length < 2) return false
+
+	return story.roots.some((root) => canCrossFromRoot(root, path))
 }

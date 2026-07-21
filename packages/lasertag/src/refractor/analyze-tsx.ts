@@ -82,6 +82,28 @@ function opaque(
 	return { kind: `opaque`, reason, range: rangeOf(sourceFile, node) }
 }
 
+function foreignOpaque(
+	reason: string,
+	sourceFile: ts.SourceFile,
+	node: ts.Node,
+	expectedRootTagName?: string,
+): OpaqueStoryNode {
+	return {
+		kind: `opaque`,
+		reason,
+		ownership: `foreign`,
+		range: rangeOf(sourceFile, node),
+		...(expectedRootTagName ? { expectedRootTagName } : {}),
+	}
+}
+
+function toKebabCase(name: string): string {
+	return name
+		.replace(/([a-z0-9])([A-Z])/g, `$1-$2`)
+		.replace(/([A-Z])([A-Z][a-z])/g, `$1-$2`)
+		.toLowerCase()
+}
+
 function choice(
 	alternatives: StoryChild[][],
 	sourceFile: ts.SourceFile,
@@ -253,6 +275,13 @@ function addImportDeclaration(
 
 	const moduleName = statement.moduleSpecifier.text
 	const namedBindings = importClause.namedBindings
+
+	if (importClause.name) {
+		index.imports.set(importClause.name.text, {
+			importedName: `default`,
+			moduleName,
+		})
+	}
 
 	if (namedBindings && ts.isNamedImports(namedBindings)) {
 		for (const element of namedBindings.elements) {
@@ -643,6 +672,41 @@ function resolveImportBinding(
 	}
 }
 
+function isImportedCall(
+	context: AnalyzeContext,
+	node: ts.CallExpression,
+	moduleName: string,
+	importedName: string,
+): boolean {
+	const binding = resolveImportBinding(
+		context,
+		node.expression.getText(context.sourceFile),
+	)
+
+	return (
+		binding?.moduleName === moduleName && binding.importedName === importedName
+	)
+}
+
+function expressionRootIdentifier(
+	expression: ts.Expression,
+): string | undefined {
+	let current = expression
+
+	while (
+		ts.isPropertyAccessExpression(current) ||
+		ts.isElementAccessExpression(current)
+	) {
+		current = current.expression
+	}
+
+	return ts.isIdentifier(current) ? current.text : undefined
+}
+
+function isRenderPropCall(node: ts.CallExpression): boolean {
+	return expressionRootIdentifier(node.expression) === `props`
+}
+
 function analyzeJsxAttributeRenderValue(
 	context: AnalyzeContext,
 	attribute: ts.JsxAttribute,
@@ -908,7 +972,13 @@ function lowerSolidComponent(
 			]
 		}
 
-		return [opaque(`unknown Solid Dynamic component`, context.sourceFile, node)]
+		return [
+			foreignOpaque(
+				`unknown Solid Dynamic component`,
+				context.sourceFile,
+				node,
+			),
+		]
 	}
 
 	if (
@@ -982,11 +1052,25 @@ function analyzeComponentTag(
 	if (loweredChildren) return loweredChildren
 
 	if (!isComponentName(tagName) || tagName.includes(`.`)) {
-		return [opaque(`dynamic JSX component`, context.sourceFile, node)]
+		return [foreignOpaque(`dynamic JSX component`, context.sourceFile, node)]
 	}
 
 	if (!context.components.has(tagName)) {
-		return [opaque(`imported or external component`, context.sourceFile, node)]
+		const binding = context.imports.get(tagName)
+		const expectedRootTagName = binding?.moduleName.startsWith(`.`)
+			? toKebabCase(
+					binding.importedName === `default` ? tagName : binding.importedName,
+				)
+			: undefined
+
+		return [
+			foreignOpaque(
+				`imported or external component`,
+				context.sourceFile,
+				node,
+				expectedRootTagName,
+			),
+		]
 	}
 
 	return analyzeComponent(context, tagName, stack)
@@ -1153,11 +1237,18 @@ function analyzeExpression(
 	}
 
 	if (ts.isCallExpression(expression)) {
-		return (
-			analyzeMapCall(context, expression, stack) ?? [
-				opaque(`unsupported render call`, context.sourceFile, expression),
-			]
-		)
+		const mappedChildren = analyzeMapCall(context, expression, stack)
+
+		if (mappedChildren) return mappedChildren
+		if (isImportedCall(context, expression, `react-dom`, `createPortal`)) {
+			return []
+		}
+
+		return [
+			isRenderPropCall(expression)
+				? foreignOpaque(`render prop call`, context.sourceFile, expression)
+				: opaque(`unsupported render call`, context.sourceFile, expression),
+		]
 	}
 
 	if (expression.kind === ts.SyntaxKind.NullKeyword) return []
@@ -1165,7 +1256,11 @@ function analyzeExpression(
 
 	if (isChildrenExpression(expression)) {
 		return [
-			opaque(`children prop render branch`, context.sourceFile, expression),
+			foreignOpaque(
+				`children prop render branch`,
+				context.sourceFile,
+				expression,
+			),
 		]
 	}
 

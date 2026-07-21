@@ -18,12 +18,15 @@ export type StoryNode = {
 	tagName: string
 	children: StoryChild[]
 	attributes?: StoryAttribute[]
+	ownership?: `foreign`
 	range?: SourceRange
 }
 
 export type OpaqueStoryNode = {
 	kind: `opaque`
 	reason: string
+	expectedRootTagName?: string
+	ownership?: `foreign`
 	range?: SourceRange
 }
 
@@ -65,6 +68,7 @@ export type CssReachabilityDiagnostic = {
 		| `dead-selector`
 		| `expect-error-explanation-too-short`
 		| `impossible-local-class`
+		| `selector-crosses-ownership-boundary`
 		| `unused-expect-error`
 	message: string
 	selector: string
