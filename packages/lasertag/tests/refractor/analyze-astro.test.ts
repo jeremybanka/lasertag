@@ -148,4 +148,73 @@ import AccountCard from "./AccountCard.astro"
 			tagName: `app-panel`,
 		})
 	})
+
+	it.each([
+		[`double-quoted string`, `"Title"`],
+		[`single-quoted string`, `'Title'`],
+		[`decimal number`, `-4.2e1`],
+		[`radix number`, `0xff`],
+		[`bigint`, `42n`],
+		[`true`, `true`],
+		[`false`, `false`],
+		[`null`, `null`],
+		[`undefined`, `undefined`],
+	])(
+		`omits a primitive %s expression from the render story`,
+		(_, expression) => {
+			const story = analyzeAstroRenderStory({
+				sourceText: `<app-panel>{${expression}}</app-panel>`,
+			})
+
+			expect(story.roots[0]).toMatchObject({
+				children: [],
+				kind: `element`,
+				tagName: `app-panel`,
+			})
+		},
+	)
+
+	it(`does not treat a string literal expression as foreign DOM`, () => {
+		const sourceText = `<literal-example class={css.class}>
+	<section>
+		<h2>{"Title"}</h2>
+	</section>
+</literal-example>`
+		const story = analyzeAstroRenderStory({ sourceText })
+
+		expect(story.roots[0]).toMatchObject({
+			children: [
+				{
+					children: [
+						{
+							children: [],
+							kind: `element`,
+							tagName: `h2`,
+						},
+					],
+					kind: `element`,
+					tagName: `section`,
+				},
+			],
+			kind: `element`,
+			tagName: `literal-example`,
+		})
+
+		const result = validateRenderSourceCssReachability({
+			cssSource: `literal-example.class {
+	> section > h2 {}
+	> section h2 {}
+	> section h3 {}
+}`,
+			sourcePath: `/project/src/Literal.astro`,
+			sourceText,
+		})
+
+		expect(result.diagnostics).toMatchObject([
+			{
+				code: `dead-selector`,
+				selector: `literal-example.class > section h3`,
+			},
+		])
+	})
 })

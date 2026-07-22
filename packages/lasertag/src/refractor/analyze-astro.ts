@@ -19,6 +19,21 @@ export type AnalyzeAstroOptions = {
 	scopeToCssClassRoots?: boolean
 }
 
+const STRING_LITERAL_EXPRESSION =
+	/^(?:"(?:[^"\\\r\n]|\\[\s\S])*"|'(?:[^'\\\r\n]|\\[\s\S])*')$/
+const DECIMAL_NUMBER_EXPRESSION =
+	/^[+-]?(?:(?:[0-9](?:_?[0-9])*)(?:\.(?:[0-9](?:_?[0-9])*)?)?|\.(?:[0-9](?:_?[0-9])*))(?:[eE][+-]?[0-9](?:_?[0-9])*)?$/
+const RADIX_NUMBER_EXPRESSION =
+	/^[+-]?0(?:[bB][01](?:_?[01])*|[oO][0-7](?:_?[0-7])*|[xX][0-9a-fA-F](?:_?[0-9a-fA-F])*)$/
+const BIGINT_EXPRESSION =
+	/^[+-]?(?:[0-9](?:_?[0-9])*|0[bB][01](?:_?[01])*|0[oO][0-7](?:_?[0-7])*|0[xX][0-9a-fA-F](?:_?[0-9a-fA-F])*)n$/
+const PRIMITIVE_KEYWORD_EXPRESSIONS = new Set([
+	`false`,
+	`null`,
+	`true`,
+	`undefined`,
+])
+
 function foreignOpaque(reason: string): OpaqueStoryNode {
 	return {
 		kind: `opaque`,
@@ -104,9 +119,29 @@ function analyzeExpression(
 		child.type === `text` ? [] : analyzeNode(child),
 	)
 
-	return children.length > 0
-		? children
-		: [foreignOpaque(`unknown Astro expression render branch`)]
+	if (children.length > 0) return children
+	if (isPrimitiveExpression(node)) return []
+
+	return [foreignOpaque(`unknown Astro expression render branch`)]
+}
+
+function isPrimitiveExpression(
+	node: Extract<AstroNode, { type: `expression` }>,
+): boolean {
+	if (node.children.some((child) => child.type !== `text`)) return false
+
+	const expression = node.children
+		.map((child) => (child.type === `text` ? child.value : ``))
+		.join(``)
+		.trim()
+
+	return (
+		PRIMITIVE_KEYWORD_EXPRESSIONS.has(expression) ||
+		STRING_LITERAL_EXPRESSION.test(expression) ||
+		DECIMAL_NUMBER_EXPRESSION.test(expression) ||
+		RADIX_NUMBER_EXPRESSION.test(expression) ||
+		BIGINT_EXPRESSION.test(expression)
+	)
 }
 
 function analyzeSlot(
