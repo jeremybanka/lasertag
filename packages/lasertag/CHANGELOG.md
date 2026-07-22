@@ -1,5 +1,11 @@
 # lasertag
 
+## 0.6.4
+
+### Patch Changes
+
+- 2ac9f36: Keep unknown JSX member-expression siblings from tainting selector paths rendered by components defined in the same module.
+
 ## 0.6.3
 
 ### Patch Changes
