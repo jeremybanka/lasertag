@@ -1427,6 +1427,131 @@ describe(`module.css nesting and at-rule reachability`, () => {
 	})
 })
 
+describe(`tag-named JSX component namespaces`, () => {
+	it(`allows the asserted component root but warns when a selector enters it`, () => {
+		expect(
+			diagnosticSummaries(
+				`
+					import css from "./AppPanel.module.css"
+
+					function MagnifyingGlassIcon() {
+						return <svg><path /></svg>
+					}
+
+					const svg = {
+						MagnifyingGlass: MagnifyingGlassIcon,
+					}
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<svg.MagnifyingGlass />
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						> svg {}
+						> svg > path {}
+					}
+				`,
+			),
+		).toEqual([
+			{
+				code: `selector-crosses-ownership-boundary`,
+				selector: `app-panel.class > svg > path`,
+			},
+		])
+	})
+
+	it(`keeps separately owned sibling selectors unambiguous`, () => {
+		expect(
+			diagnosticSummaries(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<svg.MagnifyingGlass />
+								<input />
+								<kbd>⌘K</kbd>
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						> input {}
+						> kbd {}
+					}
+				`,
+			),
+		).toEqual([])
+	})
+
+	it.each([`svg`, `span`, `header`, `article`, `div`])(
+		`recognizes the %s intrinsic namespace assertion`,
+		(tagName) => {
+			expect(
+				diagnosticSummaries(
+					`
+						import css from "./AppPanel.module.css"
+
+						export function AppPanel() {
+							return (
+								<app-panel className={css.class}>
+									<${tagName}.ExternalComponent />
+								</app-panel>
+							)
+						}
+					`,
+					`
+						app-panel.class {
+							> ${tagName} {}
+						}
+					`,
+				),
+			).toEqual([])
+		},
+	)
+
+	it(`keeps arbitrary and custom-element namespaces opaque`, () => {
+		expect(
+			diagnosticSummaries(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<icons.MagnifyingGlass />
+								<app-icon.ExternalComponent />
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						> svg {}
+						> app-icon {}
+					}
+				`,
+			),
+		).toEqual([
+			{
+				code: `selector-crosses-ownership-boundary`,
+				selector: `app-panel.class > svg`,
+			},
+			{
+				code: `selector-crosses-ownership-boundary`,
+				selector: `app-panel.class > app-icon`,
+			},
+		])
+	})
+})
+
 describe(`module.css ownership boundaries`, () => {
 	it(`reports a universal descendant selector that can enter an imported component`, () => {
 		expect(

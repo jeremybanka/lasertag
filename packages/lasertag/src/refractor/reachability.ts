@@ -196,7 +196,9 @@ function canCrossDirectChildFromChildren(
 		}
 
 		if (!segmentMatches(child, segment)) return false
-		if (child.ownership === `foreign`) return true
+		if (child.ownership === `foreign`) {
+			return !child.addressable || segmentIndex + 1 < path.length
+		}
 
 		return canCrossFromNode(child, path, segmentIndex + 1)
 	})
