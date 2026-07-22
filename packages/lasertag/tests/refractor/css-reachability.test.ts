@@ -1762,6 +1762,77 @@ describe(`module.css ownership boundaries`, () => {
 		).toEqual([])
 	})
 
+	it(`does not let a dynamic component sibling taint same-module component paths`, () => {
+		expect(
+			diagnosticSummaries(
+				`
+					import css from "./DocsNavigation.module.css"
+					import { Toggle } from "./Toggle.tsx"
+
+					export function DocsNavigation() {
+						return (
+							<docs-navigation className={css.class}>
+								<SiteDirectory />
+								<OnThisPage />
+								<Toggle.Button />
+							</docs-navigation>
+						)
+					}
+
+					function SiteDirectory() {
+						return <site-directory><nav><header>Guide</header></nav></site-directory>
+					}
+
+					function OnThisPage() {
+						return <on-this-page><nav><header>On this page</header></nav></on-this-page>
+					}
+				`,
+				`
+					docs-navigation.class {
+						> site-directory {}
+						> on-this-page {}
+						> site-directory > nav > header {}
+						> on-this-page > nav > header {}
+					}
+				`,
+			),
+		).toEqual([])
+	})
+
+	it(`keeps dynamic component siblings diagnostic for incomplete owned paths`, () => {
+		expect(
+			diagnosticSummaries(
+				`
+					import css from "./DocsNavigation.module.css"
+					import { Toggle } from "./Toggle.tsx"
+
+					export function DocsNavigation() {
+						return (
+							<docs-navigation className={css.class}>
+								<SiteDirectory />
+								<Toggle.Button />
+							</docs-navigation>
+						)
+					}
+
+					function SiteDirectory() {
+						return <site-directory><nav /></site-directory>
+					}
+				`,
+				`
+					docs-navigation.class {
+						> site-directory > footer {}
+					}
+				`,
+			),
+		).toEqual([
+			{
+				code: `selector-crosses-ownership-boundary`,
+				selector: `docs-navigation.class > site-directory > footer`,
+			},
+		])
+	})
+
 	it(`still reports descendants that can enter an unknown external sibling`, () => {
 		expect(
 			diagnosticSummaries(
