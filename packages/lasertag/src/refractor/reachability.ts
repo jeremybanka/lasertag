@@ -200,6 +200,16 @@ function hasReachableOwnedDirectPath(
 	})
 }
 
+function isUnknownComponentBoundary(
+	child: Extract<StoryChild, { kind: `opaque` }>,
+): boolean {
+	return (
+		child.expectedRootTagName === undefined &&
+		(child.reason === `imported or external component` ||
+			child.reason === `dynamic JSX component`)
+	)
+}
+
 function canCrossDirectChildFromChildren(
 	children: StoryChild[],
 	path: SelectorPath,
@@ -213,12 +223,11 @@ function canCrossDirectChildFromChildren(
 
 	return children.some((child) => {
 		if (child.kind === `opaque`) {
-			// Prefer a concrete authored path over an unrelated imported sibling
+			// Prefer a concrete authored path over an unrelated component sibling
 			// whose root tag is completely unknown.
 			if (
 				segment.tagName !== `*` &&
-				child.reason === `imported or external component` &&
-				child.expectedRootTagName === undefined &&
+				isUnknownComponentBoundary(child) &&
 				hasOwnedPath
 			) {
 				return false
