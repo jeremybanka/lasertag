@@ -1,5 +1,11 @@
 # lasertag
 
+## 0.6.3
+
+### Patch Changes
+
+- c28064e: Avoid ownership-warning cascades when an unknown imported component root is beside a concrete locally owned direct-child selector path.
+
 ## 0.6.2
 
 ### Patch Changes
