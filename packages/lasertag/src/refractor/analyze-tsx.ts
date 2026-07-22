@@ -88,12 +88,14 @@ function foreignOpaque(
 	sourceFile: ts.SourceFile,
 	node: ts.Node,
 	expectedRootTagName?: string,
+	componentName?: string,
 ): OpaqueStoryNode {
 	return {
 		kind: `opaque`,
 		reason,
 		ownership: `foreign`,
 		range: rangeOf(sourceFile, node),
+		...(componentName ? { componentName } : {}),
 		...(expectedRootTagName ? { expectedRootTagName } : {}),
 	}
 }
@@ -620,6 +622,7 @@ function createStoryNode(
 function addressableForeignRoot(
 	context: AnalyzeContext,
 	tagName: string,
+	componentName: string,
 	node: ComponentJsxNode,
 	tagNameNode: ts.JsxTagNameExpression,
 ): StoryNode {
@@ -632,9 +635,28 @@ function addressableForeignRoot(
 				node,
 			),
 		],
+		componentName,
 		kind: `element`,
 		ownership: `foreign`,
 		range: rangeOf(context.sourceFile, tagNameNode),
+		tagName,
+	}
+}
+
+function foreignRoot(
+	context: AnalyzeContext,
+	tagName: string,
+	componentName: string,
+	node: ComponentJsxNode,
+): StoryNode {
+	return {
+		children: [
+			foreignOpaque(`component implementation`, context.sourceFile, node),
+		],
+		componentName,
+		kind: `element`,
+		ownership: `foreign`,
+		range: rangeOf(context.sourceFile, node),
 		tagName,
 	}
 }
@@ -651,6 +673,10 @@ function assertedForeignRootTagName(tagName: string): string | undefined {
 	const namespaceName = tagName.slice(0, separatorIndex)
 
 	return isStandardIntrinsicTagName(namespaceName) ? namespaceName : undefined
+}
+
+function assertedForeignComponentName(tagName: string): string {
+	return tagName.slice(tagName.indexOf(`.`) + 1)
 }
 
 function isFragmentJsxTag(tagName: string): boolean {
@@ -1036,10 +1062,13 @@ function analyzeJsxElement(
 	const assertedRootTagName = assertedForeignRootTagName(tagName)
 
 	if (assertedRootTagName) {
+		const componentName = assertedForeignComponentName(tagName)
+
 		return [
 			addressableForeignRoot(
 				context,
 				assertedRootTagName,
+				componentName,
 				node,
 				node.openingElement.tagName,
 			),
@@ -1079,8 +1108,16 @@ function analyzeJsxSelfClosingElement(
 	const assertedRootTagName = assertedForeignRootTagName(tagName)
 
 	if (assertedRootTagName) {
+		const componentName = assertedForeignComponentName(tagName)
+
 		return [
-			addressableForeignRoot(context, assertedRootTagName, node, node.tagName),
+			addressableForeignRoot(
+				context,
+				assertedRootTagName,
+				componentName,
+				node,
+				node.tagName,
+			),
 		]
 	}
 
@@ -1114,7 +1151,15 @@ function analyzeComponentTag(
 	if (loweredChildren) return loweredChildren
 
 	if (!isComponentName(tagName) || tagName.includes(`.`)) {
-		return [foreignOpaque(`dynamic JSX component`, context.sourceFile, node)]
+		return [
+			foreignOpaque(
+				`dynamic JSX component`,
+				context.sourceFile,
+				node,
+				undefined,
+				tagName,
+			),
+		]
 	}
 
 	if (!context.components.has(tagName)) {
@@ -1125,14 +1170,17 @@ function analyzeComponentTag(
 				)
 			: undefined
 
-		return [
-			foreignOpaque(
-				`imported or external component`,
-				context.sourceFile,
-				node,
-				expectedRootTagName,
-			),
-		]
+		return expectedRootTagName
+			? [foreignRoot(context, expectedRootTagName, tagName, node)]
+			: [
+					foreignOpaque(
+						`imported or external component`,
+						context.sourceFile,
+						node,
+						undefined,
+						tagName,
+					),
+				]
 	}
 
 	return analyzeComponent(context, tagName, stack)

@@ -11,11 +11,13 @@ import type {
 } from "./diagnostics.ts"
 import { applyLasertagSuppressionDirectives } from "./expect-error.ts"
 import {
-	canCrossOwnershipBoundary,
 	canReachSelectorPath,
+	findOwnershipBoundaryEvidence,
 } from "./reachability.ts"
+import type { OwnershipBoundaryEvidence } from "./reachability.ts"
 import { createRenderStoryEvidence } from "./render-story-evidence.ts"
 import { scopeRenderStoryToCssClassRoots } from "./render-story-root.ts"
+import { isStandardIntrinsicTagName } from "./standard-intrinsic-tag-names.ts"
 import type { TypescriptAstSession } from "./typescript-ast.ts"
 
 export type ValidateCssReachabilityOptions = {
@@ -79,6 +81,67 @@ function ownershipBoundaryMessage(selector: string): string {
 	return `Selector "${selector}" may match DOM owned by children or an external component.`
 }
 
+function foreignComponentDescendantMessage(
+	selector: string,
+	evidence: Extract<
+		OwnershipBoundaryEvidence,
+		{ kind: `foreign-component-descendant` }
+	>,
+): string {
+	return evidence.rootWasAsserted
+		? `Selector "${selector}" crosses into DOM owned by foreign component ${evidence.componentName} beneath its asserted <${evidence.rootTagName}> root.`
+		: `Selector "${selector}" crosses into DOM owned by foreign component ${evidence.componentName} beneath its <${evidence.rootTagName}> root.`
+}
+
+function foreignComponentRootMessage(
+	selector: string,
+	evidence: Extract<
+		OwnershipBoundaryEvidence,
+		{ kind: `foreign-component-root` }
+	>,
+): string {
+	const optIn = isStandardIntrinsicTagName(evidence.rootTagName)
+		? ` Use <${evidence.rootTagName}.${evidence.componentName} /> to explicitly opt into styling this root.`
+		: ``
+
+	return `Selector "${selector}" matches <${evidence.rootTagName}>, the root rendered by foreign component ${evidence.componentName}.${optIn}`
+}
+
+function selectorPathPrefix(path: SelectorPath, segmentIndex: number): string {
+	const root = path[0]
+
+	if (!root) return ``
+
+	let prefix = `${root.tagName}.class`
+
+	for (let index = 1; index <= segmentIndex; index += 1) {
+		const segment = path[index]
+
+		if (!segment) break
+
+		prefix += segment.relation === `child` ? ` > ` : ` `
+		prefix += segment.tagName
+	}
+
+	return prefix
+}
+
+type OpaqueCollision = {
+	componentName: string
+	prefix: string
+	range: SourceRange
+	rootTagName: string
+	selectors: Set<string>
+}
+
+function opaqueCollisionMessage(collision: OpaqueCollision): string {
+	const selectorCount = collision.selectors.size
+
+	return selectorCount === 1
+		? `Cannot verify ownership of "${collision.prefix}": ${collision.componentName} has an unknown rendered root and may also render <${collision.rootTagName}>. Declare its stable intrinsic root with <tag.${collision.componentName} /> or place it beneath an owned boundary.`
+		: `Cannot verify ownership of selectors beginning at "${collision.prefix}": ${collision.componentName} has an unknown rendered root and may also render <${collision.rootTagName}>. This affects ${selectorCount} selectors. Declare its stable intrinsic root with <tag.${collision.componentName} /> or place it beneath an owned boundary.`
+}
+
 function combineReachability(results: Reachability[]): Reachability {
 	if (results.includes(`reachable`)) return `reachable`
 	if (results.includes(`unknown`)) return `unknown`
@@ -94,6 +157,7 @@ export function analyzeCssReachability({
 }: CreateCssReachabilityDiagnosticsOptions): CssReachabilityAnalysis {
 	const diagnostics: CssReachabilityDiagnostic[] = []
 	const selectorReachability: CssSelectorReachabilityAnalysis[] = []
+	const opaqueCollisions = new Map<string, OpaqueCollision>()
 
 	for (const selectorAnalysis of selectorAnalyses) {
 		const { result } = selectorAnalysis
@@ -135,8 +199,13 @@ export function analyzeCssReachability({
 		const reachability = combineReachability(
 			paths.map((path) => path.reachability),
 		)
-		const crossesOwnershipBoundary = result.paths.some((selectorPath) =>
-			canCrossOwnershipBoundary(renderStory, selectorPath),
+		const ownershipEvidence = result.paths.flatMap((selectorPath) =>
+			findOwnershipBoundaryEvidence(renderStory, selectorPath).map(
+				(evidence) => ({
+					evidence,
+					path: selectorPath,
+				}),
+			),
 		)
 
 		selectorReachability.push({
@@ -147,10 +216,59 @@ export function analyzeCssReachability({
 			selector: selectorAnalysis.selector,
 		})
 
-		if (crossesOwnershipBoundary) {
+		const seenOwnershipEvidence = new Set<string>()
+
+		for (const { evidence, path } of ownershipEvidence) {
+			const evidenceKey = JSON.stringify({ evidence, path })
+
+			if (seenOwnershipEvidence.has(evidenceKey)) continue
+
+			seenOwnershipEvidence.add(evidenceKey)
+
+			if (evidence.kind === `opaque-component-root`) {
+				const prefix = selectorPathPrefix(path, evidence.segmentIndex)
+				const collisionKey = `${evidence.componentName}\0${prefix}`
+				const collision = opaqueCollisions.get(collisionKey)
+
+				if (collision) {
+					collision.selectors.add(selectorAnalysis.selector)
+					if (selectorAnalysis.range.start < collision.range.start) {
+						collision.range = selectorAnalysis.range
+					}
+				} else {
+					opaqueCollisions.set(collisionKey, {
+						componentName: evidence.componentName,
+						prefix,
+						range: selectorAnalysis.range,
+						rootTagName: evidence.rootTagName,
+						selectors: new Set([selectorAnalysis.selector]),
+					})
+				}
+				continue
+			}
+
+			if (evidence.kind === `foreign-component-root`) {
+				diagnostics.push({
+					code: `selector-matches-foreign-component-root`,
+					message: foreignComponentRootMessage(
+						selectorAnalysis.selector,
+						evidence,
+					),
+					selector: selectorAnalysis.selector,
+					range: selectorAnalysis.range,
+				})
+				continue
+			}
+
 			diagnostics.push({
 				code: `selector-crosses-ownership-boundary`,
-				message: ownershipBoundaryMessage(selectorAnalysis.selector),
+				message:
+					evidence.kind === `foreign-component-descendant`
+						? foreignComponentDescendantMessage(
+								selectorAnalysis.selector,
+								evidence,
+							)
+						: ownershipBoundaryMessage(selectorAnalysis.selector),
 				selector: selectorAnalysis.selector,
 				range: selectorAnalysis.range,
 			})
@@ -170,6 +288,21 @@ export function analyzeCssReachability({
 			})
 		}
 	}
+
+	for (const collision of opaqueCollisions.values()) {
+		diagnostics.push({
+			code: `opaque-component-root-may-collide`,
+			message: opaqueCollisionMessage(collision),
+			range: collision.range,
+			selector: collision.prefix,
+		})
+	}
+
+	diagnostics.sort(
+		(left, right) =>
+			(left.range?.start ?? 0) - (right.range?.start ?? 0) ||
+			(left.range?.end ?? 0) - (right.range?.end ?? 0),
+	)
 
 	return {
 		diagnostics:

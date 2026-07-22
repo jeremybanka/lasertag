@@ -6,17 +6,26 @@
 			"tagName": "app-shell",
 			"children": [
 				{
-					"expectedRootTagName": "menu",
+					"children": [
+						{
+							"kind": "opaque",
+							"ownership": "foreign",
+							"reason": "component implementation"
+						}
+					],
+					"componentName": "Menu",
+					"kind": "element",
+					"ownership": "foreign",
+					"tagName": "menu"
+				},
+				{
+					"componentName": "Widget",
 					"kind": "opaque",
 					"ownership": "foreign",
 					"reason": "imported or external component"
 				},
 				{
-					"kind": "opaque",
-					"ownership": "foreign",
-					"reason": "imported or external component"
-				},
-				{
+					"componentName": "Namespace.Tool",
 					"kind": "opaque",
 					"ownership": "foreign",
 					"reason": "dynamic JSX component"

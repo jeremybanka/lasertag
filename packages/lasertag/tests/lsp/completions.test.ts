@@ -119,8 +119,8 @@ describe(`lasertag lsp selector completions`, () => {
 				textEdit: {
 					newText:
 						directive === `disable`
-							? `/* @lasertag-disable [\${1|dead-selector,impossible-local-class,selector-crosses-ownership-boundary|}] $2 */`
-							: `/* @lasertag-enable [\${1|dead-selector,impossible-local-class,selector-crosses-ownership-boundary|}] */`,
+							? `/* @lasertag-disable [\${1|dead-selector,impossible-local-class,opaque-component-root-may-collide,selector-crosses-ownership-boundary,selector-matches-foreign-component-root|}] $2 */`
+							: `/* @lasertag-enable [\${1|dead-selector,impossible-local-class,opaque-component-root-may-collide,selector-crosses-ownership-boundary,selector-matches-foreign-component-root|}] */`,
 					range: {
 						end: { character: 14 + directive.length, line: 1 },
 						start: { character: 1, line: 1 },

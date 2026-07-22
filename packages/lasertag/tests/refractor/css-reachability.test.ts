@@ -616,7 +616,7 @@ describe(`render story css reachability`, () => {
 
 		expect(result.diagnostics).toMatchObject([
 			{
-				code: `selector-crosses-ownership-boundary`,
+				code: `selector-matches-foreign-component-root`,
 				selector: `app-panel.class > user-menu`,
 			},
 		])
@@ -1541,11 +1541,19 @@ describe(`tag-named JSX component namespaces`, () => {
 			),
 		).toEqual([
 			{
-				code: `selector-crosses-ownership-boundary`,
+				code: `opaque-component-root-may-collide`,
 				selector: `app-panel.class > svg`,
 			},
 			{
-				code: `selector-crosses-ownership-boundary`,
+				code: `opaque-component-root-may-collide`,
+				selector: `app-panel.class > svg`,
+			},
+			{
+				code: `opaque-component-root-may-collide`,
+				selector: `app-panel.class > app-icon`,
+			},
+			{
+				code: `opaque-component-root-may-collide`,
 				selector: `app-panel.class > app-icon`,
 			},
 		])
@@ -1576,7 +1584,7 @@ describe(`module.css ownership boundaries`, () => {
 			),
 		).toEqual([
 			{
-				code: `selector-crosses-ownership-boundary`,
+				code: `selector-matches-foreign-component-root`,
 				selector: `app-panel.class *`,
 			},
 		])
@@ -1761,20 +1769,8 @@ describe(`module.css ownership boundaries`, () => {
 			),
 		).toEqual([
 			{
-				code: `selector-crosses-ownership-boundary`,
+				code: `opaque-component-root-may-collide`,
 				selector: `app-panel.class > file-name`,
-			},
-			{
-				code: `selector-crosses-ownership-boundary`,
-				selector: `app-panel.class > file-name > button`,
-			},
-			{
-				code: `selector-crosses-ownership-boundary`,
-				selector: `app-panel.class > file-name > button > svg`,
-			},
-			{
-				code: `selector-crosses-ownership-boundary`,
-				selector: `app-panel.class > file-name > button:hover::before`,
 			},
 		])
 	})
@@ -1815,20 +1811,12 @@ describe(`module.css ownership boundaries`, () => {
 			),
 		).toEqual([
 			{
-				code: `selector-crosses-ownership-boundary`,
+				code: `opaque-component-root-may-collide`,
 				selector: `docs-navigation.class > site-directory`,
 			},
 			{
-				code: `selector-crosses-ownership-boundary`,
+				code: `opaque-component-root-may-collide`,
 				selector: `docs-navigation.class > on-this-page`,
-			},
-			{
-				code: `selector-crosses-ownership-boundary`,
-				selector: `docs-navigation.class > site-directory > nav > header`,
-			},
-			{
-				code: `selector-crosses-ownership-boundary`,
-				selector: `docs-navigation.class > on-this-page > nav > header`,
 			},
 		])
 	})
@@ -1861,8 +1849,8 @@ describe(`module.css ownership boundaries`, () => {
 			),
 		).toEqual([
 			{
-				code: `selector-crosses-ownership-boundary`,
-				selector: `docs-navigation.class > site-directory > footer`,
+				code: `opaque-component-root-may-collide`,
+				selector: `docs-navigation.class > site-directory`,
 			},
 		])
 	})
@@ -1895,15 +1883,11 @@ describe(`module.css ownership boundaries`, () => {
 			),
 		).toEqual([
 			{
-				code: `selector-crosses-ownership-boundary`,
-				selector: `app-panel.class > file-name > span`,
+				code: `opaque-component-root-may-collide`,
+				selector: `app-panel.class > file-name`,
 			},
 			{
-				code: `selector-crosses-ownership-boundary`,
-				selector: `app-panel.class > file-name > code`,
-			},
-			{
-				code: `selector-crosses-ownership-boundary`,
+				code: `opaque-component-root-may-collide`,
 				selector: `app-panel.class span`,
 			},
 		])
@@ -1937,11 +1921,19 @@ describe(`module.css ownership boundaries`, () => {
 			),
 		).toEqual([
 			{
-				code: `selector-crosses-ownership-boundary`,
+				code: `selector-matches-foreign-component-root`,
 				selector: `app-panel.class > *`,
 			},
 			{
-				code: `selector-crosses-ownership-boundary`,
+				code: `opaque-component-root-may-collide`,
+				selector: `app-panel.class > *`,
+			},
+			{
+				code: `selector-matches-foreign-component-root`,
+				selector: `app-panel.class > user-menu`,
+			},
+			{
+				code: `opaque-component-root-may-collide`,
 				selector: `app-panel.class > user-menu`,
 			},
 		])

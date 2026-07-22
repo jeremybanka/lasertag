@@ -5,6 +5,7 @@ function structuralChildValue(child: StoryChild): unknown {
 		return {
 			kind: child.kind,
 			reason: child.reason,
+			...(child.componentName ? { componentName: child.componentName } : {}),
 			...(child.expectedRootTagName
 				? { expectedRootTagName: child.expectedRootTagName }
 				: {}),
@@ -23,6 +24,7 @@ function structuralChildValue(child: StoryChild): unknown {
 		children: structuralChildrenValue(child.children),
 		kind: child.kind,
 		...(child.addressable ? { addressable: child.addressable } : {}),
+		...(child.componentName ? { componentName: child.componentName } : {}),
 		...(child.ownership ? { ownership: child.ownership } : {}),
 		tagName: child.tagName,
 	}
