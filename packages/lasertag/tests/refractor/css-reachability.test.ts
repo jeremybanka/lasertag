@@ -1728,7 +1728,7 @@ describe(`module.css ownership boundaries`, () => {
 		).toEqual([])
 	})
 
-	it(`does not let an unknown external sibling taint owned direct-child branches`, () => {
+	it(`reports an unknown external sibling that can overlap an owned direct-child path`, () => {
 		expect(
 			diagnosticSummaries(
 				`
@@ -1738,11 +1738,11 @@ describe(`module.css ownership boundaries`, () => {
 					export function AppPanel() {
 						return (
 							<app-panel className={css.class}>
-								<local-toolbar>
+								<file-name>
 									<button type="button">
 										<svg />
 									</button>
-								</local-toolbar>
+								</file-name>
 								<External />
 							</app-panel>
 						)
@@ -1750,7 +1750,7 @@ describe(`module.css ownership boundaries`, () => {
 				`,
 				`
 					app-panel.class {
-						> local-toolbar {
+						> file-name {
 							> button {
 								> svg {}
 								&:hover::before {}
@@ -1759,10 +1759,27 @@ describe(`module.css ownership boundaries`, () => {
 					}
 				`,
 			),
-		).toEqual([])
+		).toEqual([
+			{
+				code: `selector-crosses-ownership-boundary`,
+				selector: `app-panel.class > file-name`,
+			},
+			{
+				code: `selector-crosses-ownership-boundary`,
+				selector: `app-panel.class > file-name > button`,
+			},
+			{
+				code: `selector-crosses-ownership-boundary`,
+				selector: `app-panel.class > file-name > button > svg`,
+			},
+			{
+				code: `selector-crosses-ownership-boundary`,
+				selector: `app-panel.class > file-name > button:hover::before`,
+			},
+		])
 	})
 
-	it(`does not let a dynamic component sibling taint same-module component paths`, () => {
+	it(`reports a dynamic component sibling that can overlap same-module component paths`, () => {
 		expect(
 			diagnosticSummaries(
 				`
@@ -1796,7 +1813,24 @@ describe(`module.css ownership boundaries`, () => {
 					}
 				`,
 			),
-		).toEqual([])
+		).toEqual([
+			{
+				code: `selector-crosses-ownership-boundary`,
+				selector: `docs-navigation.class > site-directory`,
+			},
+			{
+				code: `selector-crosses-ownership-boundary`,
+				selector: `docs-navigation.class > on-this-page`,
+			},
+			{
+				code: `selector-crosses-ownership-boundary`,
+				selector: `docs-navigation.class > site-directory > nav > header`,
+			},
+			{
+				code: `selector-crosses-ownership-boundary`,
+				selector: `docs-navigation.class > on-this-page > nav > header`,
+			},
+		])
 	})
 
 	it(`keeps dynamic component siblings diagnostic for incomplete owned paths`, () => {
@@ -1860,6 +1894,10 @@ describe(`module.css ownership boundaries`, () => {
 				`,
 			),
 		).toEqual([
+			{
+				code: `selector-crosses-ownership-boundary`,
+				selector: `app-panel.class > file-name > span`,
+			},
 			{
 				code: `selector-crosses-ownership-boundary`,
 				selector: `app-panel.class > file-name > code`,
