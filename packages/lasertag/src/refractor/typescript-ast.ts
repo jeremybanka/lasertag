@@ -1,8 +1,9 @@
+import { readFileSync } from "node:fs"
 import path from "node:path"
 
-import type { SourceFile } from "typescript/unstable/ast"
+import type { Node, SourceFile } from "typescript/unstable/ast"
 import type { FileSystem } from "typescript/unstable/fs"
-import { API } from "typescript/unstable/sync"
+import { API, type Project, SymbolFlags } from "typescript/unstable/sync"
 
 import {
 	resolveTypescriptSdkPath,
@@ -10,14 +11,86 @@ import {
 } from "./typescript-runtime.ts"
 
 /** A synchronous, single-owner TypeScript parser session for batched analysis. */
+export type TypescriptAstAnalysis = {
+	resolveAliasedDeclarations(node: Node): Node[]
+}
+
 export type TypescriptAstSession = {
 	[Symbol.dispose](): void
 	close(): void
 	withSourceFile<TResult>(
 		sourceText: string,
 		filePath: string,
-		use: (sourceFile: SourceFile) => TResult,
+		use: (sourceFile: SourceFile, analysis: TypescriptAstAnalysis) => TResult,
 	): TResult
+}
+
+function createTypescriptAstAnalysis(
+	project: Project,
+	dependencySources: Map<string, string>,
+	rootFilePath: string,
+): TypescriptAstAnalysis {
+	return {
+		resolveAliasedDeclarations(node) {
+			const symbol = project.checker.getSymbolAtLocation(node)
+
+			if (!symbol) return []
+
+			let resolvedSymbol = symbol
+			const seenSymbols = new Set<number>()
+
+			while (!seenSymbols.has(resolvedSymbol.id)) {
+				seenSymbols.add(resolvedSymbol.id)
+
+				for (const declaration of resolvedSymbol.declarations) {
+					const resolvedDeclaration = declaration.resolve(project)
+
+					if (!resolvedDeclaration) continue
+
+					const sourceFile = resolvedDeclaration.getSourceFile()
+					const sourceFilePath = normalizeFilePath(sourceFile.fileName)
+
+					if (sourceFilePath !== rootFilePath) {
+						dependencySources.set(sourceFilePath, sourceFile.text)
+					}
+				}
+
+				if ((resolvedSymbol.flags & SymbolFlags.Alias) === 0) break
+
+				const aliasedSymbol =
+					project.checker.getImmediateAliasedSymbol(resolvedSymbol)
+
+				if (!aliasedSymbol) break
+
+				resolvedSymbol = aliasedSymbol
+			}
+
+			if (project.checker.isUnknownSymbol(resolvedSymbol)) return []
+
+			return resolvedSymbol.declarations.flatMap((declaration) => {
+				const resolvedDeclaration = declaration.resolve(project)
+
+				return resolvedDeclaration ? [resolvedDeclaration] : []
+			})
+		},
+	}
+}
+
+function dependencySourceChanged(
+	dependencySources: ReadonlyMap<string, string>,
+	virtualSources: ReadonlyMap<string, string>,
+): boolean {
+	for (const [filePath, previousSource] of dependencySources) {
+		if (virtualSources.has(filePath)) continue
+
+		try {
+			if (readFileSync(filePath, `utf8`) !== previousSource) return true
+		} catch {
+			return true
+		}
+	}
+
+	return false
 }
 
 function normalizeFilePath(filePath: string): string {
@@ -48,6 +121,7 @@ export function createTypescriptAstSession(
 	options: TypescriptRuntimeOptions = {},
 ): TypescriptAstSession {
 	const sources = new Map<string, string>()
+	const dependencySources = new Map<string, string>()
 	const typescriptSdkPath = resolveTypescriptSdkPath(options)
 	let api: API | undefined
 	let closed = false
@@ -75,6 +149,7 @@ export function createTypescriptAstSession(
 			sources.clear()
 			api?.close()
 			api = undefined
+			dependencySources.clear()
 		},
 		withSourceFile(sourceText, filePath, use) {
 			if (closed) {
@@ -98,13 +173,23 @@ export function createTypescriptAstSession(
 			}
 
 			sources.set(normalizedFilePath, sourceText)
+			const dependencyChanged = dependencySourceChanged(
+				dependencySources,
+				sources,
+			)
+
+			if (dependencyChanged) dependencySources.clear()
 
 			const snapshot = activeApi.updateSnapshot({
 				...(previousFilePath && previousFilePath !== normalizedFilePath
 					? { closeFiles: [previousFilePath] }
 					: {}),
-				fileChanges:
-					previousFilePath === normalizedFilePath
+				// Imported component roots are ownership evidence. Rebuild the program
+				// when one of their declarations changes so a long-lived editor session
+				// never retains a verified root after its implementation changes.
+				fileChanges: dependencyChanged
+					? { invalidateAll: true }
+					: previousFilePath === normalizedFilePath
 						? { changed: [normalizedFilePath] }
 						: {
 								created: [normalizedFilePath],
@@ -125,17 +210,28 @@ export function createTypescriptAstSession(
 
 				openFilePath = normalizedFilePath
 
-				const sourceFile = snapshot
-					.getDefaultProjectForFile(normalizedFilePath)
-					?.program.getSourceFile(normalizedFilePath)
+				const project = snapshot.getDefaultProjectForFile(normalizedFilePath)
+				const sourceFile = project?.program.getSourceFile(normalizedFilePath)
 
-				if (!sourceFile) {
+				if (!project || !sourceFile) {
 					throw new Error(
 						`Unable to parse TSX source file ${normalizedFilePath}.`,
 					)
 				}
 
-				return use(sourceFile)
+				// The comparison above consumed the previous analysis's dependency
+				// snapshot. Record only dependencies discovered by this analysis so
+				// serial worker queues do not accumulate unrelated projects.
+				dependencySources.clear()
+
+				return use(
+					sourceFile,
+					createTypescriptAstAnalysis(
+						project,
+						dependencySources,
+						normalizedFilePath,
+					),
+				)
 			} finally {
 				snapshot.dispose()
 			}

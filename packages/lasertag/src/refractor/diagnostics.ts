@@ -19,6 +19,7 @@ export type StoryNode = {
 	children: StoryChild[]
 	addressable?: true
 	attributes?: StoryAttribute[]
+	componentName?: string
 	ownership?: `foreign`
 	range?: SourceRange
 }
@@ -26,6 +27,7 @@ export type StoryNode = {
 export type OpaqueStoryNode = {
 	kind: `opaque`
 	reason: string
+	componentName?: string
 	expectedRootTagName?: string
 	ownership?: `foreign`
 	range?: SourceRange
@@ -70,6 +72,8 @@ export type CssReachabilityDiagnostic = {
 		| `disable-explanation-too-short`
 		| `expect-error-explanation-too-short`
 		| `impossible-local-class`
+		| `opaque-component-root-may-collide`
+		| `selector-matches-foreign-component-root`
 		| `selector-crosses-ownership-boundary`
 		| `unused-disable`
 		| `unused-enable`

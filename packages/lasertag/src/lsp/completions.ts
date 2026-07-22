@@ -37,12 +37,12 @@ const EXPECT_ERROR_COMMENT_START = `/* ${EXPECT_ERROR_DIRECTIVE}: `
 const REGION_DIRECTIVE_COMPLETIONS = [
 	{
 		directive: `@lasertag-disable`,
-		diagnosticCodePlaceholder: `\${1|dead-selector,impossible-local-class,selector-crosses-ownership-boundary|}`,
+		diagnosticCodePlaceholder: `\${1|dead-selector,impossible-local-class,opaque-component-root-may-collide,selector-crosses-ownership-boundary,selector-matches-foreign-component-root|}`,
 		explanationPlaceholder: ` $2`,
 	},
 	{
 		directive: `@lasertag-enable`,
-		diagnosticCodePlaceholder: `\${1|dead-selector,impossible-local-class,selector-crosses-ownership-boundary|}`,
+		diagnosticCodePlaceholder: `\${1|dead-selector,impossible-local-class,opaque-component-root-may-collide,selector-crosses-ownership-boundary,selector-matches-foreign-component-root|}`,
 		explanationPlaceholder: ``,
 	},
 ] as const

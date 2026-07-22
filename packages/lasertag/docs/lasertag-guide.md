@@ -103,7 +103,7 @@ app-header-bar.class {
 
 Nested selectors must stay within DOM owned by the component file. Imported
 components, render props, and `{children}` introduce ownership boundaries. A
-selector that can match their output is reported as
+selector that enters their output is reported as
 `selector-crosses-ownership-boundary`, even when it also matches locally owned
 DOM:
 
@@ -130,9 +130,23 @@ subtree is entirely defined in the same file. Ownership analysis is
 path-sensitive, so an imported component in one branch does not prevent styling
 a separate, fully owned branch. Direct-child selectors can also cross a boundary
 when they style the root rendered by a foreign component or `{children}`.
-An unknown imported or dynamic component root remains a boundary when a named
-direct-child path also has a concrete locally owned match: the selector may
-match both branches at runtime.
+When Lasertag resolves a foreign component root and a selector matches it,
+`selector-matches-foreign-component-root` reports the verified collision. When
+the root remains opaque, `opaque-component-root-may-collide` reports that the
+component may render a matching root. Related selectors that share the same
+first uncertain root are grouped into one diagnostic. Local reachability does
+not change either result: the same selector may match owned and foreign DOM at
+runtime.
+
+Foreign roots are resolved from evidence in the TypeScript module graph, not
+from the component's name. When module resolution reaches an implementation
+whose supported return branches expose outer JSX nodes, Lasertag records those
+nodes as concrete foreign roots. Relative imports, package imports, re-exports,
+and namespace imports all use the same rule. If resolution fails, lands only on
+a declaration file, or reaches an implementation shape Refractor cannot prove,
+the root remains opaque. For example, a component named `Dialog` that actually
+returns `<section>` is treated as a foreign `<section>` root; Lasertag never
+infers `<dialog>` from the export name.
 
 For external components with an intentionally stable intrinsic root, a JSX
 member expression can assert that root at the call site. Name the namespace
@@ -213,7 +227,7 @@ app-canvas.class {
 }
 ```
 
-Put the diagnostic code in brackets. A disable also requires an explanation of at least three characters after the closing bracket; an enable does not accept an explanation. The supported reachability diagnostic codes are `dead-selector`, `impossible-local-class`, and `selector-crosses-ownership-boundary`. Regions for different codes may overlap, and a disable without a matching enable remains active through the end of the file. Lasertag reports `disable-explanation-too-short` when the explanation is missing or too short, `unused-disable` when a disable suppresses no matching diagnostics, and `unused-enable` when an enable appears outside an active region for the same code.
+Put the diagnostic code in brackets. A disable also requires an explanation of at least three characters after the closing bracket; an enable does not accept an explanation. The supported reachability diagnostic codes are `dead-selector`, `impossible-local-class`, `opaque-component-root-may-collide`, `selector-crosses-ownership-boundary`, and `selector-matches-foreign-component-root`. Regions for different codes may overlap, and a disable without a matching enable remains active through the end of the file. Lasertag reports `disable-explanation-too-short` when the explanation is missing or too short, `unused-disable` when a disable suppresses no matching diagnostics, and `unused-enable` when an enable appears outside an active region for the same code.
 
 ## Type Support
 

@@ -15,6 +15,7 @@ import { scopeRenderStoryToCssClassRoots } from "./render-story-root.ts"
 import { isStandardIntrinsicTagName } from "./standard-intrinsic-tag-names.ts"
 import {
 	createTypescriptAstSession,
+	type TypescriptAstAnalysis,
 	type TypescriptAstSession,
 } from "./typescript-ast.ts"
 
@@ -60,6 +61,8 @@ type AnalyzeContext = {
 	namespaceImports: Map<string, string>
 	warnings: RenderStoryWarning[]
 	maxComponentDepth: number
+	typescriptAnalysis: TypescriptAstAnalysis
+	foreignComponentStack: ReadonlySet<string>
 }
 
 const DEFAULT_MAX_COMPONENT_DEPTH = 25
@@ -88,21 +91,16 @@ function foreignOpaque(
 	sourceFile: ts.SourceFile,
 	node: ts.Node,
 	expectedRootTagName?: string,
+	componentName?: string,
 ): OpaqueStoryNode {
 	return {
 		kind: `opaque`,
 		reason,
 		ownership: `foreign`,
 		range: rangeOf(sourceFile, node),
+		...(componentName ? { componentName } : {}),
 		...(expectedRootTagName ? { expectedRootTagName } : {}),
 	}
-}
-
-function toKebabCase(name: string): string {
-	return name
-		.replace(/([a-z0-9])([A-Z])/g, `$1-$2`)
-		.replace(/([A-Z])([A-Z][a-z])/g, `$1-$2`)
-		.toLowerCase()
 }
 
 function choice(
@@ -620,6 +618,7 @@ function createStoryNode(
 function addressableForeignRoot(
 	context: AnalyzeContext,
 	tagName: string,
+	componentName: string,
 	node: ComponentJsxNode,
 	tagNameNode: ts.JsxTagNameExpression,
 ): StoryNode {
@@ -632,11 +631,170 @@ function addressableForeignRoot(
 				node,
 			),
 		],
+		componentName,
 		kind: `element`,
 		ownership: `foreign`,
 		range: rangeOf(context.sourceFile, tagNameNode),
 		tagName,
 	}
+}
+
+function foreignRoot(
+	context: AnalyzeContext,
+	tagName: string,
+	componentName: string,
+	node: ComponentJsxNode,
+): StoryNode {
+	return {
+		children: [
+			foreignOpaque(`component implementation`, context.sourceFile, node),
+		],
+		componentName,
+		kind: `element`,
+		ownership: `foreign`,
+		range: rangeOf(context.sourceFile, node),
+		tagName,
+	}
+}
+
+function componentDefinitionFromDeclaration(
+	sourceFile: ts.SourceFile,
+	declaration: ts.Node,
+	componentName: string,
+): ComponentDefinition | undefined {
+	if (ts.isFunctionDeclaration(declaration) && declaration.body) {
+		return {
+			body: declaration.body,
+			name: declaration.name?.text ?? componentName,
+			range: rangeOf(sourceFile, declaration),
+		}
+	}
+
+	if (
+		ts.isVariableDeclaration(declaration) &&
+		declaration.initializer &&
+		ts.isIdentifier(declaration.name)
+	) {
+		const body = functionBodyFromExpression(declaration.initializer)
+
+		return body
+			? {
+					body,
+					name: declaration.name.text,
+					range: rangeOf(sourceFile, declaration),
+				}
+			: undefined
+	}
+
+	if (ts.isExportAssignment(declaration)) {
+		const body = functionBodyFromExpression(declaration.expression)
+
+		return body
+			? {
+					body,
+					name: componentName,
+					range: rangeOf(sourceFile, declaration),
+				}
+			: undefined
+	}
+}
+
+type ResolvedForeignComponent = {
+	definition: ComponentDefinition
+	sourceFile: ts.SourceFile
+}
+
+function resolveForeignComponent(
+	context: AnalyzeContext,
+	tagNameNode: ts.JsxTagNameExpression,
+	componentName: string,
+): ResolvedForeignComponent | undefined {
+	for (const declaration of context.typescriptAnalysis.resolveAliasedDeclarations(
+		tagNameNode,
+	)) {
+		const sourceFile = declaration.getSourceFile()
+		const definition = componentDefinitionFromDeclaration(
+			sourceFile,
+			declaration,
+			componentName,
+		)
+
+		if (definition) return { definition, sourceFile }
+	}
+}
+
+function foreignRootsFromResolvedStory(
+	context: AnalyzeContext,
+	children: StoryChild[],
+	componentName: string,
+	node: ComponentJsxNode,
+): StoryChild[] {
+	return children.map((child): StoryChild => {
+		if (child.kind === `element`) {
+			return foreignRoot(context, child.tagName, componentName, node)
+		}
+
+		if (child.kind === `choice`) {
+			return choice(
+				child.alternatives.map((alternative) =>
+					foreignRootsFromResolvedStory(
+						context,
+						alternative,
+						componentName,
+						node,
+					),
+				),
+				context.sourceFile,
+				node,
+			)
+		}
+
+		return foreignOpaque(
+			`resolved component root remains opaque`,
+			context.sourceFile,
+			node,
+			undefined,
+			componentName,
+		)
+	})
+}
+
+function analyzeForeignComponent(
+	context: AnalyzeContext,
+	tagName: string,
+	tagNameNode: ts.JsxTagNameExpression,
+	node: ComponentJsxNode,
+): StoryChild[] | undefined {
+	if (context.foreignComponentStack.size >= context.maxComponentDepth) return
+
+	const resolved = resolveForeignComponent(context, tagNameNode, tagName)
+
+	if (!resolved) return
+
+	const resolutionKey = `${resolved.sourceFile.fileName}:${resolved.definition.range.start}`
+
+	if (context.foreignComponentStack.has(resolutionKey)) return
+
+	const index = collectComponentIndex(resolved.sourceFile)
+
+	index.components.set(resolved.definition.name, resolved.definition)
+
+	const importedContext: AnalyzeContext = {
+		components: index.components,
+		foreignComponentStack: new Set([
+			...context.foreignComponentStack,
+			resolutionKey,
+		]),
+		imports: index.imports,
+		maxComponentDepth: context.maxComponentDepth,
+		namespaceImports: index.namespaceImports,
+		sourceFile: resolved.sourceFile,
+		typescriptAnalysis: context.typescriptAnalysis,
+		warnings: [],
+	}
+	const roots = analyzeComponent(importedContext, resolved.definition.name, [])
+
+	return foreignRootsFromResolvedStory(context, roots, tagName, node)
 }
 
 function isIntrinsicJsxTag(tagName: string): boolean {
@@ -651,6 +809,10 @@ function assertedForeignRootTagName(tagName: string): string | undefined {
 	const namespaceName = tagName.slice(0, separatorIndex)
 
 	return isStandardIntrinsicTagName(namespaceName) ? namespaceName : undefined
+}
+
+function assertedForeignComponentName(tagName: string): string {
+	return tagName.slice(tagName.indexOf(`.`) + 1)
 }
 
 function isFragmentJsxTag(tagName: string): boolean {
@@ -1036,10 +1198,13 @@ function analyzeJsxElement(
 	const assertedRootTagName = assertedForeignRootTagName(tagName)
 
 	if (assertedRootTagName) {
+		const componentName = assertedForeignComponentName(tagName)
+
 		return [
 			addressableForeignRoot(
 				context,
 				assertedRootTagName,
+				componentName,
 				node,
 				node.openingElement.tagName,
 			),
@@ -1079,8 +1244,16 @@ function analyzeJsxSelfClosingElement(
 	const assertedRootTagName = assertedForeignRootTagName(tagName)
 
 	if (assertedRootTagName) {
+		const componentName = assertedForeignComponentName(tagName)
+
 		return [
-			addressableForeignRoot(context, assertedRootTagName, node, node.tagName),
+			addressableForeignRoot(
+				context,
+				assertedRootTagName,
+				componentName,
+				node,
+				node.tagName,
+			),
 		]
 	}
 
@@ -1113,24 +1286,50 @@ function analyzeComponentTag(
 
 	if (loweredChildren) return loweredChildren
 
+	const binding = resolveImportBinding(context, tagName)
+
+	if (binding) {
+		const componentName = tagName.slice(tagName.lastIndexOf(`.`) + 1)
+		const resolvedRoots = analyzeForeignComponent(
+			context,
+			componentName,
+			ts.isJsxElement(node) ? node.openingElement.tagName : node.tagName,
+			node,
+		)
+
+		return (
+			resolvedRoots ?? [
+				foreignOpaque(
+					`imported or external component`,
+					context.sourceFile,
+					node,
+					undefined,
+					componentName,
+				),
+			]
+		)
+	}
+
 	if (!isComponentName(tagName) || tagName.includes(`.`)) {
-		return [foreignOpaque(`dynamic JSX component`, context.sourceFile, node)]
+		return [
+			foreignOpaque(
+				`dynamic JSX component`,
+				context.sourceFile,
+				node,
+				undefined,
+				tagName,
+			),
+		]
 	}
 
 	if (!context.components.has(tagName)) {
-		const binding = context.imports.get(tagName)
-		const expectedRootTagName = binding?.moduleName.startsWith(`.`)
-			? toKebabCase(
-					binding.importedName === `default` ? tagName : binding.importedName,
-				)
-			: undefined
-
 		return [
 			foreignOpaque(
 				`imported or external component`,
 				context.sourceFile,
 				node,
-				expectedRootTagName,
+				undefined,
+				tagName,
 			),
 		]
 	}
@@ -1341,7 +1540,10 @@ function analyzeExpression(
 function withSourceFile<TResult>(
 	options: AnalyzeTsxOptions,
 	typescriptSession: TypescriptAstSession | undefined,
-	use: (sourceFile: ts.SourceFile) => TResult,
+	use: (
+		sourceFile: ts.SourceFile,
+		typescriptAnalysis: TypescriptAstAnalysis,
+	) => TResult,
 ): TResult {
 	const session =
 		typescriptSession ??
@@ -1367,14 +1569,17 @@ function createAnalyzeContext(
 	index: ComponentIndex,
 	warnings: RenderStoryWarning[],
 	options: Pick<AnalyzeTsxOptions, "maxComponentDepth">,
+	typescriptAnalysis: TypescriptAstAnalysis,
 ): AnalyzeContext {
 	return {
 		sourceFile,
 		components: index.components,
+		foreignComponentStack: new Set(),
 		imports: index.imports,
 		namespaceImports: index.namespaceImports,
 		warnings,
 		maxComponentDepth: options.maxComponentDepth ?? DEFAULT_MAX_COMPONENT_DEPTH,
+		typescriptAnalysis,
 	}
 }
 
@@ -1386,9 +1591,16 @@ function analyzeIndexedComponent(
 		AnalyzeTsxOptions,
 		"maxComponentDepth" | "scopeToCssClassRoots"
 	>,
+	typescriptAnalysis: TypescriptAstAnalysis,
 ): RenderStory {
 	const warnings: RenderStoryWarning[] = []
-	const context = createAnalyzeContext(sourceFile, index, warnings, options)
+	const context = createAnalyzeContext(
+		sourceFile,
+		index,
+		warnings,
+		options,
+		typescriptAnalysis,
+	)
 	const renderStory = {
 		componentName,
 		roots: analyzeComponent(context, componentName, []),
@@ -1404,41 +1616,61 @@ export function analyzeTsxRenderStory(
 	options: AnalyzeTsxOptions,
 	typescriptSession?: TypescriptAstSession,
 ): RenderStory {
-	return withSourceFile(options, typescriptSession, (sourceFile) => {
-		const index = collectComponentIndex(sourceFile)
-		const warnings: RenderStoryWarning[] = []
-		const componentName = selectMainComponent(index, options, warnings)
+	return withSourceFile(
+		options,
+		typescriptSession,
+		(sourceFile, typescriptAnalysis) => {
+			const index = collectComponentIndex(sourceFile)
+			const warnings: RenderStoryWarning[] = []
+			const componentName = selectMainComponent(index, options, warnings)
 
-		if (!componentName) {
-			return {
-				componentName: options.componentName ?? `unknown`,
-				roots: [opaque(`main component not found`, sourceFile, sourceFile)],
+			if (!componentName) {
+				return {
+					componentName: options.componentName ?? `unknown`,
+					roots: [opaque(`main component not found`, sourceFile, sourceFile)],
+					warnings,
+				}
+			}
+
+			const context = createAnalyzeContext(
+				sourceFile,
+				index,
+				warnings,
+				options,
+				typescriptAnalysis,
+			)
+			const renderStory = {
+				componentName,
+				roots: analyzeComponent(context, componentName, []),
 				warnings,
 			}
-		}
 
-		const context = createAnalyzeContext(sourceFile, index, warnings, options)
-		const renderStory = {
-			componentName,
-			roots: analyzeComponent(context, componentName, []),
-			warnings,
-		}
-
-		return options.scopeToCssClassRoots === false
-			? renderStory
-			: scopeRenderStoryToCssClassRoots(renderStory)
-	})
+			return options.scopeToCssClassRoots === false
+				? renderStory
+				: scopeRenderStoryToCssClassRoots(renderStory)
+		},
+	)
 }
 
 export function analyzeTsxRenderStories(
 	options: AnalyzeTsxRenderStoriesOptions,
 	typescriptSession?: TypescriptAstSession,
 ): RenderStory[] {
-	return withSourceFile(options, typescriptSession, (sourceFile) => {
-		const index = collectComponentIndex(sourceFile)
+	return withSourceFile(
+		options,
+		typescriptSession,
+		(sourceFile, typescriptAnalysis) => {
+			const index = collectComponentIndex(sourceFile)
 
-		return selectComponentStories(index, options).map((componentName) =>
-			analyzeIndexedComponent(sourceFile, index, componentName, options),
-		)
-	})
+			return selectComponentStories(index, options).map((componentName) =>
+				analyzeIndexedComponent(
+					sourceFile,
+					index,
+					componentName,
+					options,
+					typescriptAnalysis,
+				),
+			)
+		},
+	)
 }

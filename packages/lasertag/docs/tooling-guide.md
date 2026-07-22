@@ -36,11 +36,14 @@ both `.tsx` and `.astro` siblings exist, Lasertag reports an ambiguity error; it
 does not silently choose one.
 
 Refractor does not execute application code. It expands supported JSX branches
-and local components into a render story. `children` render slots, imported
-components, and render expressions it cannot resolve become opaque paths.
-Foreign opaque paths carry ownership metadata so selectors that may match their
-DOM can be distinguished from selectors that are merely inconclusive.
-Unsupported selector shapes are unknown too.
+and local components into a render story. For imported components, it asks the
+TypeScript module graph for the actual exported declaration and analyzes a
+supported implementation body when one is available. It does not infer a root
+from the component name. `children` render slots, unresolved imports,
+declaration-only packages, and render expressions it cannot prove become opaque
+paths. Foreign opaque paths carry ownership metadata so selectors that may
+match their DOM can be distinguished from selectors that are merely
+inconclusive. Unsupported selector shapes are unknown too.
 
 For Solid TSX, Refractor recognizes imports from `solid-js` and lowers `Show`,
 `For`, `Index`, `Switch`/`Match`, `ErrorBoundary`, `Suspense`, and
@@ -59,10 +62,12 @@ attachment.
 
 That uncertainty is intentional: a selector is reported as dead only when every
 supported path is provably unreachable. An unknown path prevents that report.
-Independently, Refractor reports `selector-crosses-ownership-boundary` when a
-selector can match a foreign component root or enter DOM supplied by an imported
-component, render prop, slot, or `children`. This check is path-sensitive and can
-report a selector that also has an ordinary reachable match in owned DOM.
+Independently, Refractor reports `selector-matches-foreign-component-root` for
+verified foreign-root matches, `opaque-component-root-may-collide` when an
+unknown component root may match, and `selector-crosses-ownership-boundary` when
+a selector enters DOM supplied by a foreign component, render prop, slot, or
+`children`. These checks are path-sensitive and can report a selector that also
+has an ordinary reachable match in owned DOM.
 Refractor also reports a local class other than `.class` as
 `impossible-local-class`, because Lasertag CSS Modules expose only `css.class`.
 Use `renderStory.warnings` and its opaque nodes when investigating why analysis
@@ -99,8 +104,10 @@ for (const diagnostic of diagnostics) console.error(diagnostic)
 ```
 
 The result contains the render story plus `dead-selector`,
-`impossible-local-class`, and `selector-crosses-ownership-boundary` diagnostics
-with source ranges when available. Pass
+`impossible-local-class`, `opaque-component-root-may-collide`,
+`selector-crosses-ownership-boundary`, and
+`selector-matches-foreign-component-root` diagnostics with source ranges when
+available. Pass
 `componentName` when a file contains multiple exported components and the main
 component cannot be selected by convention. Reusing
 `createTypescriptAstSession()` avoids starting a TypeScript AST session for every
@@ -280,8 +287,10 @@ forward watched-file notifications.
 
 The server provides:
 
-- `dead-selector`, `impossible-local-class`, and
-  `selector-crosses-ownership-boundary` diagnostics in CSS Modules
+- `dead-selector`, `impossible-local-class`,
+  `opaque-component-root-may-collide`,
+  `selector-crosses-ownership-boundary`, and
+  `selector-matches-foreign-component-root` diagnostics in CSS Modules
 - `disable-explanation-too-short`, `unused-disable`, and `unused-enable`
   diagnostics for invalid or redundant suppression regions
 - an `ambiguous-render-source` error when both source siblings exist

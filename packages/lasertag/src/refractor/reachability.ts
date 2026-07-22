@@ -157,106 +157,236 @@ export function canReachSelectorPath(
 	)
 }
 
-function canCrossFromNode(
+export type OwnershipBoundaryEvidence =
+	| {
+			componentName: string
+			kind: `foreign-component-descendant`
+			rootTagName: string
+			rootWasAsserted: boolean
+			segmentIndex: number
+	  }
+	| {
+			componentName: string
+			kind: `foreign-component-root`
+			rootTagName: string
+			segmentIndex: number
+	  }
+	| {
+			componentName: string
+			kind: `opaque-component-root`
+			rootTagName: string
+			segmentIndex: number
+	  }
+	| {
+			kind: `ownership-boundary`
+			segmentIndex: number
+	  }
+
+function uniqueOwnershipEvidence(
+	evidence: OwnershipBoundaryEvidence[],
+): OwnershipBoundaryEvidence[] {
+	const seen = new Set<string>()
+
+	return evidence.filter((item) => {
+		const key = JSON.stringify(item)
+
+		if (seen.has(key)) return false
+
+		seen.add(key)
+		return true
+	})
+}
+
+function ownershipEvidenceFromNode(
 	node: StoryNode,
 	path: SelectorPath,
 	segmentIndex: number,
-): boolean {
-	if (segmentIndex >= path.length) return false
+): OwnershipBoundaryEvidence[] {
+	if (segmentIndex >= path.length) return []
 
 	const segment = path[segmentIndex]
 
-	if (!segment) return false
+	if (!segment) return []
 
 	return segment.relation === `child`
-		? canCrossDirectChildFromChildren(node.children, path, segmentIndex)
+		? ownershipEvidenceFromDirectChildren(node.children, path, segmentIndex)
 		: segment.relation === `descendant`
-			? canCrossDescendantFromChildren(node.children, path, segmentIndex)
-			: false
+			? ownershipEvidenceFromDescendants(node.children, path, segmentIndex)
+			: []
 }
 
-function canCrossDirectChildFromChildren(
+function ownershipEvidenceFromOpaque(
+	child: Extract<StoryChild, { kind: `opaque` }>,
+	segment: SelectorPathSegment,
+	segmentIndex: number,
+): OwnershipBoundaryEvidence[] {
+	if (!opaqueBoundaryCanMatch(child, segment)) return []
+
+	return child.componentName && child.expectedRootTagName === undefined
+		? [
+				{
+					componentName: child.componentName,
+					kind: `opaque-component-root`,
+					rootTagName: segment.tagName,
+					segmentIndex,
+				},
+			]
+		: [{ kind: `ownership-boundary`, segmentIndex }]
+}
+
+function ownershipEvidenceFromForeignRoot(
+	child: StoryNode,
+	path: SelectorPath,
+	segmentIndex: number,
+): OwnershipBoundaryEvidence[] {
+	if (segmentIndex + 1 < path.length) {
+		return child.componentName
+			? [
+					{
+						componentName: child.componentName,
+						kind: `foreign-component-descendant`,
+						rootTagName: child.tagName,
+						rootWasAsserted: child.addressable === true,
+						segmentIndex,
+					},
+				]
+			: [{ kind: `ownership-boundary`, segmentIndex }]
+	}
+
+	if (child.addressable) return []
+
+	return child.componentName
+		? [
+				{
+					componentName: child.componentName,
+					kind: `foreign-component-root`,
+					rootTagName: child.tagName,
+					segmentIndex,
+				},
+			]
+		: [{ kind: `ownership-boundary`, segmentIndex }]
+}
+
+function ownershipEvidenceFromDirectChildren(
 	children: StoryChild[],
 	path: SelectorPath,
 	segmentIndex: number,
-): boolean {
+): OwnershipBoundaryEvidence[] {
 	const segment = path[segmentIndex]
 
-	if (!segment) return false
+	if (!segment) return []
 
-	return children.some((child) => {
-		if (child.kind === `opaque`) {
-			return opaqueBoundaryCanMatch(child, segment)
-		}
+	return uniqueOwnershipEvidence(
+		children.flatMap((child) => {
+			if (child.kind === `opaque`) {
+				return ownershipEvidenceFromOpaque(child, segment, segmentIndex)
+			}
 
-		if (child.kind === `choice`) {
-			return child.alternatives.some((alternative) =>
-				canCrossDirectChildFromChildren(alternative, path, segmentIndex),
-			)
-		}
+			if (child.kind === `choice`) {
+				return child.alternatives.flatMap((alternative) =>
+					ownershipEvidenceFromDirectChildren(alternative, path, segmentIndex),
+				)
+			}
 
-		if (!segmentMatches(child, segment)) return false
-		if (child.ownership === `foreign`) {
-			return !child.addressable || segmentIndex + 1 < path.length
-		}
+			if (!segmentMatches(child, segment)) return []
+			if (child.ownership === `foreign`) {
+				return ownershipEvidenceFromForeignRoot(child, path, segmentIndex)
+			}
 
-		return canCrossFromNode(child, path, segmentIndex + 1)
-	})
+			return ownershipEvidenceFromNode(child, path, segmentIndex + 1)
+		}),
+	)
 }
 
-function canCrossDescendantFromChildren(
+function ownershipEvidenceFromDescendants(
 	children: StoryChild[],
 	path: SelectorPath,
 	segmentIndex: number,
-): boolean {
+): OwnershipBoundaryEvidence[] {
 	const segment = path[segmentIndex]
 
-	if (!segment) return false
+	if (!segment) return []
 
-	return children.some((child) => {
-		if (child.kind === `opaque`) return child.ownership === `foreign`
-		if (child.kind === `choice`) {
-			return child.alternatives.some((alternative) =>
-				canCrossDescendantFromChildren(alternative, path, segmentIndex),
+	return uniqueOwnershipEvidence(
+		children.flatMap((child) => {
+			if (child.kind === `opaque`) {
+				return ownershipEvidenceFromOpaque(child, segment, segmentIndex)
+			}
+			if (child.kind === `choice`) {
+				return child.alternatives.flatMap((alternative) =>
+					ownershipEvidenceFromDescendants(alternative, path, segmentIndex),
+				)
+			}
+			if (child.ownership === `foreign`) {
+				if (segmentMatches(child, segment) && !child.addressable) {
+					return ownershipEvidenceFromForeignRoot(child, path, segmentIndex)
+				}
+
+				return child.componentName
+					? [
+							{
+								componentName: child.componentName,
+								kind: `foreign-component-descendant`,
+								rootTagName: child.tagName,
+								rootWasAsserted: child.addressable === true,
+								segmentIndex,
+							},
+						]
+					: [{ kind: `ownership-boundary`, segmentIndex }]
+			}
+
+			const throughMatch =
+				segmentMatches(child, segment) &&
+				ownershipEvidenceFromNode(child, path, segmentIndex + 1)
+			const throughDescendant = ownershipEvidenceFromDescendants(
+				child.children,
+				path,
+				segmentIndex,
 			)
-		}
-		if (child.ownership === `foreign`) return true
 
-		const throughMatch =
-			segmentMatches(child, segment) &&
-			canCrossFromNode(child, path, segmentIndex + 1)
-		const throughDescendant = canCrossDescendantFromChildren(
-			child.children,
-			path,
-			segmentIndex,
-		)
-
-		return throughMatch || throughDescendant
-	})
+			return [...(throughMatch || []), ...throughDescendant]
+		}),
+	)
 }
 
-function canCrossFromRoot(root: StoryChild, path: SelectorPath): boolean {
-	if (root.kind === `opaque`) return false
+function ownershipEvidenceFromRoot(
+	root: StoryChild,
+	path: SelectorPath,
+): OwnershipBoundaryEvidence[] {
+	if (root.kind === `opaque`) return []
 	if (root.kind === `choice`) {
-		return root.alternatives.some((alternative) =>
-			alternative.some((child) => canCrossFromRoot(child, path)),
+		return uniqueOwnershipEvidence(
+			root.alternatives.flatMap((alternative) =>
+				alternative.flatMap((child) => ownershipEvidenceFromRoot(child, path)),
+			),
 		)
 	}
 
 	const rootSegment = path[0]
 
-	if (!rootSegment || !segmentMatches(root, rootSegment)) return false
-	if (path.length < 2) return false
-	if (root.ownership === `foreign`) return true
+	if (!rootSegment || !segmentMatches(root, rootSegment)) return []
+	if (path.length < 2) return []
+	if (root.ownership === `foreign`) {
+		return ownershipEvidenceFromForeignRoot(root, path, 0)
+	}
 
-	return canCrossFromNode(root, path, 1)
+	return ownershipEvidenceFromNode(root, path, 1)
+}
+
+export function findOwnershipBoundaryEvidence(
+	story: RenderStory,
+	path: SelectorPath,
+): OwnershipBoundaryEvidence[] {
+	if (path.length < 2) return []
+
+	return uniqueOwnershipEvidence(
+		story.roots.flatMap((root) => ownershipEvidenceFromRoot(root, path)),
+	)
 }
 
 export function canCrossOwnershipBoundary(
 	story: RenderStory,
 	path: SelectorPath,
 ): boolean {
-	if (path.length < 2) return false
-
-	return story.roots.some((root) => canCrossFromRoot(root, path))
+	return findOwnershipBoundaryEvidence(story, path).length > 0
 }
