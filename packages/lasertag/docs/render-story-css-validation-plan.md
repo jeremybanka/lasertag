@@ -181,17 +181,19 @@ diagnostics unless the selector is impossible before the opaque boundary.
 
 ## Component Boundaries
 
-The strict interpretation is: only inline components declared in the same file.
-Imported components are outside the render story.
+Imported component DOM remains foreign to the host stylesheet, but its outer
+node does not have to remain opaque when the program provides direct evidence.
+Refractor follows the imported symbol through TypeScript module resolution and
+re-exports. If the resolved implementation has supported return branches, their
+outer JSX nodes become concrete foreign roots. Selectors that match those roots
+receive a verified foreign-root diagnostic, and selectors that descend farther
+cross the ownership boundary.
 
-There is one tempting extension: infer an imported component's root tag from its
-component name, because lasertag convention says `UserMenu` should render
-`<user-menu>`. That could make selectors such as `> user-menu` validate without
-opening `UserMenu.tsx`.
-
-This should be a separate mode, not the default MVP. The default should validate
-only what the current file proves. Convention-based imported-root inference is
-useful, but it is a different confidence level than same-file JSX.
+Component names are never evidence of rendered roots. Lasertag convention may
+say that `UserMenu` should render `<user-menu>`, but an imported library is not
+required to follow that convention. If module resolution fails, resolves only a
+declaration, or reaches an unsupported implementation shape, the component
+stays opaque and receives possible-collision diagnostics instead.
 
 ## CSS Analysis
 

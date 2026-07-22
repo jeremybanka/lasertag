@@ -138,6 +138,16 @@ first uncertain root are grouped into one diagnostic. Local reachability does
 not change either result: the same selector may match owned and foreign DOM at
 runtime.
 
+Foreign roots are resolved from evidence in the TypeScript module graph, not
+from the component's name. When module resolution reaches an implementation
+whose supported return branches expose outer JSX nodes, Lasertag records those
+nodes as concrete foreign roots. Relative imports, package imports, re-exports,
+and namespace imports all use the same rule. If resolution fails, lands only on
+a declaration file, or reaches an implementation shape Refractor cannot prove,
+the root remains opaque. For example, a component named `Dialog` that actually
+returns `<section>` is treated as a foreign `<section>` root; Lasertag never
+infers `<dialog>` from the export name.
+
 For external components with an intentionally stable intrinsic root, a JSX
 member expression can assert that root at the call site. Name the namespace
 after a standard HTML or SVG tag:

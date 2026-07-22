@@ -6,17 +6,10 @@
 			"tagName": "app-shell",
 			"children": [
 				{
-					"children": [
-						{
-							"kind": "opaque",
-							"ownership": "foreign",
-							"reason": "component implementation"
-						}
-					],
 					"componentName": "Menu",
-					"kind": "element",
+					"kind": "opaque",
 					"ownership": "foreign",
-					"tagName": "menu"
+					"reason": "imported or external component"
 				},
 				{
 					"componentName": "Widget",

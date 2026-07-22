@@ -36,11 +36,14 @@ both `.tsx` and `.astro` siblings exist, Lasertag reports an ambiguity error; it
 does not silently choose one.
 
 Refractor does not execute application code. It expands supported JSX branches
-and local components into a render story. `children` render slots, imported
-components, and render expressions it cannot resolve become opaque paths.
-Foreign opaque paths carry ownership metadata so selectors that may match their
-DOM can be distinguished from selectors that are merely inconclusive.
-Unsupported selector shapes are unknown too.
+and local components into a render story. For imported components, it asks the
+TypeScript module graph for the actual exported declaration and analyzes a
+supported implementation body when one is available. It does not infer a root
+from the component name. `children` render slots, unresolved imports,
+declaration-only packages, and render expressions it cannot prove become opaque
+paths. Foreign opaque paths carry ownership metadata so selectors that may
+match their DOM can be distinguished from selectors that are merely
+inconclusive. Unsupported selector shapes are unknown too.
 
 For Solid TSX, Refractor recognizes imports from `solid-js` and lowers `Show`,
 `For`, `Index`, `Switch`/`Match`, `ErrorBoundary`, `Suspense`, and

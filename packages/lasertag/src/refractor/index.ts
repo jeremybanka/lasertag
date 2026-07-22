@@ -9,6 +9,7 @@ export * from "./render-story-evidence.ts"
 export * from "./render-story-root.ts"
 export {
 	createTypescriptAstSession,
+	type TypescriptAstAnalysis,
 	type TypescriptAstSession,
 } from "./typescript-ast.ts"
 export * from "./validate-css-reachability.ts"

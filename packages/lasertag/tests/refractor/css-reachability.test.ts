@@ -591,7 +591,7 @@ describe(`render story css reachability`, () => {
 		])
 	})
 
-	it(`reports a selector that styles an imported component root`, () => {
+	it(`reports a possible collision with an unresolved imported component`, () => {
 		const result = validateCssReachability({
 			tsxPath: `/project/src/AppPanel.tsx`,
 			cssPath: `/project/src/AppPanel.module.css`,
@@ -616,7 +616,7 @@ describe(`render story css reachability`, () => {
 
 		expect(result.diagnostics).toMatchObject([
 			{
-				code: `selector-matches-foreign-component-root`,
+				code: `opaque-component-root-may-collide`,
 				selector: `app-panel.class > user-menu`,
 			},
 		])
@@ -1561,7 +1561,7 @@ describe(`tag-named JSX component namespaces`, () => {
 })
 
 describe(`module.css ownership boundaries`, () => {
-	it(`reports a universal descendant selector that can enter an imported component`, () => {
+	it(`reports a universal descendant selector that can enter an unresolved imported component`, () => {
 		expect(
 			diagnosticSummaries(
 				`
@@ -1584,7 +1584,7 @@ describe(`module.css ownership boundaries`, () => {
 			),
 		).toEqual([
 			{
-				code: `selector-matches-foreign-component-root`,
+				code: `opaque-component-root-may-collide`,
 				selector: `app-panel.class *`,
 			},
 		])
@@ -1645,7 +1645,7 @@ describe(`module.css ownership boundaries`, () => {
 			),
 		).toEqual([
 			{
-				code: `selector-crosses-ownership-boundary`,
+				code: `opaque-component-root-may-collide`,
 				selector: `app-panel.class > section button`,
 			},
 		])
@@ -1675,7 +1675,7 @@ describe(`module.css ownership boundaries`, () => {
 			),
 		).toEqual([
 			{
-				code: `selector-crosses-ownership-boundary`,
+				code: `opaque-component-root-may-collide`,
 				selector: `app-panel.class button`,
 			},
 		])
@@ -1707,7 +1707,7 @@ describe(`module.css ownership boundaries`, () => {
 		).toEqual([])
 	})
 
-	it(`allows a selector confined to an owned subtree beside a foreign component`, () => {
+	it(`reports when an unresolved component can collide with an owned sibling`, () => {
 		expect(
 			diagnosticSummaries(
 				`
@@ -1733,7 +1733,12 @@ describe(`module.css ownership boundaries`, () => {
 					}
 				`,
 			),
-		).toEqual([])
+		).toEqual([
+			{
+				code: `opaque-component-root-may-collide`,
+				selector: `app-panel.class > header`,
+			},
+		])
 	})
 
 	it(`reports an unknown external sibling that can overlap an owned direct-child path`, () => {
@@ -1893,7 +1898,7 @@ describe(`module.css ownership boundaries`, () => {
 		])
 	})
 
-	it(`keeps universal and known-root foreign child matches diagnostic`, () => {
+	it(`keeps universal and unresolved foreign child matches diagnostic`, () => {
 		expect(
 			diagnosticSummaries(
 				`
@@ -1921,7 +1926,7 @@ describe(`module.css ownership boundaries`, () => {
 			),
 		).toEqual([
 			{
-				code: `selector-matches-foreign-component-root`,
+				code: `opaque-component-root-may-collide`,
 				selector: `app-panel.class > *`,
 			},
 			{
@@ -1929,7 +1934,7 @@ describe(`module.css ownership boundaries`, () => {
 				selector: `app-panel.class > *`,
 			},
 			{
-				code: `selector-matches-foreign-component-root`,
+				code: `opaque-component-root-may-collide`,
 				selector: `app-panel.class > user-menu`,
 			},
 			{
