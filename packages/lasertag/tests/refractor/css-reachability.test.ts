@@ -1728,6 +1728,145 @@ describe(`module.css ownership boundaries`, () => {
 		).toEqual([])
 	})
 
+	it(`does not let an unknown external sibling taint owned direct-child branches`, () => {
+		expect(
+			diagnosticSummaries(
+				`
+					import { External } from "external-package"
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<local-toolbar>
+									<button type="button">
+										<svg />
+									</button>
+								</local-toolbar>
+								<External />
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						> local-toolbar {
+							> button {
+								> svg {}
+								&:hover::before {}
+							}
+						}
+					}
+				`,
+			),
+		).toEqual([])
+	})
+
+	it(`still reports descendants that can enter an unknown external sibling`, () => {
+		expect(
+			diagnosticSummaries(
+				`
+					import { SyntaxHighlighter } from "external-package"
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<file-name>
+									<span>example.ts</span>
+								</file-name>
+								<SyntaxHighlighter />
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						> file-name > span {}
+						> file-name > code {}
+						span {}
+					}
+				`,
+			),
+		).toEqual([
+			{
+				code: `selector-crosses-ownership-boundary`,
+				selector: `app-panel.class > file-name > code`,
+			},
+			{
+				code: `selector-crosses-ownership-boundary`,
+				selector: `app-panel.class span`,
+			},
+		])
+	})
+
+	it(`keeps universal and known-root foreign child matches diagnostic`, () => {
+		expect(
+			diagnosticSummaries(
+				`
+					import { External } from "external-package"
+					import { UserMenu } from "./UserMenu.tsx"
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<header />
+								<user-menu />
+								<External />
+								<UserMenu />
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						> * {}
+						> user-menu {}
+					}
+				`,
+			),
+		).toEqual([
+			{
+				code: `selector-crosses-ownership-boundary`,
+				selector: `app-panel.class > *`,
+			},
+			{
+				code: `selector-crosses-ownership-boundary`,
+				selector: `app-panel.class > user-menu`,
+			},
+		])
+	})
+
+	it(`keeps matching direct-child selectors diagnostic for children`, () => {
+		expect(
+			diagnosticSummaries(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel({ children }: { children: React.ReactNode }) {
+						return (
+							<app-panel className={css.class}>
+								<header />
+								{children}
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						> header {}
+					}
+				`,
+			),
+		).toEqual([
+			{
+				code: `selector-crosses-ownership-boundary`,
+				selector: `app-panel.class > header`,
+			},
+		])
+	})
+
 	it(`treats components defined in the same file as owned`, () => {
 		expect(
 			diagnosticSummaries(
