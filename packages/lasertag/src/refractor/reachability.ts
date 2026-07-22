@@ -175,41 +175,6 @@ function canCrossFromNode(
 			: false
 }
 
-function hasReachableOwnedDirectPath(
-	children: StoryChild[],
-	path: SelectorPath,
-	segmentIndex: number,
-): boolean {
-	const segment = path[segmentIndex]
-
-	if (!segment) return false
-
-	return children.some((child) => {
-		if (child.kind === `opaque`) return false
-		if (child.kind === `choice`) {
-			return child.alternatives.some((alternative) =>
-				hasReachableOwnedDirectPath(alternative, path, segmentIndex),
-			)
-		}
-
-		return (
-			child.ownership !== `foreign` &&
-			segmentMatches(child, segment) &&
-			canReachFromNode(child, path, segmentIndex + 1) === `reachable`
-		)
-	})
-}
-
-function isUnknownComponentBoundary(
-	child: Extract<StoryChild, { kind: `opaque` }>,
-): boolean {
-	return (
-		child.expectedRootTagName === undefined &&
-		(child.reason === `imported or external component` ||
-			child.reason === `dynamic JSX component`)
-	)
-}
-
 function canCrossDirectChildFromChildren(
 	children: StoryChild[],
 	path: SelectorPath,
@@ -219,20 +184,8 @@ function canCrossDirectChildFromChildren(
 
 	if (!segment) return false
 
-	const hasOwnedPath = hasReachableOwnedDirectPath(children, path, segmentIndex)
-
 	return children.some((child) => {
 		if (child.kind === `opaque`) {
-			// Prefer a concrete authored path over an unrelated component sibling
-			// whose root tag is completely unknown.
-			if (
-				segment.tagName !== `*` &&
-				isUnknownComponentBoundary(child) &&
-				hasOwnedPath
-			) {
-				return false
-			}
-
 			return opaqueBoundaryCanMatch(child, segment)
 		}
 
