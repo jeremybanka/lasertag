@@ -1,5 +1,11 @@
 # lasertag
 
+## 0.6.5
+
+### Patch Changes
+
+- 1cc6802: Treat syntactically primitive Astro expressions as non-structural content so descendant selectors do not receive incorrect ownership warnings.
+
 ## 0.6.4
 
 ### Patch Changes
