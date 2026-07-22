@@ -12,6 +12,7 @@ import type {
 	StoryNode,
 } from "./diagnostics.ts"
 import { scopeRenderStoryToCssClassRoots } from "./render-story-root.ts"
+import { isStandardIntrinsicTagName } from "./standard-intrinsic-tag-names.ts"
 import {
 	createTypescriptAstSession,
 	type TypescriptAstSession,
@@ -616,8 +617,40 @@ function createStoryNode(
 		: baseNode
 }
 
+function addressableForeignRoot(
+	context: AnalyzeContext,
+	tagName: string,
+	node: ComponentJsxNode,
+	tagNameNode: ts.JsxTagNameExpression,
+): StoryNode {
+	return {
+		addressable: true,
+		children: [
+			foreignOpaque(
+				`asserted component implementation`,
+				context.sourceFile,
+				node,
+			),
+		],
+		kind: `element`,
+		ownership: `foreign`,
+		range: rangeOf(context.sourceFile, tagNameNode),
+		tagName,
+	}
+}
+
 function isIntrinsicJsxTag(tagName: string): boolean {
 	return /^[a-z]/.test(tagName) || tagName.includes(`-`)
+}
+
+function assertedForeignRootTagName(tagName: string): string | undefined {
+	const separatorIndex = tagName.indexOf(`.`)
+
+	if (separatorIndex < 1) return
+
+	const namespaceName = tagName.slice(0, separatorIndex)
+
+	return isStandardIntrinsicTagName(namespaceName) ? namespaceName : undefined
 }
 
 function isFragmentJsxTag(tagName: string): boolean {
@@ -1000,6 +1033,23 @@ function analyzeJsxElement(
 		return analyzeJsxChildren(context, node.children, stack)
 	}
 
+	const assertedRootTagName = assertedForeignRootTagName(tagName)
+
+	if (assertedRootTagName) {
+		return [
+			addressableForeignRoot(
+				context,
+				assertedRootTagName,
+				node,
+				node.openingElement.tagName,
+			),
+		]
+	}
+
+	if (tagName.includes(`.`)) {
+		return analyzeComponentTag(context, tagName, node, stack)
+	}
+
 	if (!isIntrinsicJsxTag(tagName)) {
 		return analyzeComponentTag(context, tagName, node, stack)
 	}
@@ -1024,6 +1074,18 @@ function analyzeJsxSelfClosingElement(
 
 	if (isFragmentJsxTag(tagName)) {
 		return []
+	}
+
+	const assertedRootTagName = assertedForeignRootTagName(tagName)
+
+	if (assertedRootTagName) {
+		return [
+			addressableForeignRoot(context, assertedRootTagName, node, node.tagName),
+		]
+	}
+
+	if (tagName.includes(`.`)) {
+		return analyzeComponentTag(context, tagName, node, stack)
 	}
 
 	if (!isIntrinsicJsxTag(tagName)) {

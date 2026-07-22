@@ -131,6 +131,41 @@ path-sensitive, so an imported component in one branch does not prevent styling
 a separate, fully owned branch. Direct-child selectors can also cross a boundary
 when they style the root rendered by a foreign component or `{children}`.
 
+For external components with an intentionally stable intrinsic root, a JSX
+member expression can assert that root at the call site. Name the namespace
+after a standard HTML or SVG tag:
+
+```tsx
+const svg = {
+	MagnifyingGlass: MagnifyingGlassIcon,
+}
+
+export const CommandSearch = () => (
+	<command-search className={css.class}>
+		<svg.MagnifyingGlass />
+		<input />
+	</command-search>
+)
+```
+
+```css
+command-search.class {
+	/* Allowed: this ends at the asserted external root. */
+	> svg {}
+
+	/* Warns: the component owns everything below its root. */
+	> svg > path {}
+
+	/* Allowed: the asserted root does not make owned siblings uncertain. */
+	> input {}
+}
+```
+
+This is an unchecked assertion: Refractor does not inspect the namespace value
+or resolve the member implementation. Standard intrinsic namespaces include
+HTML and SVG names such as `span`, `article`, `div`, and `svg`. Arbitrary names
+and custom-element spellings remain opaque component boundaries.
+
 ## Tags Tell the Story
 
 Use a custom tag for the root of every exported component, named after that component in kebab case. `AppHeaderBar` should render `<app-header-bar className={css.class}>`; `ProjectList` should render `<project-list className={css.class}>`.

@@ -17,6 +17,7 @@ export type StoryNode = {
 	kind: `element`
 	tagName: string
 	children: StoryChild[]
+	addressable?: true
 	attributes?: StoryAttribute[]
 	ownership?: `foreign`
 	range?: SourceRange
