@@ -1,5 +1,12 @@
 # lasertag
 
+## 0.6.6
+
+### Patch Changes
+
+- fbf69eb: Resolve imported component roots from implementation AST evidence, distinguish verified foreign-root matches from grouped opaque-root collision risks, and preserve explicit intrinsic-root assertions without inferring DOM from component names.
+- 33b1282: Restore ownership-boundary warnings when an unknown component root can match a selector path that also has a concrete locally owned match.
+
 ## 0.6.5
 
 ### Patch Changes
