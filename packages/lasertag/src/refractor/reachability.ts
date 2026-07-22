@@ -175,7 +175,7 @@ function canCrossFromNode(
 			: false
 }
 
-function canCrossDirectChildFromChildren(
+function hasReachableOwnedDirectPath(
 	children: StoryChild[],
 	path: SelectorPath,
 	segmentIndex: number,
@@ -185,7 +185,45 @@ function canCrossDirectChildFromChildren(
 	if (!segment) return false
 
 	return children.some((child) => {
+		if (child.kind === `opaque`) return false
+		if (child.kind === `choice`) {
+			return child.alternatives.some((alternative) =>
+				hasReachableOwnedDirectPath(alternative, path, segmentIndex),
+			)
+		}
+
+		return (
+			child.ownership !== `foreign` &&
+			segmentMatches(child, segment) &&
+			canReachFromNode(child, path, segmentIndex + 1) === `reachable`
+		)
+	})
+}
+
+function canCrossDirectChildFromChildren(
+	children: StoryChild[],
+	path: SelectorPath,
+	segmentIndex: number,
+): boolean {
+	const segment = path[segmentIndex]
+
+	if (!segment) return false
+
+	const hasOwnedPath = hasReachableOwnedDirectPath(children, path, segmentIndex)
+
+	return children.some((child) => {
 		if (child.kind === `opaque`) {
+			// Prefer a concrete authored path over an unrelated imported sibling
+			// whose root tag is completely unknown.
+			if (
+				segment.tagName !== `*` &&
+				child.reason === `imported or external component` &&
+				child.expectedRootTagName === undefined &&
+				hasOwnedPath
+			) {
+				return false
+			}
+
 			return opaqueBoundaryCanMatch(child, segment)
 		}
 

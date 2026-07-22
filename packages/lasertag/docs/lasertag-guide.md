@@ -130,6 +130,10 @@ subtree is entirely defined in the same file. Ownership analysis is
 path-sensitive, so an imported component in one branch does not prevent styling
 a separate, fully owned branch. Direct-child selectors can also cross a boundary
 when they style the root rendered by a foreign component or `{children}`.
+When an imported component's root is unknown, however, it does not taint a named
+direct-child path that has a concrete locally owned match. Universal child
+selectors, descendant selectors that can enter the imported component, and
+selectors matching a known foreign root remain diagnostic.
 
 For external components with an intentionally stable intrinsic root, a JSX
 member expression can assert that root at the call site. Name the namespace
