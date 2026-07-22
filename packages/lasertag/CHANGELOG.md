@@ -1,5 +1,11 @@
 # lasertag
 
+## 0.6.2
+
+### Patch Changes
+
+- 0cc80de: Recognize standard intrinsic tag-named JSX component namespaces as addressable foreign roots while preserving ownership warnings below them.
+
 ## 0.6.1
 
 ### Patch Changes
