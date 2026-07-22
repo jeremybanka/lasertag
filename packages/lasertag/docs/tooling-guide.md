@@ -117,7 +117,9 @@ story long enough for attachment discovery. Other PascalCase Astro component
 tags use Lasertag's own-name root convention (`Dz2Orbital` becomes
 `dz2-orbital`) while their implementation stays opaque. Slots, injected HTML,
 dynamic component tags, and expressions that cannot be reduced safely remain
-opaque.
+opaque. Syntactically primitive Astro expressions such as string and number
+literals, booleans, `null`, and `undefined` are non-structural content and do not
+introduce opaque DOM branches.
 
 `scopeRenderStoryToCssClassRoots` exposes attachment-based scoping separately
 for integrations that construct render stories themselves. It defaults to
