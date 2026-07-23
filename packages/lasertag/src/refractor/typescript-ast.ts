@@ -192,8 +192,10 @@ export function createTypescriptAstSession(
 					: previousFilePath === normalizedFilePath
 						? { changed: [normalizedFilePath] }
 						: {
+								// Closing a root only removes its virtual overlay. Report the
+								// underlying file as changed so a new root can still import it.
+								...(previousFilePath ? { changed: [previousFilePath] } : {}),
 								created: [normalizedFilePath],
-								...(previousFilePath ? { deleted: [previousFilePath] } : {}),
 							},
 				openFiles: [normalizedFilePath],
 			})

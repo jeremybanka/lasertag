@@ -1,3 +1,7 @@
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import path from "node:path"
+
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const apiLifecycle = vi.hoisted(() => ({ closed: 0, created: 0 }))
@@ -99,5 +103,61 @@ describe(`TypeScript AST session`, () => {
 		expect(result.failures).toEqual([])
 		expect(result.fileResults).toHaveLength(2)
 		expect(apiLifecycle).toEqual({ closed: 1, created: 1 })
+	})
+
+	it(`resolves the previous analysis root when the next root imports it`, () => {
+		const projectRoot = mkdtempSync(
+			path.join(tmpdir(), `lasertag-session-roots-`),
+		)
+		const numericInputPath = path.join(projectRoot, `NumericInput.tsx`)
+		const kerningTilePath = path.join(projectRoot, `KerningTile.tsx`)
+		const numericInputSource = `export function NumericInput() { return <numeric-input /> }`
+		const kerningTileSource = `
+			import { NumericInput } from "./NumericInput.tsx"
+
+			export function KerningTile() {
+				return <kerning-tile><NumericInput /></kerning-tile>
+			}
+		`
+
+		writeFileSync(numericInputPath, numericInputSource)
+		writeFileSync(kerningTilePath, kerningTileSource)
+
+		const reusedSession = createTypescriptAstSession()
+
+		try {
+			analyzeTsxRenderStory(
+				{ filePath: numericInputPath, sourceText: numericInputSource },
+				reusedSession,
+			)
+
+			const reusedStory = analyzeTsxRenderStory(
+				{ filePath: kerningTilePath, sourceText: kerningTileSource },
+				reusedSession,
+			)
+			const freshStory = analyzeTsxRenderStory({
+				filePath: kerningTilePath,
+				sourceText: kerningTileSource,
+			})
+
+			expect(reusedStory).toEqual(freshStory)
+			expect(reusedStory).toMatchObject({
+				roots: [
+					{
+						children: [
+							{
+								kind: `element`,
+								tagName: `numeric-input`,
+							},
+						],
+						kind: `element`,
+						tagName: `kerning-tile`,
+					},
+				],
+			})
+		} finally {
+			reusedSession.close()
+			rmSync(projectRoot, { force: true, recursive: true })
+		}
 	})
 })
