@@ -1,6 +1,6 @@
 {
 	"name": "lasertag",
-	"version": "0.6.6",
+	"version": "0.6.7",
 	"description": "zero-runtime structural css for jsx with css modules",
 	"repository": {
 		"type": "git",
