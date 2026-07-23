@@ -1,5 +1,11 @@
 # lasertag
 
+## 0.6.7
+
+### Patch Changes
+
+- 53189a6: Keep imported component root evidence stable across CLI worker counts and prior files analyzed by a reused TypeScript session.
+
 ## 0.6.6
 
 ### Patch Changes
