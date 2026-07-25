@@ -76,7 +76,7 @@
 		"@types/estree": "1.0.9",
 		"@types/node": "26.1.1",
 		"@types/react": "19.2.17",
-		"eslint": "10.7.0",
+		"eslint": "10.8.0",
 		"jiti": "2.7.0",
 		"preact": "10.29.7",
 		"solid-js": "1.9.14",
