@@ -1,5 +1,11 @@
 # lasertag
 
+## 0.7.0
+
+### Minor Changes
+
+- cef242f: License Lasertag under the Mozilla Public License 2.0 and include the license in npm and VSIX distributions.
+
 ## 0.6.7
 
 ### Patch Changes
