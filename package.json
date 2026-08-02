@@ -1,5 +1,6 @@
 {
 	"name": "lasertag-workspace",
+	"license": "MPL-2.0",
 	"private": true,
 	"type": "module",
 	"scripts": {

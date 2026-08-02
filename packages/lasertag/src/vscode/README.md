@@ -101,3 +101,13 @@ Operational logs and protocol traces appear in **View: Toggle Output** under
   `lasertag.trace.server: "verbose"` only when protocol-level detail is useful.
 - Missing warnings can be intentional: Lasertag does not call a selector dead
   when an unsupported or dynamic render path could still reach it.
+
+## License
+
+Lasertag is free and open-source software under the Mozilla Public License 2.0.
+MPL 2.0 permits use for any purpose and combination with open or proprietary
+code. Its share-back requirement applies at the file level: when you distribute
+changes to MPL-covered files, make those files' source available under MPL 2.0;
+separate files remain under terms of your choice. See Mozilla's
+[official MPL 2.0 FAQ](https://www.mozilla.org/en-US/MPL/2.0/FAQ/) for the
+plain-language explanation and the included `LICENSE` file for the full terms.

@@ -48,6 +48,7 @@ export type LasertagCommandRunner = (
 ) => Promise<{ exitCode: number }>
 
 type LasertagPackageJson = {
+	license: string
 	version: string
 }
 
@@ -95,7 +96,7 @@ function resolvePackageRoot(
 	return path.dirname(packageJsonPath)
 }
 
-function createVscodeManifest(version: string) {
+function createVscodeManifest(version: string, license: string) {
 	return {
 		name: "lasertag-vscode",
 		displayName: "Lasertag",
@@ -110,7 +111,7 @@ function createVscodeManifest(version: string) {
 			url: "https://github.com/jeremybanka/lasertag.git",
 			directory: "packages/lasertag/src/vscode",
 		},
-		license: "MIT",
+		license,
 		engines: {
 			vscode: "^1.100.0",
 		},
@@ -125,7 +126,7 @@ function createVscodeManifest(version: string) {
 		extensionKind: ["workspace"],
 		icon: "dist/LasertagIcon.png",
 		main: "./dist/extension.mjs",
-		files: ["dist", "README.md"],
+		files: ["dist", "LICENSE", "README.md"],
 		contributes: {
 			commands: [
 				{
@@ -377,10 +378,18 @@ export async function buildLasertagVsix(
 		path.join(packageRoot, "src", "vscode", "README.md"),
 		path.join(buildRoot, "README.md"),
 	)
+	await cp(path.join(packageRoot, "LICENSE"), path.join(buildRoot, "LICENSE"))
 	await copyVscodeRuntimeDependencies(path.join(packageDist, "node_modules"))
 	await writeFile(
 		path.join(buildRoot, "package.json"),
-		`${JSON.stringify(createVscodeManifest(lasertagPackageJson.version), null, "\t")}\n`,
+		`${JSON.stringify(
+			createVscodeManifest(
+				lasertagPackageJson.version,
+				lasertagPackageJson.license,
+			),
+			null,
+			"\t",
+		)}\n`,
 	)
 
 	const runner = options.runCommand ?? runCommand
@@ -392,7 +401,6 @@ export async function buildLasertagVsix(
 			"--target",
 			vscodeTarget,
 			"--no-dependencies",
-			"--skip-license",
 			"--out",
 			vsixPath,
 		],
