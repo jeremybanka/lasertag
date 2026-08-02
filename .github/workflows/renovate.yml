@@ -34,10 +34,10 @@ jobs:
           permission-pull-requests: write
           permission-issues: write
           permission-statuses: write
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
-      - uses: renovatebot/github-action@8217b3fc286df088d7c27f3255fe8414463bc0fd # v46.1.15
+      - uses: renovatebot/github-action@973d3e5a68e735a444e8c03432b66eedb343c302 # v46.2.0
         env:
           LOG_LEVEL: debug
           RENOVATE_ALLOW_SCRIPTS: "true"
