@@ -31,6 +31,7 @@ docs-layout.class {
 			margin-top: 1.5em;
 		}
 
+		/* @lasertag-disable [selector-crosses-ownership-boundary] general styling for documentation content */
 		> * {
 			width: 100%;
 		}
@@ -75,4 +76,5 @@ docs-layout.class {
 			}
 		}
 	}
+	/* @lasertag-enable [selector-crosses-ownership-boundary] */
 }

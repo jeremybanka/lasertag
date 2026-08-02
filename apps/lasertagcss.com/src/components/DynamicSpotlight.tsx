@@ -12,6 +12,7 @@ export type SpotlightProps = {
 	startingPosition?: ElementPosition
 	updateSignals?: unknown[]
 	variant?: `surface` | `target`
+	hiddenAtViewportWidth?: 960 | 1280
 }
 
 export function DynamicSpotlight({
@@ -22,6 +23,7 @@ export function DynamicSpotlight({
 	startingPosition = { top: 0, left: 0, width: 0, height: 0 },
 	updateSignals = [],
 	variant = `target`,
+	hiddenAtViewportWidth,
 }: SpotlightProps): VNode {
 	const elementIdsKey = (elementIds ?? []).join(`\u0000`)
 	const targetElementIds = React.useMemo(
@@ -83,6 +85,7 @@ export function DynamicSpotlight({
 	return (
 		<dynamic-spotlight
 			class={css.class}
+			data-hidden-at-viewport-width={hiddenAtViewportWidth}
 			data-spotlight-kind={variant}
 			style={
 				position.width === 0 || position.height === 0

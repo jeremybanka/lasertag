@@ -6,6 +6,7 @@ app-shell.class {
 	overflow-x: hidden;
 	position: relative;
 
+	/* @lasertag-disable [selector-crosses-ownership-boundary] shared typography for slotted page content */
 	code {
 		color: var(--fg-soft-1);
 		font-family: Theia, monospace !important;
@@ -26,6 +27,7 @@ app-shell.class {
 			color: var(--hyperlink-visited-color);
 		}
 	}
+	/* @lasertag-enable [selector-crosses-ownership-boundary] */
 
 	> * {
 		@media screen and (min-width: 960px) {
@@ -123,6 +125,9 @@ app-shell.class {
 		flex-grow: 1;
 		margin-top: 2em;
 		position: relative;
+		> page-content {
+			display: contents;
+		}
 		&::before {
 			background: url("/noise.svg") repeat center / 1024px;
 			content: "";
