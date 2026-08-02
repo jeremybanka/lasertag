@@ -16,7 +16,7 @@ docs-navigation.class {
 			width: 240px;
 		}
 
-		nav {
+		> nav {
 			display: flex;
 			flex-flow: column;
 			gap: 1.33em;
@@ -59,7 +59,7 @@ docs-navigation.class {
 			z-index: 10;
 		}
 		@media screen and (max-width: 959px) {
-			nav {
+			> nav {
 				margin-top: 3em;
 			}
 			&[data-menu-is-open="false"] {
@@ -82,7 +82,7 @@ docs-navigation.class {
 		}
 	}
 
-	> toggle-button {
+	> menu-toggle {
 		border-radius: 50%;
 		display: block;
 		position: fixed;

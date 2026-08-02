@@ -31,14 +31,16 @@ export function DocsNavigation(): VNode {
 		<docs-navigation class={css.class}>
 			<SiteDirectory menuIsOpen={menuIsOpen} pathname={pathname} />
 			<OnThisPage menuIsOpen={menuIsOpen} pathname={pathname} />
-			<Toggle.Button
-				ariaControls="site-directory on-this-page"
-				ariaLabel="Documentation menu"
-				checked={menuIsOpen}
-				onClick={() => setMenuIsOpen((open) => !open)}
-			>
-				☰
-			</Toggle.Button>
+			<menu-toggle>
+				<Toggle.Button
+					ariaControls="site-directory on-this-page"
+					ariaLabel="Documentation menu"
+					checked={menuIsOpen}
+					onClick={() => setMenuIsOpen((open) => !open)}
+				>
+					☰
+				</Toggle.Button>
+			</menu-toggle>
 		</docs-navigation>
 	)
 }
@@ -97,6 +99,7 @@ function OnThisPage({ menuIsOpen, pathname }: NavigationPanelProps): VNode {
 					parentRef={elementRef}
 					updateSignals={[menuIsOpen, pathname, headings]}
 					variant="surface"
+					hiddenAtViewportWidth={1280}
 				/>
 				<DynamicSpotlight
 					elementId={activeHeadingId ? `${activeHeadingId}-link` : null}
@@ -136,6 +139,7 @@ function SiteDirectory({ menuIsOpen, pathname }: NavigationPanelProps): VNode {
 					parentRef={elementRef}
 					updateSignals={[menuIsOpen, pathname]}
 					variant="surface"
+					hiddenAtViewportWidth={960}
 				/>
 				<DynamicSpotlight
 					elementId={pathnameId}
