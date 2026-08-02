@@ -103,7 +103,11 @@ describe(`lasertag vsix builder`, () => {
 
 	it(`writes the VSCode manifest and copies its analysis runtimes`, async () => {
 		const fixture = createFixture({
-			"package.json": JSON.stringify({ version: `9.8.7-test` }),
+			LICENSE: `fixture license`,
+			"package.json": JSON.stringify({
+				license: `MPL-2.0`,
+				version: `9.8.7-test`,
+			}),
 			"src/vscode/extension.ts": `
 				export function activate() {}
 				export function deactivate() {}
@@ -131,6 +135,8 @@ describe(`lasertag vsix builder`, () => {
 				views: Record<string, Array<{ id: string }>>
 				viewsContainers: { activitybar: Array<{ id: string }> }
 			}
+			files: string[]
+			license: string
 			main: string
 			version: string
 		}
@@ -148,6 +154,8 @@ describe(`lasertag vsix builder`, () => {
 			resolveCurrentVscodePlatformTarget(process.platform, process.arch),
 		)
 		expect(manifest.version).toBe(`9.8.7-test`)
+		expect(manifest.files).toContain(`LICENSE`)
+		expect(manifest.license).toBe(`MPL-2.0`)
 		expect(manifest.main).toBe(`./dist/extension.mjs`)
 		expect(
 			manifest.contributes.configuration.properties[
@@ -172,6 +180,7 @@ describe(`lasertag vsix builder`, () => {
 		expect(
 			existsSync(path.join(result.buildRoot, `dist/LasertagActivity.svg`)),
 		).toBe(true)
+		expect(existsSync(path.join(result.buildRoot, `LICENSE`))).toBe(true)
 		expect(existsSync(path.join(astroCompilerPath, `dist/astro.wasm`))).toBe(
 			true,
 		)
@@ -194,7 +203,7 @@ describe(`lasertag vsix builder`, () => {
 		expect(commands).toHaveLength(1)
 		expect(commands[0]?.cwd).toBe(result.buildRoot)
 		expect(commands[0]?.args).toContain(`--no-dependencies`)
-		expect(commands[0]?.args).toContain(`--skip-license`)
+		expect(commands[0]?.args).not.toContain(`--skip-license`)
 		expect(commands[0]?.args).toContain(result.vsixPath)
 	})
 })

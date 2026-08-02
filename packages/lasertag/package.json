@@ -2,12 +2,14 @@
 	"name": "lasertag",
 	"version": "0.6.7",
 	"description": "zero-runtime structural css for jsx with css modules",
+	"license": "MPL-2.0",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/jeremybanka/lasertag.git",
 		"directory": "packages/lasertag"
 	},
 	"files": [
+		"LICENSE",
 		"dist/*.d.mts",
 		"dist/*.d.mts.map",
 		"dist/*.mjs",
