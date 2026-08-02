@@ -80,7 +80,7 @@
 		"@types/react": "19.2.18",
 		"eslint": "10.8.0",
 		"jiti": "2.7.0",
-		"preact": "10.29.7",
+		"preact": "10.29.8",
 		"solid-js": "1.9.14",
 		"vitest": "npm:@voidzero-dev/vite-plus-test@0.1.24"
 	},
