@@ -73,8 +73,8 @@
 	},
 	"devDependencies": {
 		"@eslint/core": "1.2.1",
-		"@typescript-eslint/parser": "8.65.0",
-		"@typescript-eslint/utils": "8.65.0",
+		"@typescript-eslint/parser": "8.66.0",
+		"@typescript-eslint/utils": "8.66.0",
 		"@types/estree": "1.0.9",
 		"@types/node": "26.1.2",
 		"@types/react": "19.2.18",
