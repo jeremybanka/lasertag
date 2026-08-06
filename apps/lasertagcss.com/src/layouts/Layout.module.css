@@ -157,7 +157,7 @@ app-shell.class {
 	}
 
 	> footer {
-		background: var(--bg-shade-2);
+		background: var(--bg-color);
 		display: flex;
 		flex-flow: row;
 		justify-content: space-between;
