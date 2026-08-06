@@ -5,6 +5,7 @@ artifacts/
 .mise/
 .pnpm-home/
 .pnpm-store/
+.wrangler/
 .xdg-data/
 .mise.local.toml
 .env
