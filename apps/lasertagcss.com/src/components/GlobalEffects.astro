@@ -5,7 +5,7 @@ const effectsGlobal = globalThis as typeof globalThis &
 
 function updateThemeColor(): void {
 	const themeColor = getComputedStyle(document.documentElement)
-		.getPropertyValue(`--bg-shade-2`)
+		.getPropertyValue(`--bg-color`)
 		.trim()
 	document
 		.querySelector(`meta[name="theme-color"]`)

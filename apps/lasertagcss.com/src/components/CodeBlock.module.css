@@ -16,14 +16,14 @@ code-block.class {
 		z-index: 0;
 
 		&:global(.hard) {
-			background-color: var(--bg-hard-1);
-			mix-blend-mode: var(--fill-hard-blend-mode);
-			opacity: var(--fill-hard-opacity);
+			background-color: var(--code-block-fill);
+			mix-blend-mode: var(--code-block-blend-mode);
+			opacity: var(--code-block-hard-opacity);
 		}
 		&:global(.soft) {
-			background-color: var(--bg-soft-1);
-			mix-blend-mode: var(--fill-soft-blend-mode);
-			opacity: var(--fill-soft-opacity);
+			background-color: var(--code-block-fill);
+			mix-blend-mode: var(--code-block-blend-mode);
+			opacity: var(--code-block-soft-opacity);
 		}
 	}
 
