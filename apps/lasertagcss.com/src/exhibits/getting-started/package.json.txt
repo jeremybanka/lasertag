@@ -1,0 +1,6 @@
+{
+	"scripts": {
+		"css:check": "lasertag check",
+		"css:fix": "lasertag fix"
+	}
+}

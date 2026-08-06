@@ -1,0 +1,17 @@
+import lasertag from "lasertag/eslint-plugin"
+
+export default [
+	{
+		files: ["**/*.{jsx,tsx}"],
+		plugins: { lasertag },
+		rules: {
+			"lasertag/access-css-module-class-only": "error",
+			"lasertag/ban-div": "error",
+			"lasertag/export-own-component-only": "error",
+			"lasertag/header-main-footer-as-group": "error",
+			"lasertag/import-own-css-module-only": "error",
+			"lasertag/name-imported-css-module-as-css": "error",
+			"lasertag/render-tag-with-own-name": "error"
+		}
+	}
+]

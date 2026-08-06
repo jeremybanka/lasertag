@@ -1,0 +1,11 @@
+account-panel.class {
+	/* children owns whatever matches this paragraph. */
+	> main p {
+		max-width: 60ch;
+	}
+
+	/* AccountActions owns the button it renders. */
+	> footer > button {
+		background: red;
+	}
+}

@@ -2,21 +2,101 @@ import Exhibit from "c/Exhibit.astro";
 
 # exhibits
 
-Exhibits keep documentation examples in standalone source files so they can be
-highlighted, copied, and eventually checked as real code.
+<doc-lead>
+  Documentation examples are source files, not strings embedded in prose. They
+  can be copied, inspected, formatted, and—when they represent valid local
+  code—checked by Lasertag itself.
+</doc-lead>
 
-## full files
+## a complete component pair
 
-Use a source path to render the complete exhibit.
+This is the pair used throughout the introduction and getting-started guide.
+
+<Exhibit src="getting-started/ProfileCard.tsx" />
+
+<Exhibit src="getting-started/ProfileCard.module.css" />
+
+The TSX and CSS files live beside the other exhibits and participate in the
+documentation site's type and structural checks.
+
+## the smallest pair
+
+`AppHeaderBar` shows the minimum convention without props or branching:
 
 <Exhibit src="getting-started/AppHeaderBar.tsx" />
 
-## named regions
+<Exhibit src="getting-started/AppHeaderBar.module.css" />
 
-Append a region name to show only the code between matching exhibit markers.
+## framework syntax
+
+The structure stays constant while the attachment syntax changes.
+
+### React
+
+<Exhibit src="frameworks/ReactNotice.tsx.txt" />
+
+### Preact
+
+<Exhibit src="frameworks/PreactNotice.tsx.txt" />
+
+### Solid
+
+<Exhibit src="frameworks/SolidNotice.tsx.txt" />
+
+### Astro
+
+<Exhibit src="frameworks/AstroNotice.astro.txt" />
+
+## branching render stories
+
+The analyzer treats both supported returns as real possibilities:
+
+<Exhibit src="how-it-works/StatusPanel.tsx.txt" />
+
+<Exhibit src="how-it-works/StatusPanel.module.css.txt" />
+
+## ownership boundaries
+
+This component owns its regions but not the content passed into them:
+
+<Exhibit src="composition/AccountPanel.tsx.txt" />
+
+<Exhibit src="composition/AccountPanel.module.css.txt" />
+
+Compare it with selectors that deliberately cross those boundaries:
 
 <Exhibit
-	src="getting-started/AppHeaderBar.tsx#component"
-	label="component region"
-	soft
+  src="composition/CrossingTheBoundary.module.css.txt"
+  label="do not copy: cross-owner selectors"
+  soft
 />
+
+## checked exceptions
+
+Runtime-created DOM can be documented with a local, self-invalidating directive:
+
+<Exhibit src="diagnostics/ExpectedRuntimeDom.module.css.txt" />
+
+Use a scoped region when several selectors share the same reason:
+
+<Exhibit src="diagnostics/DisabledRegion.module.css.txt" />
+
+## how exhibits work
+
+The `<Exhibit>` component reads source from `src/exhibits`, derives syntax
+highlighting from the displayed filename, and renders it with the same copyable
+code block used across the site. Files ending in `.txt` display without that
+suffix, allowing intentionally invalid or framework-specific examples to remain
+documentation fixtures rather than compiled site code.
+
+Named regions can show one focused part of a larger source file:
+
+<Exhibit
+  src="getting-started/AppHeaderBar.tsx#component"
+  label="component region"
+  soft
+/>
+
+Region markers are stripped from the rendered result. Prefer full files when
+the surrounding context teaches something; use a region when the complete file
+would bury the idea being explained.

@@ -1,0 +1,19 @@
+import css from "./StatusPanel.module.css"
+
+export function StatusPanel({ error }: { error?: Error }) {
+	if (error) {
+		return (
+			<status-panel className={css.class}>
+				<strong>Could not load</strong>
+				<button type="button">Retry</button>
+			</status-panel>
+		)
+	}
+
+	return (
+		<status-panel className={css.class}>
+			<strong>Ready</strong>
+			<output>42 results</output>
+		</status-panel>
+	)
+}

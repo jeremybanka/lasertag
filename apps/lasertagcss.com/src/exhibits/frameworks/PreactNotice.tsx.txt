@@ -1,0 +1,9 @@
+import css from "./PreactNotice.module.css"
+
+export function PreactNotice() {
+	return (
+		<preact-notice className={css.class}>
+			<strong>Preact</strong>
+		</preact-notice>
+	)
+}

@@ -1,0 +1,12 @@
+const svg = {
+	MagnifyingGlass: MagnifyingGlassIcon
+}
+
+export function CommandSearch() {
+	return (
+		<command-search className={css.class}>
+			<svg.MagnifyingGlass />
+			<input aria-label="Search commands" />
+		</command-search>
+	)
+}

@@ -1,0 +1,11 @@
+command-search.class {
+	> svg {
+		width: 1rem;
+	}
+	> input {
+		flex: 1;
+	}
+
+	/* Still crosses into the icon component's private DOM. */
+	> svg > path {}
+}

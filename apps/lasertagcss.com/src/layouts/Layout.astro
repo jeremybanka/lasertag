@@ -17,6 +17,7 @@ const {
 	description = `Lasertag is structural CSS for people (and robots) who love CSS. ${packageJson.description}.`,
 	title = `lasertag | structural CSS`,
 } = Astro.props
+const canonicalUrl = new URL(Astro.url.pathname, `https://lasertagcss.com`)
 ---
 
 <html lang="en">
@@ -25,8 +26,15 @@ const {
 		<meta name="viewport" content="width=device-width" />
 		<link rel="icon" type="image/svg+xml" href={lasertagIconUrl} />
 		<link rel="apple-touch-icon" href={lasertagIconPngUrl} />
+		<link rel="canonical" href={canonicalUrl} />
 		<meta name="theme-color" content="#070707" />
 		<meta name="description" content={description} />
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content="Lasertag" />
+		<meta property="og:title" content={title} />
+		<meta property="og:description" content={description} />
+		<meta property="og:url" content={canonicalUrl} />
+		<meta name="twitter:card" content="summary" />
 		<meta name="generator" content={Astro.generator} />
 		<title>{title}</title>
 		<ClientRouter />

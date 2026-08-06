@@ -1,0 +1,4 @@
+pnpm lasertag check
+pnpm lasertag check --max-files=all
+pnpm lasertag check --show-story
+pnpm lasertag check --format=json "src/**/*.module.css"

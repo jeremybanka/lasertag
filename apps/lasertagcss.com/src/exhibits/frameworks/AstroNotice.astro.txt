@@ -1,0 +1,7 @@
+---
+import css from "./AstroNotice.module.css"
+---
+
+<astro-notice class={css.class}>
+	<strong>Astro</strong>
+</astro-notice>
