@@ -1,0 +1,5 @@
+// Choose the JSX runtime used by this project.
+import "lasertag/css-modules"
+import "lasertag/react-jsx"
+// import "lasertag/preact-jsx"
+// import "lasertag/solid-jsx"

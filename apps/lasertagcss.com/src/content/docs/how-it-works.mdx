@@ -1,0 +1,149 @@
+import Exhibit from "c/Exhibit.astro";
+
+# how it works
+
+<doc-lead>
+  Refractor converts render source into a finite structural story, scopes that
+  story to the `css.class` attachment, and asks whether each CSS selector path
+  can exist without crossing ownership.
+</doc-lead>
+
+## the pipeline
+
+For each `.module.css` file, Lasertag:
+
+1. resolves an exact same-stem `.tsx` or `.astro` source;
+2. selects the main component;
+3. parses supported render branches without executing code;
+4. expands analyzable local components and resolves imported-root evidence;
+5. scopes the result to roots carrying `css.class`;
+6. parses structural paths from nested CSS selectors;
+7. evaluates reachability and ownership for every path; and
+8. applies checked suppression directives before returning diagnostics.
+
+The CLI, LSP, editor view, and public API share this pipeline.
+
+## render stories are alternatives
+
+A component can return more than one valid tree:
+
+<Exhibit src="how-it-works/StatusPanel.tsx.txt" />
+
+Refractor preserves the error and success alternatives. A selector is reachable
+if any supported possibility contains its path:
+
+<Exhibit src="how-it-works/StatusPanel.module.css.txt" />
+
+`strong`, `button`, and `output` are all reachable. `progress` is dead because
+it appears in no possibility.
+
+## analysis begins at css.class
+
+A source file can render wrappers, fragments, or unrelated sibling roots.
+Lasertag discovers the outermost nodes whose `class`, `className`, or Astro
+`class:list` expression uses `css.class`, then scopes reachability to their
+owned stories.
+
+This prevents unrelated JSX in the same source from making a selector look
+reachable. When no attachment can be discovered, validation substitutes an
+opaque ownership root and makes no dead-selector claims. ESLint handles the
+missing or misplaced attachment convention.
+
+## selectors become paths
+
+Lasertag is interested in structural relations rather than visual declarations.
+A selector such as:
+
+<Exhibit src="how-it-works/selector.module.css.txt" />
+
+becomes a path of:
+
+<Exhibit src="how-it-works/selector-path.txt" />
+
+Supported refinements such as attributes and pseudo-classes do not invent
+missing structural elements. Selector shapes that cannot be interpreted safely
+remain unknown rather than producing speculative dead-code warnings.
+
+## three reachability results
+
+Each selector path is classified as:
+
+- **reachable** — at least one supported story path matches;
+- **unreachable** — every supported path proves the structure cannot exist; or
+- **unknown** — an opaque branch or unsupported construct might produce it.
+
+Only unreachable paths become `dead-selector`. If results from several selector
+branches are combined, reachable wins over unknown, and unknown wins over
+unreachable. This is the conservative bias that keeps deletion safe.
+
+## ownership is evaluated separately
+
+Reachability asks whether a path can match. Ownership asks whose DOM it matches.
+For every selector path, Refractor tracks evidence about imported components,
+slots, children, render callbacks, and opaque foreign roots.
+
+That separate pass allows Lasertag to say:
+
+- “this path matches, but it enters caller-owned children”;
+- “this direct child is actually another component's verified root”; or
+- “this component root is unknown and may collide with the selected tag.”
+
+A locally reachable match does not erase foreign evidence elsewhere in the
+story.
+
+## imported roots use source evidence
+
+Refractor asks TypeScript's module graph for the actual exported declaration. It
+follows relative and package imports, re-exports, and namespace imports. If a
+supported implementation exposes outer JSX nodes, those nodes become concrete
+foreign roots.
+
+It never guesses from a component's name. When resolution fails, reaches only a
+declaration file, or finds an unsupported implementation shape, the root stays
+opaque.
+
+Intrinsic namespace assertions such as `<svg.Icon />` bypass this resolution
+for the root only. They are explicit, unchecked evidence supplied by the author.
+
+## supported dynamic structure
+
+TSX analysis follows common static control flow and local functions. Solid's
+recognized control-flow primitives receive framework-aware lowering. Astro
+analysis recognizes literal content, structural HTML, custom tags, and explicit
+layout children.
+
+The analyzer does not evaluate arbitrary JavaScript, run framework code, fetch
+data, or render the application. Expressions it cannot prove are represented as
+opaque story nodes with a reason and source range.
+
+## performance model
+
+Production pays no analysis cost and ships no Lasertag runtime. During tooling:
+
+- CLI jobs analyze modules in parallel with work stealing;
+- each worker reuses a TypeScript AST session;
+- the language server reuses unchanged source snapshots and reachability
+  results; and
+- the editor caps materialized render possibilities.
+
+Your emitted styles grow with component CSS, not with a runtime or utility
+catalog. The structural convention also makes component deletion naturally
+remove its owned stylesheet.
+
+## public API layers
+
+Use the highest-level function that matches your input:
+
+| API                                   | Use it when…                                        |
+| ------------------------------------- | --------------------------------------------------- |
+| `validateCssReachability`             | You already have TSX and CSS source text.           |
+| `validateRenderSourceCssReachability` | The source may be TSX or Astro.                     |
+| `analyzeTsxRenderStory`               | You need TSX story extraction itself.               |
+| `analyzeAstroRenderStory`             | You need Astro story extraction itself.             |
+| `analyzeRenderStory`                  | You want extension-based adapter dispatch.          |
+| `scopeRenderStoryToCssClassRoots`     | You construct stories and need attachment scoping.  |
+| `createTypescriptAstSession`          | You analyze a batch and want to reuse parser state. |
+
+The [tooling guide](/docs/tooling#refractor-api) contains a minimal integration.
+For debugging conservative results, inspect both `renderStory.warnings` and
+opaque nodes—not only the final diagnostics.

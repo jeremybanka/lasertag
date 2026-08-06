@@ -1,0 +1,135 @@
+import Exhibit from "c/Exhibit.astro";
+
+# core model
+
+<doc-lead>
+  Lasertag makes one relationship explicit: a component owns a rendered
+  structure, and one CSS Module describes that structure. Everything else
+  follows from making that relationship statically legible.
+</doc-lead>
+
+## a subset of CSS Modules
+
+A Lasertag stylesheet is a CSS Module. Your existing bundler still scopes the
+class name and emits CSS. Lasertag adds a narrower authoring contract:
+
+1. one exported component per component module;
+2. one exact sibling `.module.css` file;
+3. one exported class, always named `.class`;
+4. one component-named custom root carrying `css.class`; and
+5. selectors that stay inside DOM rendered by that component.
+
+Because this is a subset rather than a new styling system, removing Lasertag's
+tools leaves valid CSS Modules behind.
+
+## one styling dimension per component
+
+Traditional component CSS often accumulates independent class names:
+`card`, `cardHeader`, `avatar`, `avatarSmall`, `actions`, `actionsCompact`. Each
+name creates another mapping to track between JSX, CSS, variants, and callers.
+
+Lasertag reduces that dimensionality. The module exports one attachment point;
+structure, attributes, states, media conditions, and pseudo-classes carry the
+rest of the information.
+
+<Exhibit
+  src="core-model/ProfileCardVariants.module.css.txt"
+  label="one attachment, many visual decisions"
+/>
+
+The stylesheet remains expressive, but there is only one public class contract
+to attach, type, rename, and search for.
+
+## the DOM is the shared vocabulary
+
+In Lasertag, JSX and CSS do not communicate through a bag of arbitrary local
+class names. They describe the same tree.
+
+<Exhibit src="getting-started/ProfileCard.tsx" />
+
+<Exhibit src="getting-started/ProfileCard.module.css" />
+
+This makes Inspect Element useful: `profile-card`, `user-identity`, and
+`avatar-frame` are the same terms you search for in source. Component roots are
+frequently unique across the repository.
+
+## semantic HTML before custom structure
+
+Lasertag's custom tags are not a replacement for HTML semantics. Use the
+platform whenever it has the right word:
+
+- landmarks and sections: `nav`, `article`, `aside`, `section`;
+- lists: `ul`, `ol`, `li`;
+- text meaning: `strong`, `em`, `blockquote`, `time`, `data`;
+- output: `output`, `meter`, `progress`;
+- forms: `form`, `fieldset`, `legend`, `label`, `input`, `select`, `textarea`,
+  `button`; and
+- media: `figure`, `figcaption`, `picture`, `img`, `video`.
+
+Use a hyphenated local tag only when no built-in element expresses the role.
+`search-controls`, `price-summary`, and `avatar-frame` communicate more than an
+anonymous wrapper without pretending to have global application meaning.
+
+> Custom elements used as structural tags do not need to be registered. Unknown
+> hyphenated elements participate in layout and styling like ordinary elements;
+> Lasertag's JSX types make them legal to TypeScript.
+
+## exported roots are addresses
+
+An exported `ProfileCard` renders `<profile-card>`. This is a stable address in
+three places:
+
+- the component declaration;
+- the browser DOM; and
+- the stylesheet root `profile-card.class`.
+
+The root wrapper is mandatory even when a native element might work. Put the
+native element inside it. The wrapper makes ownership visible and prevents a
+component implementation change from silently changing the CSS address used by
+its parent.
+
+Local, non-exported helper components may use a semantic native root when that
+is clearest. The strict ESLint option `checkAllComponentFunctions: true` can
+apply component-named roots to all PascalCase functions if a project prefers
+uniformity.
+
+## ownership is the cascade boundary
+
+CSS can technically select through any descendant. Lasertag's rule is narrower:
+a component styles DOM it renders itself. Imported components, `children`, render
+props, and Astro slots introduce boundaries.
+
+The rule is about maintenance, not encapsulation theater. A parent may style
+the element that contains a slot, size the region around an imported component,
+or pass an explicit API to that component. It should not depend on private DOM
+several levels inside another owner.
+
+Read [composition and ownership](/docs/composition) for the precise boundary
+rules and escape hatches.
+
+## static analysis, no runtime
+
+Lasertag does not register custom elements, inject styles, walk the DOM, or ship
+component metadata. Refractor reads source, turns supported return paths into a
+render story, and compares selector paths against that story.
+
+This choice gives Lasertag two important properties:
+
+- application performance is the performance of ordinary CSS Modules; and
+- analysis can run in the editor and CI without changing production behavior.
+
+The analyzer is conservative. It reports dead code only when every supported
+path is provably unreachable. Unknown dynamic structure remains unknown—not
+dead. See [how it works](/docs/how-it-works) for the full contract.
+
+## the mental model
+
+When authoring a component, ask four questions:
+
+1. What is the component's stable root address?
+2. Which official HTML elements describe its meaning and interactions?
+3. Which local structural roles still need names?
+4. Where does ownership pass to another component or caller?
+
+If JSX answers those questions clearly, the CSS usually becomes a direct
+transcription of the owned tree.

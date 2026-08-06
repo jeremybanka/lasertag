@@ -1,0 +1,13 @@
+status-panel.class {
+	/* Reachable in both render possibilities. */
+	> strong {}
+
+	/* Reachable in the error possibility. */
+	> button {}
+
+	/* Reachable in the success possibility. */
+	> output {}
+
+	/* Unreachable in every possibility: dead CSS. */
+	> progress {}
+}

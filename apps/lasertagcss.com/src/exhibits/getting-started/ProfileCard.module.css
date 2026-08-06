@@ -1,0 +1,49 @@
+profile-card.class {
+	background: var(--bg-soft-1);
+	border: 1px solid var(--bg-soft-glass-3);
+	border-radius: 18px;
+	display: flex;
+	flex-flow: column;
+	gap: 18px;
+	padding: 20px;
+
+	> header {
+		align-items: center;
+		display: flex;
+		gap: 12px;
+
+		> avatar-frame {
+			align-items: center;
+			background: var(--brand-color);
+			border-radius: 50%;
+			display: flex;
+			height: 42px;
+			justify-content: center;
+			width: 42px;
+		}
+
+		> user-identity {
+			display: flex;
+			flex-flow: column;
+
+			> strong {}
+			> span {
+				color: var(--fg-soft-2);
+			}
+		}
+	}
+
+	> footer {
+		align-items: center;
+		display: flex;
+		justify-content: space-between;
+
+		> small {
+			color: var(--fg-soft-1);
+		}
+		> button {
+			border-radius: 999px;
+			padding: 8px 14px;
+		}
+	}
+}

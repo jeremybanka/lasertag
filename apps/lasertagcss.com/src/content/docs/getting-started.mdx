@@ -1,19 +1,141 @@
+import { CodeBlock } from "c/CodeBlock";
 import Exhibit from "c/Exhibit.astro";
 
 # getting started
 
-This route is a stub for installation and first-component guidance.
+<doc-lead>
+  Add Lasertag to one component first. You should finish with two familiar files
+  and a command that can prove their structures agree.
+</doc-lead>
 
-## install
+## prerequisites
 
-Install `lasertag` alongside the JSX framework and lint tooling used by the
-project.
+You need a project that already compiles `.module.css` files and renders JSX
+with React, Preact, or Solid, or an Astro project using CSS Modules. Lasertag
+does not replace your framework or CSS pipeline.
 
-## pair structure with styles
+> **Existing project?** Choose a small leaf component with no `children` prop and
+> few imported components. Its ownership boundary will be obvious while you
+> learn the convention.
 
-The exhibit pipeline is already live and reads examples directly from
-`src/exhibits`.
+## 1. install Lasertag
 
-<Exhibit src="getting-started/AppHeaderBar.tsx" />
+Install it as a development dependency:
 
-<Exhibit src="getting-started/AppHeaderBar.module.css" />
+<CodeBlock filepath="install.sh" code={`pnpm add -D lasertag`} />
+
+Use the equivalent development-dependency command for npm, Yarn, or Bun.
+
+## 2. load the types
+
+Create a declaration file included by your TypeScript project. Import the CSS
+Module type and the JSX type for your framework:
+
+<Exhibit src="getting-started/lasertag.d.ts.txt" />
+
+For Preact, replace `lasertag/react-jsx` with `lasertag/preact-jsx`. For Solid,
+use `lasertag/solid-jsx`. Astro templates do not need a JSX custom-element type,
+but TSX islands still do.
+
+The CSS Module type exposes exactly one member:
+
+<Exhibit
+  src="getting-started/module.css.d.ts.txt"
+  label="the CSS Module contract"
+/>
+
+## 3. pair a component and stylesheet
+
+Create two siblings with the same stem:
+
+<Exhibit src="getting-started/component-pair.txt" label="component pair" />
+
+The source must be an exact `.tsx` or `.astro` sibling. Lasertag deliberately
+does not guess across `.jsx`, directory index files, or unrelated names. Having
+both `ProfileCard.tsx` and `ProfileCard.astro` is ambiguous and reported as an
+error.
+
+## 4. write the component structure
+
+Import the sibling module as `css`. Export one multiword component and render
+its kebab-case name as the root. Attach `css.class` to that root.
+
+<Exhibit src="getting-started/ProfileCard.tsx" />
+
+Notice the vocabulary:
+
+- `profile-card` identifies the exported component;
+- `header`, `footer`, `strong`, `small`, and `button` use official semantics;
+- `avatar-frame` and `user-identity` name local structure for which HTML has no
+  precise element; and
+- there is no `<div>`.
+
+## 5. mirror it in CSS
+
+The stylesheet has one top-level member: the component root joined to `.class`.
+Nest through DOM the component owns.
+
+<Exhibit src="getting-started/ProfileCard.module.css" />
+
+Nothing here is a Lasertag-specific styling language. It is CSS nesting inside
+a CSS Module.
+
+## 6. run the structural check
+
+<CodeBlock filepath="check.sh" code={`pnpm lasertag check`} />
+
+A clean project prints:
+
+<Exhibit src="getting-started/clean-output.txt" label="clean check" soft />
+
+If you add `> progress {}` to the stylesheet without rendering a `progress`
+element, the check reports `dead-selector` and exits nonzero.
+
+## 7. make it routine
+
+Add scripts so contributors and CI use the same commands:
+
+<Exhibit src="getting-started/package.json.txt" />
+
+Run `css:check` in CI. Treat `css:fix` as a deliberate deletion tool: review its
+diff, then rerun the check.
+
+## 8. enforce authoring conventions
+
+The reachability checker proves CSS against a render story. The ESLint plugin
+enforces the conventions that create that story: sibling imports, the `css`
+binding, component exports, root tags, semantic grouping, and the ban on
+`<div>`.
+
+Add the plugin to the JSX-aware flat ESLint configuration your project already
+uses:
+
+<Exhibit src="getting-started/eslint.config.ts.txt" />
+
+The snippet shows every rule explicitly. Keep your existing TypeScript parser
+and framework configuration around it.
+
+## 9. add live feedback
+
+VS Code users can build and install the extension shipped inside the npm
+package:
+
+<CodeBlock filepath="editor.sh" code={`pnpm lasertag vsix`} />
+
+It adds live diagnostics, render-aware selector completions, cleanup actions,
+and a **Render Story** view. Other editors can run the standalone language
+server with `pnpm exec lasertag-lsp --stdio`.
+
+## success checklist
+
+- The component and `.module.css` file are exact siblings.
+- The module is imported as `css`.
+- Only `css.class` is accessed.
+- The exported component has a multiword name and matching custom root.
+- `css.class` is attached to that owned root.
+- Nested selectors describe only DOM rendered in the component file.
+- `pnpm lasertag check` is clean.
+
+You now have the complete minimum. Next, read the [core model](/docs/core-model)
+to understand why each constraint exists, or [authoring components](/docs/authoring)
+to convert more of an application.

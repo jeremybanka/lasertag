@@ -18,12 +18,20 @@ function getLanguage(filepath?: string): string {
 	switch (extension) {
 		case `css`:
 			return `css`
+		case `json`:
+		case `jsonc`:
+			return `json`
 		case `sh`:
 			return `bash`
+		case `txt`:
+			return `text`
 		case `ts`:
 			return `ts`
 		case `tsx`:
 			return `tsx`
+		case `yaml`:
+		case `yml`:
+			return `yaml`
 		case `astro`:
 			return `astro`
 		default:

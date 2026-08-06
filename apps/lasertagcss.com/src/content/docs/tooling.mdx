@@ -1,0 +1,153 @@
+import { CodeBlock } from "c/CodeBlock";
+import Exhibit from "c/Exhibit.astro";
+
+# CLI & editor
+
+<doc-lead>
+  The CLI, language server, VS Code extension, and Refractor API are different
+  surfaces over one conservative analysis engine. Choose the surface that fits
+  the moment; the structural answer stays the same.
+</doc-lead>
+
+## choose a surface
+
+| Need                                   | Surface                    |
+| -------------------------------------- | -------------------------- |
+| Fast local or CI validation            | `lasertag check`           |
+| Deliberate dead-selector deletion      | `lasertag fix`             |
+| Live diagnostics and completions       | `lasertag-lsp`             |
+| Bundled editor experience              | Lasertag VS Code extension |
+| Custom integrations and render stories | `lasertag/refractor`       |
+
+## check
+
+The default command scans `**/*.module.css`, discovers exact `.tsx` or `.astro`
+siblings, and leaves files untouched:
+
+<Exhibit src="tooling/check.sh.txt" />
+
+The default ignores `node_modules`, `dist`, `build`, `coverage`, and Refractor's
+corpus providers. A diagnostic or file-analysis failure exits nonzero.
+
+### stylish output
+
+Human-readable output groups warnings by stylesheet, anchors each warning to a
+small source frame, and ends with an accounting summary.
+
+<Exhibit src="tooling/check-output.txt" />
+
+Only ten affected files are expanded by default. `--max-files=all` removes that
+display cap; JSON output always includes every diagnostic.
+
+### render-story evidence
+
+`--show-story` adds up to three closest render possibilities to each displayed
+dead selector. The real matching prefix is followed by a marked impossible
+continuation—useful when a deeply nested selector differs from JSX in one place.
+
+## fix
+
+`fix` removes selectors diagnosed as `dead-selector` or
+`impossible-local-class`:
+
+<Exhibit src="tooling/fix.sh.txt" />
+
+Use it only when deletion is intended. It does not broadly rewrite components,
+rename tags, or suppress ownership warnings. Always review the diff and rerun
+the check.
+
+## CI
+
+The cleanest policy is the same command contributors run locally:
+
+<Exhibit src="tooling/ci.yml.txt" />
+
+For large monorepos, narrow the glob per job or run one root check. Analysis is
+parallelized with work stealing and reuses a TypeScript AST session per worker.
+
+## VS Code extension
+
+The npm package contains everything needed to build a current-platform VSIX:
+
+<Exhibit src="tooling/editor.sh.txt" />
+
+The installed extension provides:
+
+- live CSS Module diagnostics;
+- render-aware selector, attribute, refinement, and directive completions;
+- **Clean up Dead Selectors** and **Restart Lasertag Server** commands;
+- source navigation between a component and its stylesheet; and
+- a **Render Story** Activity Bar view.
+
+Each top-level Render Story item is a complete render possibility. Styled real
+branches open the most specific matching selector. Unstyled branches open their
+source tag. Unreachable selectors are inserted after their closest real branch,
+so the view shows where the stylesheet expected the DOM to continue.
+
+The view materializes at most 48 possibilities to keep heavily conditional
+components responsive.
+
+## standalone language server
+
+Other editors can launch:
+
+<CodeBlock filepath="lsp.sh" code={`pnpm exec lasertag-lsp --stdio`} />
+
+The client should send `.module.css`, `.tsx`, and `.astro` documents, identify
+the workspace folder, and forward create/change/delete events for those
+extensions. The server dynamically registers watchers when the client supports
+it.
+
+| Environment variable           | Purpose                                              |
+| ------------------------------ | ---------------------------------------------------- |
+| `LASERTAG_TYPESCRIPT_SDK_PATH` | TypeScript 7 native executable used for TSX parsing. |
+| `LASERTAG_LSP_LOG_LEVEL`       | `off`, `error`, `warn`, `info`, or `debug`.          |
+
+## extension settings
+
+| Setting                        | Purpose                                               |
+| ------------------------------ | ----------------------------------------------------- |
+| `lasertag.lsp.path`            | Launch another `lasertag-lsp` executable.             |
+| `lasertag.server.path`         | Launch another server module when no LSP path is set. |
+| `lasertag.typescript.sdk.path` | Use another TypeScript 7 native executable.           |
+| `lasertag.log.level`           | Operational logging from `off` through `debug`.       |
+| `lasertag.trace.server`        | Protocol tracing: `off`, `messages`, or `verbose`.    |
+
+Relative paths resolve from the first workspace root. Reload the VS Code window
+after changing extension settings; restarting the server does not rebuild the
+client configuration.
+
+## Refractor API
+
+Use `lasertag/refractor` when another tool already has source text or needs the
+render story itself:
+
+<Exhibit src="tooling/analyze.ts.txt" />
+
+For batches, create one `createTypescriptAstSession()`, pass it as the second
+argument, and close it when finished. Use
+`validateRenderSourceCssReachability` when the source may be TSX or Astro.
+
+## troubleshooting
+
+### nothing is analyzed
+
+Verify exact sibling stems and extensions. A CSS Module without a `.tsx` or
+`.astro` sibling is skipped; having both source types is an ambiguity error.
+
+### no warning appears
+
+No diagnostic can mean “unknown,” not necessarily reachable. Dynamic expressions
+and unresolved components deliberately prevent dead-code claims. Inspect the
+Render Story or Refractor result.
+
+### the wrong component is selected
+
+Selection prefers a file-stem export, then a default export, then a single
+exported component. Resolve ambiguous exports or pass `componentName` to the API.
+
+### analysis needs more detail
+
+Set editor logging to `info` for counts of story elements, opaque branches,
+selectors, and reachability. At `debug`, Lasertag logs sibling resolution,
+parsed selectors, the normalized story, and every path's result.

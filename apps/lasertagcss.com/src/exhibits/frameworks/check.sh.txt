@@ -1,0 +1,2 @@
+pnpm lasertag check "apps/dashboard/src/**/*.module.css"
+pnpm lasertag check "packages/ui/src/**/*.module.css,apps/docs/src/**/*.module.css"

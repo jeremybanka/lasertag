@@ -26,6 +26,7 @@ function usePathname(): string {
 export function DocsNavigation(): VNode {
 	const pathname = usePathname()
 	const [menuIsOpen, setMenuIsOpen] = React.useState(false)
+	React.useEffect(() => setMenuIsOpen(false), [pathname])
 
 	return (
 		<docs-navigation class={css.class}>
@@ -147,7 +148,7 @@ function SiteDirectory({ menuIsOpen, pathname }: NavigationPanelProps): VNode {
 					updateSignals={[menuIsOpen, pathname]}
 				/>
 				<section>
-					<header>Guide</header>
+					<header>Start</header>
 					<main>
 						<section>
 							<a id="-docs-link" href="/docs">
@@ -159,11 +160,56 @@ function SiteDirectory({ menuIsOpen, pathname }: NavigationPanelProps): VNode {
 								getting started
 							</a>
 						</section>
+						<section>
+							<a id="-docs-core-model-link" href="/docs/core-model">
+								core model
+							</a>
+						</section>
 					</main>
 				</section>
 				<section>
-					<header>Examples</header>
+					<header>Use</header>
 					<main>
+						<section>
+							<a id="-docs-authoring-link" href="/docs/authoring">
+								authoring components
+							</a>
+						</section>
+						<section>
+							<a id="-docs-composition-link" href="/docs/composition">
+								composition & ownership
+							</a>
+						</section>
+						<section>
+							<a id="-docs-frameworks-link" href="/docs/frameworks">
+								frameworks
+							</a>
+						</section>
+					</main>
+				</section>
+				<section>
+					<header>Tools</header>
+					<main>
+						<section>
+							<a id="-docs-tooling-link" href="/docs/tooling">
+								CLI & editor
+							</a>
+						</section>
+						<section>
+							<a id="-docs-diagnostics-link" href="/docs/diagnostics">
+								diagnostics
+							</a>
+						</section>
+					</main>
+				</section>
+				<section>
+					<header>Deep dive</header>
+					<main>
+						<section>
+							<a id="-docs-how-it-works-link" href="/docs/how-it-works">
+								how it works
+							</a>
+						</section>
 						<section>
 							<a id="-docs-exhibits-link" href="/docs/exhibits">
 								exhibits

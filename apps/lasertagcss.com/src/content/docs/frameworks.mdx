@@ -1,0 +1,109 @@
+import Exhibit from "c/Exhibit.astro";
+
+# frameworks
+
+<doc-lead>
+  Lasertag depends on CSS Modules and analyzable component source, not a runtime
+  integration. React, Preact, Solid, and Astro use the same structural contract
+  with small syntax differences.
+</doc-lead>
+
+## shared setup
+
+Every TypeScript project imports the CSS Module declaration and, for TSX, one
+framework-specific custom-element declaration:
+
+<Exhibit src="frameworks/framework-types.d.ts.txt" />
+
+Put these imports in a `.d.ts` file included by the project's `tsconfig.json`,
+or list the exports in `compilerOptions.types`. Choose one JSX declaration for
+the runtime compiling that project.
+
+All filesystem tools require exact sibling pairs:
+
+<Exhibit src="frameworks/source-pairs.txt" />
+
+## React
+
+Import `lasertag/react-jsx` and attach `css.class` with `className`:
+
+<Exhibit src="frameworks/ReactNotice.tsx.txt" />
+
+Use the existing React/TypeScript ESLint parser configuration and scope
+Lasertag's component rules to JSX-bearing files. Refractor follows supported
+return statements, conditional expressions, logical branches, arrays,
+fragments, and local components without executing the module.
+
+## Preact
+
+Import `lasertag/preact-jsx`. Preact also uses `className` in TSX, though its JSX
+runtime accepts `class` too; using `className` keeps TSX examples consistent.
+
+<Exhibit src="frameworks/PreactNotice.tsx.txt" />
+
+Keep `jsxImportSource: "preact"` in the TypeScript project as usual. Lasertag's
+types augment Preact's JSX namespace with arbitrary standards-compliant
+hyphenated custom elements.
+
+## Solid
+
+Import `lasertag/solid-jsx` and use Solid's `class` attribute:
+
+<Exhibit src="frameworks/SolidNotice.tsx.txt" />
+
+Refractor recognizes Solid imports rather than treating every similarly named
+component as control flow. Supported primitives include:
+
+- `Show`, `For`, `Index`, and `Switch` / `Match`;
+- `ErrorBoundary`, `Suspense`, and `SuspenseList`;
+- `Dynamic` and `NoHydration` from `solid-js/web`; and
+- aliased or namespace imports of those primitives.
+
+Static alternatives become render possibilities. Dynamic values remain opaque,
+and recognized portal-style output is excluded from descendant ownership.
+
+## Astro
+
+Astro uses `class={css.class}` in a same-named `.astro` file:
+
+<Exhibit src="frameworks/AstroNotice.astro.txt" />
+
+Astro HTML and custom tags become structural story nodes. Primitive expressions
+such as strings, numbers, booleans, `null`, and `undefined` are treated as
+non-structural content. Slots, injected HTML, dynamic component tags, and
+expressions that cannot be reduced safely remain opaque.
+
+Components whose names end in `Layout` are treated as transparent slot wrappers
+so explicit children remain visible long enough to discover the `css.class`
+attachment. Other PascalCase Astro components use the conventional own-name
+root in the story while their internals remain foreign.
+
+The JSX-focused ESLint rules do not parse `.astro` templates by themselves;
+use Astro's own lint/parser setup alongside `lasertag check` and the language
+server for structural reachability.
+
+## mixed repositories
+
+Each component pair is analyzed from its source extension, so a monorepo can
+contain React, Preact, Solid, and Astro packages. Keep the appropriate JSX type
+import in each TypeScript project rather than loading all framework declarations
+globally.
+
+The CLI scans every `**/*.module.css` by default. Narrow a CI job when a package
+needs an independent boundary:
+
+<Exhibit src="frameworks/check.sh.txt" />
+
+There is one positional target. Put several globs in one quoted,
+comma-separated value.
+
+## other CSS Module environments
+
+The emitted stylesheet needs no Lasertag runtime support. A framework or bundler
+that supports CSS Modules can carry Lasertag-authored CSS. Full static analysis
+currently requires a supported `.tsx` or `.astro` render source, and JSX typing
+is provided for React, Preact, and Solid.
+
+That distinction matters: **CSS compatibility is broad; analyzer adapters are
+explicit.** Unsupported render languages still receive valid CSS Modules, but
+not the same render-story guarantees until an adapter exists.

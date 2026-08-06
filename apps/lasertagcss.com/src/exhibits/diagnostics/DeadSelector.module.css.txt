@@ -1,0 +1,9 @@
+project-card.class {
+	> header {}
+
+	/* dead-selector: no footer exists in the render story. */
+	> footer {}
+
+	/* impossible-local-class: only .class is exported. */
+	.secondaryAction {}
+}

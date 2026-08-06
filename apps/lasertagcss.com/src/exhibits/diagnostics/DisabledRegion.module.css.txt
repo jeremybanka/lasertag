@@ -1,0 +1,8 @@
+chart-canvas.class {
+	/* @lasertag-disable [dead-selector] chart runtime owns these layers */
+	> canvas {}
+	> chart-overlay {}
+	/* @lasertag-enable [dead-selector] */
+
+	> footer {}
+}

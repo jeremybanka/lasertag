@@ -1,0 +1,148 @@
+import Exhibit from "c/Exhibit.astro";
+
+# diagnostics
+
+<doc-lead>
+  A Lasertag diagnostic is either a proven structural mismatch, an ownership
+  risk, or a stale exception. This reference explains what each result means and
+  what to change first.
+</doc-lead>
+
+## reachability and ownership
+
+| Code                                      | Meaning                                                                           | First response                                                 |
+| ----------------------------------------- | --------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| `dead-selector`                           | No supported render path can match the selector.                                  | Correct JSX/CSS drift or delete the selector.                  |
+| `impossible-local-class`                  | The module uses a local class other than `.class`.                                | Express the distinction with structure, state, or a component. |
+| `selector-crosses-ownership-boundary`     | A selector enters children, a slot, render-prop output, or foreign component DOM. | Stop at owned structure or define a child API.                 |
+| `selector-matches-foreign-component-root` | A selector matches a root proven to be rendered by another component.             | Style the owned container or move the visual responsibility.   |
+| `opaque-component-root-may-collide`       | An unresolved component might render the selected root tag.                       | Avoid the collision or assert a guaranteed intrinsic root.     |
+
+### dead-selector
+
+This is the strongest dead-code claim. Every supported render possibility was
+checked and none can produce the selector path.
+
+<Exhibit src="diagnostics/DeadSelector.module.css.txt" />
+
+Check whether JSX changed, a tag was renamed, or a condition was removed. If
+the style is obsolete, delete it manually or use `lasertag fix`.
+
+### impossible-local-class
+
+Lasertag CSS Modules expose only `css.class`, so another local class cannot be
+attached through the typed module contract. Replace variant classes with
+attributes, pseudo-classes, stateful native elements, structural tags, or a new
+component boundary.
+
+### selector-crosses-ownership-boundary
+
+The selector can enter DOM supplied by another owner. This warning can coexist
+with a valid local match; reachability does not make a foreign match safe. Read
+[composition and ownership](/docs/composition) before suppressing it.
+
+### selector-matches-foreign-component-root
+
+TypeScript module resolution reached an implementation and proved its outer
+element. Lasertag does not infer roots from names: a component named `Dialog`
+that returns `<section>` is treated as a foreign `<section>`.
+
+### opaque-component-root-may-collide
+
+The imported implementation could not be proven, and its unknown root could
+match the same tag as your selector. Related selectors sharing the first
+uncertain root are grouped into one diagnostic to avoid cascades.
+
+If a third-party component guarantees an intrinsic root, an explicit
+`<svg.Icon />`-style assertion can make the root addressable. The assertion does
+not transfer ownership of descendants.
+
+## exception-directive diagnostics
+
+| Code                                 | Meaning                                                         |
+| ------------------------------------ | --------------------------------------------------------------- |
+| `expect-error-explanation-too-short` | An expect-error has no useful explanation.                      |
+| `unused-expect-error`                | The following selector no longer has a suppressible diagnostic. |
+| `disable-explanation-too-short`      | A disable region has no useful explanation.                     |
+| `unused-disable`                     | The region suppressed no matching diagnostics.                  |
+| `unused-enable`                      | An enable appears without an active disable for that code.      |
+
+These diagnostics make exceptions self-cleaning. A directive is not a comment
+that silences tooling forever; it is another checked part of the contract.
+
+## expect one known mismatch
+
+Place `@lasertag-expect-error` immediately before the selector and explain why
+runtime DOM differs from source:
+
+<Exhibit src="diagnostics/ExpectedRuntimeDom.module.css.txt" />
+
+The explanation after `:` must contain at least three characters. The directive
+can suppress a reachability or ownership diagnostic on the following selector.
+When the warning disappears, the directive becomes `unused-expect-error` and
+`lasertag fix` or the editor cleanup action can remove it.
+
+Use this for concrete, local facts: a library appends a canvas, sanitized HTML
+has a documented shape, or a platform integration creates a known node. Do not
+use it merely because analysis is inconvenient.
+
+## disable one code across a region
+
+For several related selectors, disable a specific diagnostic code and re-enable
+it after the region:
+
+<Exhibit src="diagnostics/DisabledRegion.module.css.txt" />
+
+The disable explanation is required; the enable takes no explanation. Regions
+for different codes may overlap, and a disable without an enable remains active
+to the end of the file.
+
+The suppressible reachability codes are:
+
+- `dead-selector`;
+- `impossible-local-class`;
+- `opaque-component-root-may-collide`;
+- `selector-crosses-ownership-boundary`; and
+- `selector-matches-foreign-component-root`.
+
+Prefer the narrowest code and smallest region that states the real exception.
+
+## ambiguous-render-source
+
+Filesystem tools report an error when both exact siblings exist:
+
+<Exhibit src="diagnostics/ambiguous-pair.txt" label="ambiguous pair" soft />
+
+Remove or rename one source. Lasertag will not guess which render story owns the
+stylesheet.
+
+## render-story warnings
+
+Refractor also records warnings on the story itself. These explain why analysis
+became conservative and may not surface as a CSS diagnostic:
+
+| Warning                    | Meaning                                             |
+| -------------------------- | --------------------------------------------------- |
+| `component-not-found`      | The requested main component could not be selected. |
+| `multiple-main-components` | More than one export is a plausible main component. |
+| `component-cycle`          | Local component expansion encountered a cycle.      |
+| `unknown-expression`       | A render expression could not be reduced safely.    |
+
+Unknown structure prevents a `dead-selector` claim for paths it might produce.
+Inspect `renderStory.warnings`, use `--show-story`, or enable debug logs rather
+than assuming silence proves reachability.
+
+## a response hierarchy
+
+When any diagnostic appears:
+
+1. **Correct drift** between source and CSS.
+2. **Improve structure** if a generic wrapper or class is hiding meaning.
+3. **Respect ownership** by stopping at the boundary or exposing an API.
+4. **Make evidence explicit** with a stable intrinsic-root assertion when the
+   dependency truly guarantees it.
+5. **Document runtime behavior** with the narrowest checked directive only when
+   source cannot express the real DOM.
+
+This order preserves Lasertag's value. Suppression is a last, accountable tool—not
+the normal authoring path.
