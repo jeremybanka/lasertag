@@ -14,6 +14,8 @@
 		"dist/*.d.mts.map",
 		"dist/*.mjs",
 		"dist/*.mjs.map",
+		"assets/logos/LasertagActivity.svg",
+		"assets/logos/LasertagIcon.png",
 		"docs",
 		"examples",
 		"src",

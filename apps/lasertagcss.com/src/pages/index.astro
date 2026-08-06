@@ -1,4 +1,6 @@
 ---
+import lasertagIconUrl from "../../../../packages/lasertag/assets/logos/LasertagIcon.svg?url"
+
 import Layout from "../layouts/Layout.astro"
 import css from "./index.module.css"
 ---
@@ -6,7 +8,7 @@ import css from "./index.module.css"
 <Layout>
 	<home-splash class={css.class}>
 		<title-lockup>
-			<img src="/lasertag.png" alt="Lasertag" />
+			<img src={lasertagIconUrl} alt="Lasertag" />
 			<h1>lasertag</h1>
 			<p>Structural CSS for people (and robots) who love CSS.</p>
 			<tag-line>CSS you can maintain.</tag-line>

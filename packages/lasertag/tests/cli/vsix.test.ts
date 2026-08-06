@@ -81,8 +81,8 @@ describe(`lasertag vsix builder`, () => {
 			"package.json": JSON.stringify({ version: `9.8.7-test` }),
 			"src/lsp/server.ts": ``,
 			"src/vscode/extension.ts": `import "missing-vsix-runtime"`,
-			"src/vscode/LasertagActivity.svg": ``,
-			"src/vscode/LasertagIcon.png": ``,
+			"assets/logos/LasertagActivity.svg": ``,
+			"assets/logos/LasertagIcon.png": ``,
 			"src/vscode/README.md": `# Lasertag`,
 		})
 		let packaged = false
@@ -113,8 +113,8 @@ describe(`lasertag vsix builder`, () => {
 				export function deactivate() {}
 			`,
 			"src/vscode/README.md": `# Lasertag`,
-			"src/vscode/LasertagActivity.svg": ``,
-			"src/vscode/LasertagIcon.png": ``,
+			"assets/logos/LasertagActivity.svg": ``,
+			"assets/logos/LasertagIcon.png": ``,
 			"src/lsp/server.ts": `console.log("server")`,
 		})
 		const commands: Array<{ args: string[]; cwd: string }> = []

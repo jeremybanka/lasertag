@@ -2,6 +2,8 @@
 import { ClientRouter } from "astro:transitions"
 import packageJson from "lasertag/package.json"
 
+import lasertagIconPngUrl from "../../../../packages/lasertag/assets/logos/LasertagIcon.png?url"
+import lasertagIconUrl from "../../../../packages/lasertag/assets/logos/LasertagIcon.svg?url"
 import GlobalEffects from "../components/GlobalEffects.astro"
 import "../globals.css"
 import css from "./Layout.module.css"
@@ -21,8 +23,8 @@ const {
 	<head>
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width" />
-		<link rel="icon" type="image/png" href="/favicon.png" />
-		<link rel="apple-touch-icon" href="/apple-icon.png" />
+		<link rel="icon" type="image/svg+xml" href={lasertagIconUrl} />
+		<link rel="apple-touch-icon" href={lasertagIconPngUrl} />
 		<meta name="theme-color" content="#070707" />
 		<meta name="description" content={description} />
 		<meta name="generator" content={Astro.generator} />
@@ -35,7 +37,7 @@ const {
 				<nav>
 					<left-side>
 						<a href="/">
-							<img src="/lasertag.png" alt="" transition:persist />
+							<img src={lasertagIconUrl} alt="" transition:persist />
 							<brand-name>lasertagcss</brand-name>.com
 						</a>
 					</left-side>
