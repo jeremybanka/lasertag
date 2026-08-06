@@ -18,7 +18,6 @@ home-splash.class {
 		width: 100%;
 
 		> img {
-			background: white;
 			border-radius: 22%;
 			box-shadow: 0 25px 80px -35px var(--brand-color);
 			height: clamp(150px, 25vw, 230px);
