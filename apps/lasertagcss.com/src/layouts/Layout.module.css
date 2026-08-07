@@ -37,18 +37,27 @@ app-shell.class {
 
 	> header {
 		--nav-background: var(--bg-soft-glass-1);
+		--nav-backdrop-filter: blur(15px);
 		--nav-box-shadow: 0 1px 10px 1px var(--bg-shadow-1);
-		backdrop-filter: blur(15px);
+		backdrop-filter: var(--nav-backdrop-filter);
 		background: var(--nav-background);
 		border: 1px solid var(--bg-soft-glass-3);
+		border-bottom-width: 2px;
+		border-left-color: var(--bg-soft-glass-1);
 		border-radius: 2em;
+		border-right-color: var(--bg-soft-glass-1);
+		border-top-color: var(--bg-soft-glass-1);
+		border-top-width: 2px;
 		box-shadow: var(--nav-box-shadow);
-		margin: 0.75em 0.25em 0.25em;
+		margin: 0.25em;
 		position: fixed;
 		top: 0;
 		width: calc(100% - 0.5em);
 		z-index: 120;
 
+		@media screen and (max-width: 960px) {
+			margin-top: 0.75em;
+		}
 		@media screen and (min-width: 960px) {
 			backdrop-filter: none;
 			background: none;
@@ -57,14 +66,22 @@ app-shell.class {
 			margin: 0;
 			padding: 1em;
 			width: 100%;
-			> nav > left-side,
-			> nav > right-side {
-				backdrop-filter: blur(15px);
-				background: var(--nav-background);
-				border: 1px solid var(--bg-soft-glass-3);
-				border-radius: 2em;
-				box-shadow: var(--nav-box-shadow);
-				padding: 0 20px;
+			> nav {
+				gap: 20px;
+				> left-side,
+				> right-side {
+					backdrop-filter: var(--nav-backdrop-filter);
+					background: var(--nav-background);
+					border: 1px solid var(--bg-soft-glass-3);
+					border-bottom-width: 2px;
+					border-left-color: var(--bg-soft-glass-1);
+					border-radius: 2em;
+					border-right-color: var(--bg-soft-glass-1);
+					border-top-color: var(--bg-soft-glass-1);
+					border-top-width: 2px;
+					box-shadow: var(--nav-box-shadow);
+					padding: 0 20px;
+				}
 			}
 		}
 
@@ -83,10 +100,12 @@ app-shell.class {
 				gap: 16px;
 				height: 100%;
 				> a {
+					align-content: center;
 					align-items: center;
 					display: inline-flex;
 					font-family: Theia;
 					height: 100%;
+					padding-bottom: 1px;
 				}
 			}
 			> left-side {
@@ -142,6 +161,7 @@ app-shell.class {
 			display: flex;
 			justify-content: center;
 			left: 0;
+			line-height: 27px;
 			pointer-events: none;
 			position: absolute;
 			top: -33px;
@@ -149,12 +169,25 @@ app-shell.class {
 			width: calc(100% - 0.5em);
 			z-index: 130;
 			> span {
+				align-items: flex-end;
+				backdrop-filter: blur(15px);
 				background: var(--bg-soft-glass-1);
 				border-radius: 10px;
 				box-shadow: 0 1px 10px 1px var(--bg-shadow-1);
 				color: var(--fg-soft-3);
+				display: flex;
 				font-size: 15px;
+				font-weight: 600;
 				padding: 2px 12px;
+			}
+
+			@media screen and (min-width: 960px) {
+				top: -29px;
+				> span {
+					backdrop-filter: none;
+					background: none;
+					box-shadow: none;
+				}
 			}
 		}
 	}
