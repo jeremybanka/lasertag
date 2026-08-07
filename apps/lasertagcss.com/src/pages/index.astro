@@ -1,5 +1,6 @@
 ---
-import lasertagIconUrl from "../../../../packages/lasertag/assets/logos/LasertagIcon.svg?url"
+import lasertagIconBlackUrl from "../../../../packages/lasertag/assets/logos/LasertagIconBlack.svg?url"
+import lasertagIconWhiteUrl from "../../../../packages/lasertag/assets/logos/LasertagIconWhite.svg?url"
 
 import Layout from "../layouts/Layout.astro"
 import css from "./index.module.css"
@@ -29,7 +30,13 @@ import css from "./index.module.css"
 				</hero-copy>
 
 				<hero-mark aria-hidden="true">
-					<img src={lasertagIconUrl} alt="" />
+					<picture>
+						<source
+							media="(prefers-color-scheme: light)"
+							srcset={lasertagIconWhiteUrl}
+						/>
+						<img src={lasertagIconBlackUrl} alt="" />
+					</picture>
 					<samp><span>✓</span> No dead CSS found.</samp>
 				</hero-mark>
 			</hero-grid>

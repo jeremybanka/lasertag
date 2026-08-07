@@ -3,7 +3,8 @@ import { ClientRouter } from "astro:transitions"
 import packageJson from "lasertag/package.json"
 
 import lasertagIconPngUrl from "../../../../packages/lasertag/assets/logos/LasertagIcon.png?url"
-import lasertagIconUrl from "../../../../packages/lasertag/assets/logos/LasertagIcon.svg?url"
+import lasertagIconBlackUrl from "../../../../packages/lasertag/assets/logos/LasertagIconBlack.svg?url"
+import lasertagIconWhiteUrl from "../../../../packages/lasertag/assets/logos/LasertagIconWhite.svg?url"
 import GlobalEffects from "../components/GlobalEffects.astro"
 import "../globals.css"
 import css from "./Layout.module.css"
@@ -24,7 +25,18 @@ const canonicalUrl = new URL(Astro.url.pathname, `https://lasertagcss.com`)
 	<head>
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width" />
-		<link rel="icon" type="image/svg+xml" href={lasertagIconUrl} />
+		<link
+			rel="icon"
+			type="image/svg+xml"
+			href={lasertagIconBlackUrl}
+			media="(prefers-color-scheme: dark)"
+		/>
+		<link
+			rel="icon"
+			type="image/svg+xml"
+			href={lasertagIconWhiteUrl}
+			media="(prefers-color-scheme: light)"
+		/>
 		<link rel="apple-touch-icon" href={lasertagIconPngUrl} />
 		<link rel="canonical" href={canonicalUrl} />
 		<meta name="theme-color" content="#767676" />
@@ -45,7 +57,13 @@ const canonicalUrl = new URL(Astro.url.pathname, `https://lasertagcss.com`)
 				<nav>
 					<left-side>
 						<a href="/">
-							<img src={lasertagIconUrl} alt="" transition:persist />
+							<picture transition:persist>
+								<source
+									media="(prefers-color-scheme: light)"
+									srcset={lasertagIconWhiteUrl}
+								/>
+								<img src={lasertagIconBlackUrl} alt="" />
+							</picture>
 							<brand-name>lasertagcss</brand-name>.com
 						</a>
 					</left-side>

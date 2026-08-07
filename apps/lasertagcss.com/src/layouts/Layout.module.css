@@ -93,11 +93,14 @@ app-shell.class {
 				padding-left: 20px;
 				> a {
 					margin-left: -10px;
-					> img {
-						border-radius: 22%;
-						height: 40px;
-						margin-right: 6px;
-						width: 40px;
+					> picture {
+						display: flex;
+						> img {
+							border-radius: 22%;
+							height: 40px;
+							margin-right: 6px;
+							width: 40px;
+						}
 					}
 					> brand-name {
 						color: var(--brand-color);
