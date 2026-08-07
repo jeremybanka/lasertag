@@ -14,6 +14,7 @@
 		"currentcolor",
 		"Deque",
 		"Deques",
+		"esbuild",
 		"frontmatter",
 		"greyscale",
 		"HTMX",
@@ -35,6 +36,7 @@
 		"prismjs",
 		"quasis",
 		"rebeccapurple",
+		"renderable",
 		"reparsing",
 		"seagreen",
 		"selectedcontent",
@@ -43,10 +45,13 @@
 		"Takua",
 		"treetrunks",
 		"tsgolint",
+		"unasserted",
+		"Uruz",
 		"vite",
 		"viteplus",
 		"vitest",
 		"voidzero",
-		"wordmark"
+		"wordmark",
+		"workerd"
 	]
 }
