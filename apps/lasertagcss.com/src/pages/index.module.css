@@ -109,7 +109,7 @@ home-splash.class {
 					justify-self: end;
 				}
 
-				> img {
+				> picture > img {
 					display: block;
 					height: clamp(120px, 17vw, 210px);
 					width: clamp(120px, 17vw, 210px);
