@@ -36,19 +36,6 @@ app-shell.class {
 	}
 
 	> header {
-		--nav-background: var(--bg-soft-glass-1);
-		--nav-backdrop-filter: blur(15px);
-		--nav-box-shadow: 0 1px 10px 1px var(--bg-shadow-1);
-		backdrop-filter: var(--nav-backdrop-filter);
-		background: var(--nav-background);
-		border: 1px solid var(--bg-soft-glass-3);
-		border-bottom-width: 2px;
-		border-left-color: var(--bg-soft-glass-1);
-		border-radius: 2em;
-		border-right-color: var(--bg-soft-glass-1);
-		border-top-color: var(--bg-soft-glass-1);
-		border-top-width: 2px;
-		box-shadow: var(--nav-box-shadow);
 		margin: 0.25em;
 		position: fixed;
 		top: 0;
@@ -59,29 +46,11 @@ app-shell.class {
 			margin-top: 0.75em;
 		}
 		@media screen and (min-width: 960px) {
-			backdrop-filter: none;
-			background: none;
-			border: none;
-			box-shadow: none;
 			margin: 0;
 			padding: 1em;
 			width: 100%;
 			> nav {
 				gap: 20px;
-				> left-side,
-				> right-side {
-					backdrop-filter: var(--nav-backdrop-filter);
-					background: var(--nav-background);
-					border: 1px solid var(--bg-soft-glass-3);
-					border-bottom-width: 2px;
-					border-left-color: var(--bg-soft-glass-1);
-					border-radius: 2em;
-					border-right-color: var(--bg-soft-glass-1);
-					border-top-color: var(--bg-soft-glass-1);
-					border-top-width: 2px;
-					box-shadow: var(--nav-box-shadow);
-					padding: 0 20px;
-				}
 			}
 		}
 
@@ -92,49 +61,6 @@ app-shell.class {
 			height: 50px;
 			> gap-between {
 				flex-grow: 1;
-			}
-			> left-side,
-			> right-side {
-				align-items: center;
-				display: flex;
-				gap: 16px;
-				height: 100%;
-				> a {
-					align-content: center;
-					align-items: center;
-					display: inline-flex;
-					font-family: Theia;
-					height: 100%;
-					padding-bottom: 1px;
-				}
-			}
-			> left-side {
-				padding-left: 20px;
-				> a {
-					margin-left: -10px;
-					> picture {
-						display: flex;
-						> img {
-							border-radius: 22%;
-							height: 40px;
-							margin-right: 6px;
-							width: 40px;
-						}
-					}
-					> brand-name {
-						color: var(--brand-color);
-						font-family: Theia;
-					}
-				}
-			}
-			> right-side {
-				justify-content: flex-end;
-				padding-right: 20px;
-				> span {
-					background: var(--bg-soft-glass-3);
-					height: 100%;
-					width: 1px;
-				}
 			}
 		}
 	}
@@ -150,7 +76,7 @@ app-shell.class {
 			display: contents;
 		}
 		&::before {
-			background: url("/noise.svg") repeat center / 1024px;
+			background: url("/noise.svg") repeat center / 512px;
 			content: "";
 			inset: 0;
 			mix-blend-mode: soft-light;
@@ -172,7 +98,6 @@ app-shell.class {
 				align-items: flex-end;
 				backdrop-filter: blur(15px);
 				background: var(--bg-soft-glass-1);
-				border-radius: 10px;
 				box-shadow: 0 1px 10px 1px var(--bg-shadow-1);
 				color: var(--fg-soft-3);
 				display: flex;
