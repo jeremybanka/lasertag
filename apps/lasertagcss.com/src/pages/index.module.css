@@ -80,7 +80,6 @@ home-splash.class {
 					> a:first-of-type {
 						background: var(--fg-color);
 						border: 1px solid var(--fg-color);
-						border-radius: 3px;
 						color: var(--bg-color);
 						gap: 18px;
 						padding: 11px 16px;

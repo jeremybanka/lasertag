@@ -86,7 +86,6 @@ docs-layout.class {
 			> a {
 				background: var(--bg-soft-glass-1);
 				border: 1px solid var(--bg-soft-glass-3);
-				border-radius: 14px;
 				display: flex;
 				flex-flow: column;
 				gap: 8px;
@@ -113,7 +112,6 @@ docs-layout.class {
 		blockquote {
 			background: var(--bg-soft-glass-1);
 			border-left: 4px solid var(--brand-color);
-			border-radius: 4px 12px 12px 4px;
 			padding: 16px 18px;
 			width: min(690px, calc(100svw - 30px));
 

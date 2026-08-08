@@ -1,0 +1,67 @@
+responsive-nav-panel.class {
+	align-items: center;
+	backdrop-filter: blur(15px);
+	background: color-mix(in srgb, var(--fg-color) 14%, transparent);
+	display: flex;
+	filter: drop-shadow(0 4px 8px var(--bg-shadow-1));
+	flex-shrink: 0;
+	gap: 10px;
+	height: 100%;
+	padding: 0 12px;
+	position: relative;
+
+	/* @lasertag-disable [selector-crosses-ownership-boundary] The panel owns the presentation contract for its slotted navigation content. */
+	> svg {
+		pointer-events: none;
+		position: absolute;
+	}
+	> a {
+		align-content: center;
+		align-items: center;
+		display: inline-flex;
+		font-family: Theia;
+		height: 100%;
+		padding-bottom: 1px;
+	}
+
+	&[data-side="left"] {
+		> a {
+			margin-left: -4px;
+			> picture {
+				display: flex;
+				> img {
+					height: 36px;
+					margin-right: 4px;
+					width: 36px;
+				}
+			}
+			> brand-name {
+				color: var(--brand-color);
+				font-family: Theia;
+			}
+		}
+	}
+	&[data-side="right"] {
+		justify-content: flex-end;
+		> span {
+			background: color-mix(in srgb, var(--fg-color) 24%, transparent);
+			height: 100%;
+			width: 1px;
+		}
+	}
+	@media screen and (min-width: 960px) {
+		gap: 16px;
+		padding: 0 20px;
+
+		&[data-side="left"] > a {
+			margin-left: -10px;
+
+			> picture > img {
+				height: 40px;
+				margin-right: 6px;
+				width: 40px;
+			}
+		}
+	}
+	/* @lasertag-enable [selector-crosses-ownership-boundary] */
+}
