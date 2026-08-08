@@ -76,7 +76,7 @@
 		"@typescript-eslint/parser": "8.66.0",
 		"@typescript-eslint/utils": "8.66.0",
 		"@types/estree": "1.0.9",
-		"@types/node": "26.1.2",
+		"@types/node": "26.2.0",
 		"@types/react": "19.2.18",
 		"eslint": "10.8.0",
 		"jiti": "2.7.0",
