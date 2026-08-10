@@ -395,14 +395,12 @@ export function createRenderStoryView(
 	)
 	const possibilities = materialized
 		.slice(0, MAX_RENDER_STORY_POSSIBILITIES)
-		.map(
-			(roots): RenderStoryViewPossibility => ({
-				roots: styles.reduce(
-					(viewRoots, style) => insertUnreachableStyle(viewRoots, roots, style),
-					roots.map((root) => createViewNode(root, [], options)),
-				),
-			}),
-		)
+		.map((roots): RenderStoryViewPossibility => ({
+			roots: styles.reduce(
+				(viewRoots, style) => insertUnreachableStyle(viewRoots, roots, style),
+				roots.map((root) => createViewNode(root, [], options)),
+			),
+		}))
 
 	return {
 		componentName: options.renderStory.componentName,
