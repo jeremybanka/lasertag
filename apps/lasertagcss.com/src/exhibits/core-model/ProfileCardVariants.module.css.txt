@@ -1,0 +1,8 @@
+profile-card.class {
+	> header > user-identity > strong {}
+	> footer > button:hover {}
+
+	&[data-density="compact"] {}
+
+	@media (width < 40rem) {}
+}

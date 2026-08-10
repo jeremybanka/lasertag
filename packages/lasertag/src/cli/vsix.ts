@@ -367,11 +367,11 @@ export async function buildLasertagVsix(
 	await mkdir(packageDist, { recursive: true })
 	await bundleVscodeRuntime(packageRoot, packageDist)
 	await cp(
-		path.join(packageRoot, "src", "vscode", "LasertagIcon.png"),
+		path.join(packageRoot, "assets", "logos", "LasertagIcon.png"),
 		path.join(packageDist, "LasertagIcon.png"),
 	)
 	await cp(
-		path.join(packageRoot, "src", "vscode", "LasertagActivity.svg"),
+		path.join(packageRoot, "assets", "logos", "LasertagActivity.svg"),
 		path.join(packageDist, "LasertagActivity.svg"),
 	)
 	await cp(

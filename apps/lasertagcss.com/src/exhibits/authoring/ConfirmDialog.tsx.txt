@@ -1,0 +1,5 @@
+<confirm-dialog className={css.class}>
+	<header><h2>Delete project?</h2></header>
+	<main><p>This cannot be undone.</p></main>
+	<footer><button type="button">Cancel</button></footer>
+</confirm-dialog>

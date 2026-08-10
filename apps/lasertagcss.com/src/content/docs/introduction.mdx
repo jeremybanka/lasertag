@@ -1,0 +1,108 @@
+import Exhibit from "c/Exhibit.astro";
+
+# understand lasertag
+
+<doc-lead>
+  Lasertag is structural CSS for people (and robots) who love CSS. It keeps
+  ordinary CSS Modules, then adds enough convention for tools to prove which
+  component owns a selector and whether that selector can match.
+</doc-lead>
+
+More formally, Lasertag is a **statically enforced subset of CSS Modules**.
+Anything that supports CSS Modules can support Lasertag. There is no runtime,
+runtime stylesheet, proprietary file format, or replacement for CSS.
+
+<doc-cards>
+  <a href="/docs/getting-started">
+    <strong>Build your first component</strong>
+    <span>Install Lasertag and reach a clean check in a few minutes.</span>
+  </a>
+  <a href="/docs/core-model">
+    <strong>Learn the model</strong>
+    <span>See how one class, owned DOM, and semantic tags fit together.</span>
+  </a>
+  <a href="/docs/diagnostics">
+    <strong>Understand a warning</strong>
+    <span>Look up every diagnostic and the safest way to respond.</span>
+  </a>
+  <a href="/docs/how-it-works">
+    <strong>Go under the hood</strong>
+    <span>Follow JSX through render stories and reachability analysis.</span>
+  </a>
+</doc-cards>
+
+## the whole idea in two files
+
+A component owns one same-named CSS Module. The component renders a root tag
+named after itself and attaches the module's only exported class.
+
+<Exhibit src="getting-started/ProfileCard.tsx" />
+
+The stylesheet mirrors the component's owned DOM with nested tag selectors.
+
+<Exhibit src="getting-started/ProfileCard.module.css" />
+
+That is still a normal CSS Module. Lasertag simply makes the relationship
+between the two files explicit enough to inspect statically.
+
+## what you get
+
+### local reasoning
+
+The component, its DOM vocabulary, and its visual rules live together. A change
+to `profile-card > footer > button` has an intentionally small blast radius,
+and the source of that DOM is easy to locate.
+
+### ordinary CSS
+
+Use properties, selectors, nesting, media queries, pseudo-classes, custom
+properties, and the platform features you already know. Lasertag constrains
+ownership and structure, not visual expression.
+
+### semantic markup
+
+Reach for `article`, `nav`, `label`, `button`, `output`, and the rest of HTML
+first. When HTML has no precise word for a local structural role, use a
+descriptive hyphenated tag such as `user-identity` or `action-row`. Lasertag
+does not allow the anonymous fallback of `<div>`.
+
+### continuous dead-code detection
+
+Lasertag compares selectors with every render path it can prove. If no supported
+path can produce a selector, `lasertag check` fails locally and in CI. Expected
+runtime-generated DOM can be documented with checked suppression directives;
+stale suppressions become diagnostics too.
+
+### inspectability for people and robots
+
+Component-named roots and local structural tags survive into the DOM. Inspect
+Element points to a vocabulary shared by JSX and CSS instead of an undifferentiated
+sea of wrappers. The same reduction in ambiguity helps coding agents reason
+about behavior without loading an unrelated styling system into every task.
+
+## why not utilities?
+
+Utility CSS couples visual decisions to the render tree. Lasertag takes the
+opposite position: JSX describes what the interface _is_; CSS describes how that
+structure looks. The coupling is structural and checked, but visual details stay
+out of logical code.
+
+This is not an argument that everyone should prefer Lasertag. It is for teams
+that want to keep the expressive power of CSS while making component styles
+maintainable, searchable, and mechanically accountable.
+
+| If you value…           | Lasertag's answer                                           |
+| ----------------------- | ----------------------------------------------------------- |
+| CSS as a language       | Keep CSS Modules and the cascade inside an explicit owner.  |
+| predictable changes     | Give each component one structural styling dimension.       |
+| readable DOM            | Use semantic HTML and meaningful local custom tags.         |
+| static tooling          | Analyze source and selectors without shipping a runtime.    |
+| AI-assisted maintenance | Separate logical markup from visual implementation details. |
+
+## choose your next step
+
+- New to Lasertag? Continue to [getting started](/docs/getting-started).
+- Converting an existing component? Read [authoring components](/docs/authoring).
+- Composing children or third-party components? Read
+  [composition and ownership](/docs/composition).
+- Evaluating the guarantees? Read [how it works](/docs/how-it-works).

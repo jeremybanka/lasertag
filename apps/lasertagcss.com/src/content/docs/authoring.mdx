@@ -1,0 +1,160 @@
+import Exhibit from "c/Exhibit.astro";
+
+# authoring components
+
+<doc-lead>
+  Start from meaning, name the remaining structure, and let nested CSS follow
+  the result. This guide covers the conventions Lasertag's ESLint rules enforce.
+</doc-lead>
+
+## pair files exactly
+
+The component and stylesheet share a directory and stem:
+
+<Exhibit src="authoring/valid-pairs.txt" label="valid pairs" />
+
+Lasertag does not pair `.jsx` files, `index.tsx`, or a stylesheet with a
+differently named source file. Exact names make discovery deterministic for the
+CLI, editor, and people.
+
+## import only your own module
+
+A component module imports its sibling stylesheet and names the default binding
+`css`:
+
+<Exhibit src="authoring/owned-import.ts.txt" label="the owned import" />
+
+Do not reach into another component's CSS Module or collect several component
+styles in one source file. Shared values belong in custom properties or a small
+global foundation; shared visual components remain components.
+
+## export the component the file names
+
+`AppHeaderBar.tsx` exports `AppHeaderBar`. Avoid unrelated exported values or
+additional exported components from that module. Private types, constants, and
+small local helpers are fine.
+
+Exported component names contain multiple words, ensuring the kebab-case DOM
+name is a valid custom-element name:
+
+| Component            | Root                      |
+| -------------------- | ------------------------- |
+| `AppHeaderBar`       | `<app-header-bar>`        |
+| `ProjectList`        | `<project-list>`          |
+| `OAuthCallbackPanel` | `<o-auth-callback-panel>` |
+
+The ESLint rule is the source of truth for acronym casing and reports the exact
+root it expects.
+
+## attach one class to the owned root
+
+Access only `css.class`, and attach it to the outer component-named tag on every
+return path.
+
+<Exhibit src="getting-started/AppHeaderBar.tsx" />
+
+Avoid computed access, destructuring several class names, conditional class maps,
+or attaching `css.class` below an unrelated wrapper. Attributes and native state
+are better tools for variants:
+
+<Exhibit src="authoring/SaveButton.tsx.txt" label="state stays structural" />
+
+## write the root selector
+
+The stylesheet contains one top-level ruleset joining the root tag and `.class`:
+
+<Exhibit src="getting-started/AppHeaderBar.module.css" />
+
+Declarations on the root style the exported component. Nested direct-child
+selectors describe owned descendants. Media rules, container rules, keyframes,
+custom properties, pseudo-classes, pseudo-elements, and attribute refinements
+remain ordinary CSS.
+
+## prefer direct-child structure
+
+Use `>` when the JSX relationship is direct. It documents the render tree and
+keeps selectors from accidentally reaching into a boundary deeper down.
+
+<Exhibit
+  src="authoring/ProjectList.module.css.txt"
+  label="structural nesting"
+/>
+
+Descendant and universal selectors are allowed when the component owns every
+matching branch, but they deserve more scrutiny. The wider the selector, the
+more likely it crosses into `children` or an imported component.
+
+## use HTML's vocabulary
+
+Choose tags in this order:
+
+1. a native element with the correct semantics or behavior;
+2. a descriptive, highly local hyphenated structural tag; or
+3. a component extracted because the region has independent behavior,
+   ownership, or reuse.
+
+Do not use `<div>`. The ban forces a useful decision instead of allowing
+structure to remain unnamed.
+
+### native controls are already components
+
+Prefer `button`, `input`, `select`, `textarea`, `details`, `summary`, and
+`dialog` to custom clickable wrappers. They bring keyboard behavior,
+accessibility semantics, forms integration, and browser affordances.
+
+### do not add wrappers mechanically
+
+A wrapper should identify a meaningful layout boundary, repeated item, media
+frame, form control, or structural role. A single-child wrapper that contributes
+nothing is still noise even when it has a clever name.
+
+## group header, main, and footer
+
+These elements gain local meaning as a sibling group. If one appears under a
+parent, include at least one of the others and do not mix unrelated element
+children into that group.
+
+<Exhibit
+  src="authoring/ConfirmDialog.tsx.txt"
+  label="a meaningful three-part group"
+/>
+
+`header` plus `main`, `main` plus `footer`, and `header` plus `footer` are also
+valid. The grouping rule catches a common failure mode where generic wrappers
+are merely renamed without improving structure.
+
+## model variants without extra local classes
+
+Use component props to produce attributes and meaningful DOM states:
+
+<Exhibit
+  src="authoring/AlertBanner.module.css.txt"
+  label="variants and interaction"
+/>
+
+If a variant changes the structure, render that structure. Refractor analyzes
+supported conditional paths; CSS can target elements present in any real path.
+
+## keep globals small
+
+Use `globals.css` for resets, fonts, inherited form behavior, document colors,
+and a compact semantic token palette. Keep component layout, spacing, borders,
+shadows, and local typography in the owning module.
+
+Lasertag ships `lasertag/templates/globals.css` as a dark-default starting point.
+Treat it as a template, not a required design system.
+
+## refactoring workflow
+
+When converting an existing component:
+
+1. add the component-named root and attach `css.class`;
+2. replace useful native structure before inventing custom tags;
+3. name the remaining local layout roles;
+4. collapse local classes into the structural tree;
+5. stop selectors at imported components and caller-supplied content;
+6. run ESLint, then `lasertag check`; and
+7. inspect the DOM once to confirm the vocabulary is genuinely helpful.
+
+Composition is where ownership becomes most important. Continue with
+[composition and ownership](/docs/composition).

@@ -1,0 +1,159 @@
+import Exhibit from "c/Exhibit.astro";
+
+# composition & ownership
+
+<doc-lead>
+  A component may arrange another component, but it does not own that
+  component's private DOM. Lasertag turns this maintenance boundary into a
+  selector rule.
+</doc-lead>
+
+## what a component owns
+
+Owned DOM is structure written in the component's source file beneath the node
+carrying `css.class`. Local components whose implementations can be expanded
+may contribute owned structure too.
+
+Ownership becomes foreign or opaque at:
+
+- an imported component;
+- `{children}`;
+- a render prop or callback-produced subtree;
+- an Astro `<slot />`;
+- injected HTML; or
+- an expression Refractor cannot safely reduce.
+
+This is intentionally different from _reachability_. A selector can match some
+locally owned DOM and still be unsafe because another path lets it enter foreign
+DOM.
+
+## stop at the boundary
+
+Consider a panel that owns its regions but receives main content and imports its
+actions:
+
+<Exhibit src="composition/AccountPanel.tsx.txt" />
+
+The parent can style the regions it renders:
+
+<Exhibit src="composition/AccountPanel.module.css.txt" />
+
+It should not style paragraphs supplied through `children` or buttons rendered
+inside `AccountActions`:
+
+<Exhibit
+  src="composition/CrossingTheBoundary.module.css.txt"
+  label="selectors that cross ownership"
+  soft
+/>
+
+Those dependencies are invisible in the parent's public API. A harmless markup
+change inside the child can break the parent, and the same selector may
+accidentally style several unrelated descendants.
+
+## ways to compose safely
+
+### style the containing region
+
+Size, position, or decorate the element you own around the foreign content.
+Grid and flex layout often need only the child slot, not the child's internals.
+
+### give the child a real API
+
+If a parent needs to affect appearance, pass a semantic prop such as `density`,
+`tone`, `placement`, or `emphasis`. The child decides how that state maps to its
+DOM and CSS.
+
+### use inherited values intentionally
+
+Typography, color, and custom properties can cross component boundaries through
+the cascade without selectors reaching into private DOM. Document custom
+properties that form a component theming API.
+
+### extract shared ownership
+
+If two components truly need to coordinate the same internal structure, the
+boundary may be wrong. Extract a component that owns the complete visual unit or
+move the relevant DOM into the owner of the stylesheet.
+
+## direct children can still be foreign
+
+`>` does not automatically make a selector safe. If an imported component
+renders a root `<button>`, then `> button` can match that foreign root.
+
+When Lasertag resolves the implementation, it reports
+`selector-matches-foreign-component-root`. When it cannot prove the root, it
+reports `opaque-component-root-may-collide` if the unknown component might
+produce the selected tag.
+
+This distinction keeps warnings actionable:
+
+- a **verified foreign root** tells you what the dependency actually renders;
+- an **opaque collision** tells you the selector relies on a root Lasertag cannot
+  verify; and
+- **crosses ownership boundary** tells you the selector continues below foreign
+  content.
+
+## assert a stable intrinsic root
+
+Some third-party components intentionally guarantee a native root—an icon that
+always renders `svg`, for example. A JSX member expression can assert that root
+at the call site by naming the namespace after the intrinsic tag:
+
+<Exhibit src="composition/IntrinsicRootAssertion.tsx.txt" />
+
+Then the stylesheet may stop at the asserted root:
+
+<Exhibit
+  src="composition/CommandSearch.module.css.txt"
+  label="using the asserted root"
+/>
+
+The assertion is unchecked: Refractor trusts the namespace and does not inspect
+its value. Use standard HTML or SVG tag names only when the external component's
+contract is genuinely stable.
+
+## branches are path-sensitive
+
+An imported component in one branch does not taint a separate, fully owned
+branch. Lasertag considers each supported render possibility and each selector
+path independently.
+
+Likewise, a broad selector can be reachable locally and still warn about a
+foreign branch. The question is not merely “can this match?” but also “can this
+match DOM this module does not own?”
+
+## portals are outside the story
+
+Recognized portal-style rendering is excluded from a component's descendant
+story because the output lives elsewhere in the document. Give the portaled
+content its own component and stylesheet instead of pretending it is a
+descendant of the trigger.
+
+## runtime-created DOM
+
+Canvas libraries, rich-text editors, maps, and other runtimes may create DOM that
+does not exist in JSX. If the component legitimately owns that DOM, document the
+exception next to the selector:
+
+<Exhibit
+  src="diagnostics/ExpectedRuntimeDom.module.css.txt"
+  label="a checked exception"
+/>
+
+The explanation is required. When the selector becomes reachable or disappears,
+the directive becomes `unused-expect-error`, so exceptions cannot silently rot.
+
+For several runtime-owned selectors, use a diagnostic-scoped disable region.
+See the [diagnostics reference](/docs/diagnostics) for exact syntax.
+
+## review questions
+
+When an ownership warning appears, ask:
+
+1. Did this component render the selected element itself?
+2. Can I style the owned containing region instead?
+3. Is inherited state or a custom property the real contract?
+4. Should the child expose a semantic prop?
+5. Is the boundary wrong enough that the DOM should move?
+6. Is this truly runtime-created DOM that deserves a documented exception?

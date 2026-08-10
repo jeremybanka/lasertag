@@ -1,0 +1,35 @@
+<script>
+const effectsKey = `__lasertagGlobalEffectsInstalled`
+const effectsGlobal = globalThis as typeof globalThis &
+	Record<string, boolean | undefined>
+
+function updateThemeColor(): void {
+	const themeColor = getComputedStyle(document.documentElement)
+		.getPropertyValue(`--bg-color`)
+		.trim()
+	document
+		.querySelector(`meta[name="theme-color"]`)
+		?.setAttribute(`content`, themeColor)
+}
+
+async function copyCodeBlock(button: HTMLButtonElement): Promise<void> {
+	const code = button.closest(`code-block`)?.querySelector(`pre code`)?.textContent
+	if (code !== undefined) await navigator.clipboard.writeText(code)
+}
+
+if (!effectsGlobal[effectsKey]) {
+	effectsGlobal[effectsKey] = true
+	matchMedia(`(prefers-color-scheme: dark)`).addEventListener(
+		`change`,
+		updateThemeColor,
+	)
+	document.addEventListener(`click`, (event) => {
+		if (!(event.target instanceof Element)) return
+		const button = event.target.closest(`code-block > file-name > button`)
+		if (button instanceof HTMLButtonElement) void copyCodeBlock(button)
+	})
+	document.addEventListener(`astro:page-load`, updateThemeColor)
+}
+
+updateThemeColor()
+</script>

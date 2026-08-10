@@ -1,9 +1,11 @@
 node_modules/
 dist/
 artifacts/
+.astro/
 .mise/
 .pnpm-home/
 .pnpm-store/
+.wrangler/
 .xdg-data/
 .mise.local.toml
 .env
@@ -15,4 +17,3 @@ packages/lasertag-vscode/server/
 
 .lasertag-vsix/
 Lasertag.vsix
-

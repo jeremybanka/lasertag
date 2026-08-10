@@ -1,0 +1,72 @@
+---
+import lasertagIconBlackUrl from "../../../../packages/lasertag/assets/logos/LasertagIconBlack.svg?url"
+import lasertagIconWhiteUrl from "../../../../packages/lasertag/assets/logos/LasertagIconWhite.svg?url"
+
+import Layout from "../layouts/Layout.astro"
+import css from "./index.module.css"
+---
+
+<Layout>
+	<home-splash class={css.class}>
+		<section aria-labelledby="home-title">
+			<hero-kicker>
+				<span aria-hidden="true"></span>
+				A statically enforced subset of CSS Modules
+			</hero-kicker>
+
+			<hero-grid>
+				<hero-copy>
+					<h1 id="home-title">CSS you can maintain.</h1>
+					<p>
+						Keep visual details in CSS, logical structure in components, and
+						the relationship between them statically verifiable.
+					</p>
+					<nav aria-label="Get started with Lasertag">
+						<a href="/docs/getting-started">
+							Start building <span aria-hidden="true">→</span>
+						</a>
+						<a href="/docs/core-model">See how it works</a>
+					</nav>
+				</hero-copy>
+
+				<hero-mark aria-hidden="true">
+					<picture>
+						<source
+							media="(prefers-color-scheme: light)"
+							srcset={lasertagIconWhiteUrl}
+						/>
+						<img src={lasertagIconBlackUrl} alt="" />
+					</picture>
+					<samp><span>✓</span> No dead CSS found.</samp>
+				</hero-mark>
+			</hero-grid>
+
+			<ul aria-label="Lasertag at a glance">
+				<li><strong>Zero</strong><span>runtime</span></li>
+				<li><strong>Native</strong><span>CSS Modules</span></li>
+				<li><strong>Semantic</strong><span>markup</span></li>
+				<li><strong>Static</strong><span>dead-code detection</span></li>
+			</ul>
+		</section>
+
+		<section aria-labelledby="agent-report-title">
+			<quote-context>
+				<p>Field report</p>
+				<span>21 warnings → 0 dead selectors</span>
+			</quote-context>
+			<quote-copy>
+				<h2 id="agent-report-title">Strict enough for robots.</h2>
+				<blockquote>
+					“Lasertag taught me its convention the hard way. My first pass had
+					21 warnings, so I restructured around semantic custom elements.
+					Now: <em>no dead CSS found.</em> That’s a genuinely invasive
+					convention, exactly as advertised.”
+				</blockquote>
+				<cite>
+					An AI coding agent, after independently restructuring a real
+					component to satisfy Lasertag
+				</cite>
+			</quote-copy>
+		</section>
+	</home-splash>
+</Layout>

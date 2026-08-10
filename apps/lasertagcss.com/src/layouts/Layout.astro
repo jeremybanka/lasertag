@@ -1,0 +1,96 @@
+---
+import { ClientRouter } from "astro:transitions"
+import packageJson from "lasertag/package.json"
+
+import lasertagIconPngUrl from "../../../../packages/lasertag/assets/logos/LasertagIcon.png?url"
+import lasertagIconBlackUrl from "../../../../packages/lasertag/assets/logos/LasertagIconBlack.svg?url"
+import lasertagIconWhiteUrl from "../../../../packages/lasertag/assets/logos/LasertagIconWhite.svg?url"
+import GlobalEffects from "../components/GlobalEffects.astro"
+import { ResponsiveNavPanel } from "../components/ResponsiveNavPanel"
+import "../globals.css"
+import css from "./Layout.module.css"
+
+type Props = {
+	description?: string
+	title?: string
+}
+
+const {
+	description = `Lasertag is structural CSS for people (and robots) who love CSS. ${packageJson.description}.`,
+	title = `lasertag | structural CSS`,
+} = Astro.props
+const canonicalUrl = new URL(Astro.url.pathname, `https://lasertagcss.com`)
+---
+
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width" />
+		<link
+			rel="icon"
+			type="image/svg+xml"
+			href={lasertagIconBlackUrl}
+			media="(prefers-color-scheme: dark)"
+		/>
+		<link
+			rel="icon"
+			type="image/svg+xml"
+			href={lasertagIconWhiteUrl}
+			media="(prefers-color-scheme: light)"
+		/>
+		<link rel="apple-touch-icon" href={lasertagIconPngUrl} />
+		<link rel="canonical" href={canonicalUrl} />
+		<meta name="theme-color" content="#767676" />
+		<meta name="description" content={description} />
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content="Lasertag" />
+		<meta property="og:title" content={title} />
+		<meta property="og:description" content={description} />
+		<meta property="og:url" content={canonicalUrl} />
+		<meta name="twitter:card" content="summary" />
+		<meta name="generator" content={Astro.generator} />
+		<title>{title}</title>
+		<ClientRouter />
+	</head>
+	<body>
+		<app-shell class={css.class}>
+			<header>
+				<nav>
+					<ResponsiveNavPanel side="left" client:load>
+						<a href="/">
+							<picture transition:persist>
+								<source
+									media="(prefers-color-scheme: light)"
+									srcset={lasertagIconWhiteUrl}
+								/>
+								<img src={lasertagIconBlackUrl} alt="" />
+							</picture>
+							<brand-name>lasertagcss</brand-name>.com
+						</a>
+					</ResponsiveNavPanel>
+					<gap-between />
+					<ResponsiveNavPanel side="right" client:load>
+						<a href="/docs">docs</a>
+						<span />
+						<a href="https://github.com/jeremybanka/lasertag">github</a>
+					</ResponsiveNavPanel>
+				</nav>
+			</header>
+
+			<main>
+				<banner-message><span>🕊️ Free Palestine 🇵🇸</span></banner-message>
+				<page-content><slot /></page-content>
+			</main>
+
+			<footer>
+				<span>
+					<a href="https://www.npmjs.com/package/lasertag">
+						<code>{packageJson.version}</code>
+					</a>
+				</span>
+				<span>♥️ <a href="https://github.com/jeremybanka">jeremybanka</a></span>
+			</footer>
+		</app-shell>
+		<GlobalEffects />
+	</body>
+</html>

@@ -1,5 +1,5 @@
 <div align="left">
-  <img alt="lasertag logo" src="https://raw.githubusercontent.com/jeremybanka/lasertag/main/LasertagWordmark.png" width="600" height="150">
+  <img alt="lasertag logo" src="packages/lasertag/assets/logos/LasertagWordmark.svg" width="600" height="150">
 </div>
 
 Workspace for the Lasertag CSS package.

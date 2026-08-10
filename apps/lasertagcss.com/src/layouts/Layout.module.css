@@ -1,0 +1,133 @@
+app-shell.class {
+	display: flex;
+	flex-flow: column;
+	height: auto;
+	min-height: 100vh;
+	overflow-x: hidden;
+	position: relative;
+
+	/* @lasertag-disable [selector-crosses-ownership-boundary] shared typography for slotted page content */
+	code {
+		color: var(--fg-soft-1);
+		font-family: Theia, monospace !important;
+		font-size: 15px;
+		font-weight: 500;
+		padding: 1px 2px;
+	}
+	a,
+	a > code {
+		color: var(--hyperlink-color);
+		font-weight: 500;
+		text-decoration: inherit;
+		&:hover {
+			color: var(--hyperlink-hover-color);
+			text-decoration: underline;
+		}
+		&:visited {
+			color: var(--hyperlink-visited-color);
+		}
+	}
+	/* @lasertag-enable [selector-crosses-ownership-boundary] */
+
+	> * {
+		@media screen and (min-width: 960px) {
+			padding: 1em;
+		}
+	}
+
+	> header {
+		margin: 0.25em;
+		position: fixed;
+		top: 0;
+		width: calc(100% - 0.5em);
+		z-index: 120;
+
+		@media screen and (max-width: 960px) {
+			margin-top: 0.75em;
+		}
+		@media screen and (min-width: 960px) {
+			margin: 0;
+			padding: 1em;
+			width: 100%;
+			> nav {
+				gap: 20px;
+			}
+		}
+
+		> nav {
+			display: flex;
+			flex-flow: row;
+			gap: 1em;
+			height: 50px;
+			> gap-between {
+				flex-grow: 1;
+			}
+		}
+	}
+
+	> main {
+		background-color: var(--bg-color);
+		display: flex;
+		flex-flow: column;
+		flex-grow: 1;
+		margin-top: 2em;
+		position: relative;
+		> page-content {
+			display: contents;
+		}
+		&::before {
+			background: url("/noise.svg") repeat center / 512px;
+			content: "";
+			inset: 0;
+			mix-blend-mode: soft-light;
+			pointer-events: none;
+			position: absolute;
+		}
+		> banner-message {
+			display: flex;
+			justify-content: center;
+			left: 0;
+			line-height: 27px;
+			pointer-events: none;
+			position: absolute;
+			top: -33px;
+			user-select: none;
+			width: calc(100% - 0.5em);
+			z-index: 130;
+			> span {
+				align-items: flex-end;
+				backdrop-filter: blur(15px);
+				background: var(--bg-soft-glass-1);
+				box-shadow: 0 1px 10px 1px var(--bg-shadow-1);
+				color: var(--fg-soft-3);
+				display: flex;
+				font-size: 15px;
+				font-weight: 600;
+				padding: 2px 12px;
+			}
+
+			@media screen and (min-width: 960px) {
+				top: -29px;
+				> span {
+					backdrop-filter: none;
+					background: none;
+					box-shadow: none;
+				}
+			}
+		}
+	}
+
+	> footer {
+		background: var(--bg-color);
+		display: flex;
+		flex-flow: row;
+		justify-content: space-between;
+		padding: 20px 10px;
+		position: relative;
+		z-index: 100;
+		> span > a,
+		> span > a > code {
+			color: var(--fg-soft-1);
+		}
+	}
+}

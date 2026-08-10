@@ -1,0 +1,3 @@
+self       status-panel
+child      footer
+descendant output

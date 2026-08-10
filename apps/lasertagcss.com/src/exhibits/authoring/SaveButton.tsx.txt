@@ -1,0 +1,5 @@
+<save-button className={css.class} data-state={state}>
+	<button disabled={state === "saving"} type="submit">
+		{state === "saving" ? "Saving…" : "Save"}
+	</button>
+</save-button>
