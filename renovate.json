@@ -49,6 +49,14 @@
 			]
 		},
 		{
+			"groupName": "changesets",
+			"matchPackageNames": [
+				"@changesets/cli",
+				"@changesets/config",
+				"changesets/action"
+			]
+		},
+		{
 			"matchManagers": ["github-actions"],
 			"dependencyDashboardApproval": true
 		},
