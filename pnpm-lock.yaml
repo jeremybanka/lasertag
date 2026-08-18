@@ -60,7 +60,7 @@ importers:
         version: 3.9.2(supports-color@7.2.0)
       atom.io:
         specifier: 0.52.0
-        version: 0.52.0(@typescript-eslint/parser@8.67.0(eslint@10.8.1(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0))(eslint@10.8.1(jiti@2.7.0)(supports-color@7.2.0))(solid-js@1.9.14)
+        version: 0.52.0(@typescript-eslint/parser@8.67.0(eslint@10.8.1(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0))(eslint@10.8.1(jiti@2.7.0)(supports-color@7.2.0))(solid-js@1.9.15)
       comline:
         specifier: 0.5.1
         version: 0.5.1(zod@4.4.3)
@@ -117,8 +117,8 @@ importers:
         specifier: 10.29.8
         version: 10.29.8
       solid-js:
-        specifier: 1.9.14
-        version: 1.9.14
+        specifier: 1.9.15
+        version: 1.9.15
       vitest:
         specifier: npm:@voidzero-dev/vite-plus-test@0.1.24
         version: '@voidzero-dev/vite-plus-test@0.1.24(@types/node@26.2.0)(jiti@2.7.0)(typescript@7.0.2)(vite@8.0.16(@types/node@26.2.0)(jiti@2.7.0)(yaml@2.9.0))(yaml@2.9.0)'
@@ -3242,8 +3242,8 @@ packages:
     resolution: {integrity: sha512-aqVvWoyO21L23mb+drl4RmMXbf6N7FdHjAhTRA9ZBL7apWBgfWC16KjrASI+1p9GAroljyMHj6fK67i0UiTNvQ==}
     engines: {node: '>= 18'}
 
-  solid-js@1.9.14:
-    resolution: {integrity: sha512-sAEXC0Kk0S1EDg+8ysEWJDbYhA3RRoEjwuySUGlKIemeo0I5YZfOyumNjNs9Sv3y2nmhD+0rW66ag2HsMuQiGQ==}
+  solid-js@1.9.15:
+    resolution: {integrity: sha512-EeiY2xfpZJqPLjXspVEKjAII4yv8NyG//NxZ3IpOFHdUNnnTyL0uJOeS9LWGvA7cFCz5y94cjFwYlmw5Luncsg==}
 
   source-map-js@1.2.1:
     resolution: {integrity: sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==}
@@ -5126,11 +5126,11 @@ snapshots:
 
   asynckit@0.4.0: {}
 
-  atom.io@0.52.0(@typescript-eslint/parser@8.67.0(eslint@10.8.1(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0))(eslint@10.8.1(jiti@2.7.0)(supports-color@7.2.0))(solid-js@1.9.14):
+  atom.io@0.52.0(@typescript-eslint/parser@8.67.0(eslint@10.8.1(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0))(eslint@10.8.1(jiti@2.7.0)(supports-color@7.2.0))(solid-js@1.9.15):
     optionalDependencies:
       '@typescript-eslint/parser': 8.67.0(eslint@10.8.1(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0)
       eslint: 10.8.1(jiti@2.7.0)(supports-color@7.2.0)
-      solid-js: 1.9.14
+      solid-js: 1.9.15
 
   azure-devops-node-api@12.5.0:
     dependencies:
@@ -6485,7 +6485,7 @@ snapshots:
 
   smol-toml@1.7.0: {}
 
-  solid-js@1.9.14:
+  solid-js@1.9.15:
     dependencies:
       csstype: 3.2.3
       seroval: 1.5.4
