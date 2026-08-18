@@ -81,7 +81,7 @@
 		"eslint": "10.8.1",
 		"jiti": "2.7.0",
 		"preact": "10.29.8",
-		"solid-js": "1.9.14",
+		"solid-js": "1.9.15",
 		"vitest": "npm:@voidzero-dev/vite-plus-test@0.1.24"
 	},
 	"peerDependencies": {
