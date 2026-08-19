@@ -59,8 +59,8 @@ importers:
         specifier: 3.9.2
         version: 3.9.2(supports-color@7.2.0)
       atom.io:
-        specifier: 0.52.0
-        version: 0.52.0(@typescript-eslint/parser@8.67.0(eslint@10.8.1(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0))(eslint@10.8.1(jiti@2.7.0)(supports-color@7.2.0))(solid-js@1.9.15)
+        specifier: 0.52.1
+        version: 0.52.1(@typescript-eslint/parser@8.67.0(eslint@10.8.1(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0))(eslint@10.8.1(jiti@2.7.0)(supports-color@7.2.0))(solid-js@1.9.15)
       comline:
         specifier: 0.5.1
         version: 0.5.1(zod@4.4.3)
@@ -1922,8 +1922,8 @@ packages:
   asynckit@0.4.0:
     resolution: {integrity: sha512-Oei9OH4tRh0YqU3GxhX79dM/mwVgvbZJaSNaRk+bshkj0S5cfHcgYakreBjrHwatXKbz+IoIdYLxrKim2MjW0Q==}
 
-  atom.io@0.52.0:
-    resolution: {integrity: sha512-mKNZw2F0DBrU3iaf3DJriFeDeKsr+xdKrS96O4sid+D28GSBuR6KtGJZrgA83CK6QM0RLAFbt8AAkBMUQoA4QA==}
+  atom.io@0.52.1:
+    resolution: {integrity: sha512-VBICBdDLPbmT7PjqXb4r+tTiGaYLuAc31lnaZvBZaRvR7o94fY4ZQZw9rWTYn7leKmZQx2XGQe+v7Vh/bckV4Q==}
     peerDependencies:
       '@floating-ui/react': '>=0.25.0'
       '@floating-ui/react-dom': '>=2.0.0'
@@ -5126,7 +5126,7 @@ snapshots:
 
   asynckit@0.4.0: {}
 
-  atom.io@0.52.0(@typescript-eslint/parser@8.67.0(eslint@10.8.1(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0))(eslint@10.8.1(jiti@2.7.0)(supports-color@7.2.0))(solid-js@1.9.15):
+  atom.io@0.52.1(@typescript-eslint/parser@8.67.0(eslint@10.8.1(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0))(eslint@10.8.1(jiti@2.7.0)(supports-color@7.2.0))(solid-js@1.9.15):
     optionalDependencies:
       '@typescript-eslint/parser': 8.67.0(eslint@10.8.1(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0)
       eslint: 10.8.1(jiti@2.7.0)(supports-color@7.2.0)
