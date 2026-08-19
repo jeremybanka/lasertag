@@ -25,7 +25,7 @@
 		"@dprint/json": "0.23.0",
 		"@dprint/markdown": "0.22.1",
 		"@dprint/oxc": "0.34.0",
-		"@dprint/toml": "0.7.0",
+		"@dprint/toml": "0.8.0",
 		"cspell": "10.0.1",
 		"dprint": "0.55.2",
 		"dprint-plugin-malva": "0.16.0",
