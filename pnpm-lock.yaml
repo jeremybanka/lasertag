@@ -68,8 +68,8 @@ importers:
         specifier: 1.2.5
         version: 1.2.5
       takua:
-        specifier: 0.2.2
-        version: 0.2.2
+        specifier: 0.2.3
+        version: 0.2.3
       tinyglobby:
         specifier: 0.2.17
         version: 0.2.17
@@ -3307,8 +3307,8 @@ packages:
     resolution: {integrity: sha512-9kY+CygyYM6j02t5YFHbNz2FN5QmYGv9zAjVp4lCDjlCw7amdckXlEt/bjMhUIfj4ThGRE4gCUH5+yGnNuPo5A==}
     engines: {node: '>=10.0.0'}
 
-  takua@0.2.2:
-    resolution: {integrity: sha512-yjNZ/dE7vzzecyyMyzpV9IF74cirv8H1ci6U+1fICICOtsb/5Cstz86Hu4GK8IgO9HTlA6rgjg7d/ljq7RDNWQ==}
+  takua@0.2.3:
+    resolution: {integrity: sha512-X/UsrLMSttBXrgAthtDZW9iuorphm7dgm5h6AskgpONCtpwd59zo8dN3sPHzi9LkEZ2mfxTVWMqAZpsoeEIt1Q==}
 
   tar-fs@2.1.5:
     resolution: {integrity: sha512-OboTd8mmMhZDNPV+UjQcK9yKAatXu2aJ+r1w4im1Otd4M4fl2hwvdoXUxIYHFTHWK/3y3FarBP70v3vwmGlOxw==}
@@ -6564,7 +6564,7 @@ snapshots:
       string-width: 4.2.3
       strip-ansi: 6.0.1
 
-  takua@0.2.2: {}
+  takua@0.2.3: {}
 
   tar-fs@2.1.5:
     dependencies:
