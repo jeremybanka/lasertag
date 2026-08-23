@@ -62,8 +62,8 @@ importers:
         specifier: 0.52.1
         version: 0.52.1(@typescript-eslint/parser@8.67.0(eslint@10.9.0(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0))(eslint@10.9.0(jiti@2.7.0)(supports-color@7.2.0))(solid-js@1.9.15)
       comline:
-        specifier: 0.5.1
-        version: 0.5.1(zod@4.4.3)
+        specifier: 0.5.2
+        version: 0.5.2(zod@4.4.3)
       rolldown:
         specifier: 1.2.5
         version: 1.2.5
@@ -2063,8 +2063,8 @@ packages:
     resolution: {integrity: sha512-FQN4MRfuJeHf7cBbBMJFXhKSDq+2kAArBlmRBvcvFE5BB1HZKXtSFASDhdlz9zOYwxh8lDdnvmMOe/+5cdoEdg==}
     engines: {node: '>= 0.8'}
 
-  comline@0.5.1:
-    resolution: {integrity: sha512-Ld9dLjIJt4UgQ2/PBcL346ARXwybfwmzrrGEMgQE/AzLFnyTLMVlrxkwwmRCte1NJIW6rKMVaYbt0E7IC/1hnw==}
+  comline@0.5.2:
+    resolution: {integrity: sha512-eMGYMIw2Q34LtO4vaNvQCPWcVTasnMUCDj7YnOADvyfc4ddKqhKX1TwQgYiiKp8qSjgXdMYE+EHJl9cznQ7azA==}
     peerDependencies:
       arktype: ^2.1.28
       zod: ^4.2.0
@@ -3363,8 +3363,8 @@ packages:
     resolution: {integrity: sha512-sf4i37nQ2LBx4m3wB74y+ubopq6W/dIzXg0FDGjsYnZHVa1Da8FH853wlL2gtUhg+xJXjfk3kUZS3BRoQeoQBQ==}
     engines: {node: '>=6'}
 
-  treetrunks@0.1.8:
-    resolution: {integrity: sha512-fD1vRlo9LqlSxjnKlyZvJ6U4hrOIwNUrSEl+3npElgpm7UvwwVqh6ncl8663IqhIxMy34BQILddW5vgz/NaGbA==}
+  treetrunks@0.1.9:
+    resolution: {integrity: sha512-+K9abw3ZRJ3dKrSPNmUWMyGYkTjL++2WkehbxywrnsdgHHClPbBLY5L1ksKtKF/JfX4RzxaUj9tONAW5hgRABw==}
 
   ts-api-utils@2.5.0:
     resolution: {integrity: sha512-OJ/ibxhPlqrMM0UiNHJ/0CKQkoKF243/AEmplt3qpRgkW8VG7IfOS41h7V8TjITqdByHzrjcS/2si+y4lIh8NA==}
@@ -5251,10 +5251,10 @@ snapshots:
     dependencies:
       delayed-stream: 1.0.0
 
-  comline@0.5.1(zod@4.4.3):
+  comline@0.5.2(zod@4.4.3):
     dependencies:
       '@standard-schema/spec': 1.1.0
-      treetrunks: 0.1.8
+      treetrunks: 0.1.9
     optionalDependencies:
       zod: 4.4.3
 
@@ -6617,7 +6617,7 @@ snapshots:
 
   totalist@3.0.1: {}
 
-  treetrunks@0.1.8: {}
+  treetrunks@0.1.9: {}
 
   ts-api-utils@2.5.0(typescript@6.0.3):
     dependencies:
