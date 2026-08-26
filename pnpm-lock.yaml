@@ -83,8 +83,8 @@ importers:
         specifier: 10.1.0
         version: 10.1.0
       vscode-languageserver-textdocument:
-        specifier: 1.0.12
-        version: 1.0.12
+        specifier: 1.0.13
+        version: 1.0.13
       zod:
         specifier: 4.4.3
         version: 4.4.3
