@@ -20,7 +20,7 @@
 		"workflows": "./scripts/update-workflows.node.ts"
 	},
 	"devDependencies": {
-		"@changesets/cli": "3.0.0",
+		"@changesets/cli": "3.0.1",
 		"@changesets/config": "4.0.0",
 		"@dprint/json": "0.23.0",
 		"@dprint/markdown": "0.23.1",
