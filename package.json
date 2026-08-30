@@ -23,7 +23,7 @@
 		"@changesets/cli": "3.0.1",
 		"@changesets/config": "4.0.0",
 		"@dprint/json": "0.23.0",
-		"@dprint/markdown": "0.23.1",
+		"@dprint/markdown": "0.23.2",
 		"@dprint/oxc": "0.37.0",
 		"@dprint/toml": "0.8.0",
 		"cspell": "10.1.1",
