@@ -1,5 +1,11 @@
 # lasertag
 
+## 0.7.2
+
+### Patch Changes
+
+- e7c7a53: Warn at `@lasertag-own-subtree` JSX comments when adoption syntax, placement, or implementation evidence is invalid, including directives nested in supported Solid control flow.
+
 ## 0.7.1
 
 ### Patch Changes
