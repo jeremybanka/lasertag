@@ -775,15 +775,14 @@ import css from "./AppPanel.module.css"
 	})
 
 	it(`places adoption warnings on the TSX directive instead of the CSS file`, () => {
-		const marker = `{/* @lasertag-own-subtree */}`
+		const marker = `/* @lasertag-adopt-subtree */`
 		const sourceText = `
 			import css from "./AppPanel.module.css"
 
 			export function AppPanel() {
 				return (
 					<app-panel className={css.class}>
-						${marker}
-						<section />
+						<section ${marker} />
 					</app-panel>
 				)
 			}

@@ -213,8 +213,7 @@ function consumerSource(
 		export function AppPanel() {
 			return (
 				<app-panel className={css.class}>
-					{/* @lasertag-own-subtree */}
-					<${componentName} />
+					<${componentName} /* @lasertag-adopt-subtree */ />
 				</app-panel>
 			)
 		}
@@ -284,8 +283,7 @@ describe(`validated render-story adoption`, () => {
 					export function AppPanel() {
 						return (
 							<app-panel className={css.class}>
-								{/* @lasertag-own-subtree */}
-								<HeadlessEditor />
+								<HeadlessEditor /* @lasertag-adopt-subtree */ />
 								<HeadlessEditor />
 							</app-panel>
 						)
@@ -431,7 +429,7 @@ describe(`validated render-story adoption`, () => {
 					end: expect.any(Number),
 					start: expect.any(Number),
 				},
-				selector: `@lasertag-own-subtree`,
+				selector: `@lasertag-adopt-subtree`,
 			},
 		])
 	})
@@ -446,8 +444,7 @@ describe(`validated render-story adoption`, () => {
 					export function AppPanel() {
 						return (
 							<app-panel className={css.class}>
-								{/* @lasertag-own-subtree */}
-								<svg.Icon />
+								<svg.Icon /* @lasertag-adopt-subtree */ />
 							</app-panel>
 						)
 					}
@@ -464,24 +461,20 @@ describe(`validated render-story adoption`, () => {
 	it.each([
 		{
 			label: `intrinsic element`,
-			target: `<section />`,
+			target: `<section /* @lasertag-adopt-subtree */ />`,
 		},
 		{
-			label: `fragment`,
-			target: `<><section /></>`,
-		},
-		{
-			label: `expression`,
-			target: `{true && <section />}`,
+			label: `named fragment`,
+			target: `<React.Fragment /* @lasertag-adopt-subtree */><section /></React.Fragment>`,
 		},
 		{
 			label: `local component`,
 			prefix: `function LocalPanel() { return <local-panel /> }`,
-			target: `<LocalPanel />`,
+			target: `<LocalPanel /* @lasertag-adopt-subtree */ />`,
 		},
 		{
-			label: `no following instance`,
-			target: ``,
+			label: `unbound member component`,
+			target: `<Widgets.Panel /* @lasertag-adopt-subtree */ />`,
 		},
 	])(
 		`reports an invalid adoption target for a $label`,
@@ -495,7 +488,6 @@ describe(`validated render-story adoption`, () => {
 					export function AppPanel() {
 						return (
 							<app-panel className={css.class}>
-								{/* @lasertag-own-subtree */}
 								${target}
 							</app-panel>
 						)
@@ -517,8 +509,7 @@ describe(`validated render-story adoption`, () => {
 					export function AppPanel() {
 						return (
 							<app-panel className={css.class}>
-								{/* @lasertag-own-subtree: the editor is headless */}
-								<HeadlessEditor />
+								<HeadlessEditor /* @lasertag-adopt-subtree: the editor is headless */ />
 							</app-panel>
 						)
 					}
@@ -537,10 +528,108 @@ describe(`validated render-story adoption`, () => {
 					export function AppPanel() {
 						return (
 							<app-panel className={css.class}>
-								{/* @lasertag-own-subtree-ish */}
-								<section />
+								<section /* @lasertag-adopt-subtree-ish */ />
 							</app-panel>
 						)
+					}
+				`,
+				`app-panel.class {}`,
+			),
+		).toEqual([])
+	})
+
+	it(`reports the released sibling directive with migration guidance`, () => {
+		expect(
+			diagnosticCodes(
+				`
+					import { HeadlessEditor } from "./HeadlessEditor.tsx"
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								{/* @lasertag-own-subtree */}
+								<HeadlessEditor />
+							</app-panel>
+						)
+					}
+				`,
+				`app-panel.class {}`,
+			),
+		).toEqual([`invalid-adoption-directive`])
+	})
+
+	it(`reports the new directive when it is misplaced as a sibling`, () => {
+		expect(
+			diagnosticCodes(
+				`
+					import { HeadlessEditor } from "./HeadlessEditor.tsx"
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								{/* @lasertag-adopt-subtree */}
+								<HeadlessEditor />
+							</app-panel>
+						)
+					}
+				`,
+				`app-panel.class {}`,
+			),
+		).toEqual([`invalid-adoption-directive`])
+	})
+
+	it(`reports duplicate opening-tag directives`, () => {
+		expect(
+			diagnosticCodes(
+				consumerSource(
+					`import { HeadlessEditor } from "./HeadlessEditor.tsx"`,
+					`HeadlessEditor /* @lasertag-adopt-subtree */`,
+				),
+				`app-panel.class {}`,
+			),
+		).toEqual([`invalid-adoption-directive`])
+	})
+
+	it(`recognizes the directive among attributes on a paired opening tag`, () => {
+		expect(
+			diagnosticCodes(
+				`
+					import { HeadlessEditor } from "./HeadlessEditor.tsx"
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						const props = {}
+						return (
+							<app-panel className={css.class}>
+								<HeadlessEditor
+									before="yes"
+									/* @lasertag-adopt-subtree */
+									{...props}
+									after="yes"
+								></HeadlessEditor>
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						> headless-editor > editable-region > caret-layer {}
+					}
+				`,
+			),
+		).toEqual([])
+	})
+
+	it(`does not read directive text from an attribute value`, () => {
+		expect(
+			diagnosticCodes(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return <app-panel className={css.class} title="/* @lasertag-adopt-subtree */" />
 					}
 				`,
 				`app-panel.class {}`,
@@ -560,8 +649,7 @@ describe(`validated render-story adoption`, () => {
 						return (
 							<app-panel className={css.class}>
 								<Show when={true}>
-									{/* @lasertag-own-subtree */}
-									<HeadlessEditor />
+									<HeadlessEditor /* @lasertag-adopt-subtree */ />
 								</Show>
 							</app-panel>
 						)
@@ -600,8 +688,7 @@ describe(`validated render-story adoption`, () => {
 						export function AppPanel() {
 							return (
 								<app-panel className={css.class}>
-									<${component} ${props}>
-										{/* @lasertag-own-subtree */}
+									<${component} /* @lasertag-adopt-subtree */ ${props}>
 										${contents}
 									</${component}>
 								</app-panel>

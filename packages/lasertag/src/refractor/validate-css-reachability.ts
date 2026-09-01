@@ -164,7 +164,7 @@ function adoptionDiagnostics(
 							? { renderSourcePath: warning.sourcePath }
 							: {}),
 						...(warning.range ? { renderSourceRange: warning.range } : {}),
-						selector: `@lasertag-own-subtree`,
+						selector: `@lasertag-adopt-subtree`,
 					},
 				]
 			: [],

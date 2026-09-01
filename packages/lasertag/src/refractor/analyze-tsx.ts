@@ -68,7 +68,8 @@ type AnalyzeContext = {
 }
 
 const DEFAULT_MAX_COMPONENT_DEPTH = 25
-const OWN_SUBTREE_DIRECTIVE = `@lasertag-own-subtree`
+const ADOPT_SUBTREE_DIRECTIVE = `@lasertag-adopt-subtree`
+const LEGACY_OWN_SUBTREE_DIRECTIVE = `@lasertag-own-subtree`
 
 type NodeWithModifiers = ts.Node & {
 	modifiers?: ts.NodeArray<ts.ModifierLike>
@@ -853,10 +854,6 @@ type AdoptionRequest = {
 	range: SourceRange
 }
 
-type AdoptionDirective =
-	| { kind: `invalid`; range: SourceRange }
-	| { kind: `ready`; adoption: AdoptionRequest }
-
 type MappedComponentStoryResolution =
 	| { kind: `missing` }
 	| { kind: `ambiguous`; sourcePaths: string[] }
@@ -1016,7 +1013,7 @@ function invalidAdoptionTarget(
 ): void {
 	context.warnings.push({
 		code: `invalid-adoption-target`,
-		message: `Could not apply ${OWN_SUBTREE_DIRECTIVE}: ${detail}`,
+		message: `Could not apply ${ADOPT_SUBTREE_DIRECTIVE}: ${detail}`,
 		range: adoption.range,
 		sourcePath: context.sourceFile.fileName,
 	})
@@ -1025,10 +1022,11 @@ function invalidAdoptionTarget(
 function invalidAdoptionDirective(
 	context: AnalyzeContext,
 	range: SourceRange,
+	detail: string,
 ): void {
 	context.warnings.push({
 		code: `invalid-adoption-directive`,
-		message: `${OWN_SUBTREE_DIRECTIVE} must be the only content in its JSX comment.`,
+		message: `Could not apply ${ADOPT_SUBTREE_DIRECTIVE}: ${detail}`,
 		range,
 		sourcePath: context.sourceFile.fileName,
 	})
@@ -1124,6 +1122,91 @@ function isFragmentJsxTag(tagName: string): boolean {
 }
 
 type ComponentJsxNode = ts.JsxElement | ts.JsxSelfClosingElement
+type ComponentJsxOpening = ts.JsxOpeningElement | ts.JsxSelfClosingElement
+
+function openingTagCommentRanges(
+	context: AnalyzeContext,
+	node: ComponentJsxOpening,
+): SourceRange[] {
+	const positions = [
+		node.tagName.end,
+		...node.attributes.properties.map((attribute) => attribute.end),
+	]
+	const ranges = new Map<string, SourceRange>()
+
+	for (const position of positions) {
+		const comments = [
+			...(ts.getLeadingCommentRanges(context.sourceFile.text, position) ?? []),
+			...(ts.getTrailingCommentRanges(context.sourceFile.text, position) ?? []),
+		]
+
+		for (const comment of comments) {
+			if (comment.kind !== ts.SyntaxKind.MultiLineCommentTrivia) continue
+			if (comment.pos < node.tagName.end || comment.end > node.end) continue
+
+			const range = { end: comment.end, start: comment.pos }
+
+			ranges.set(`${range.start}:${range.end}`, range)
+		}
+	}
+
+	return [...ranges.values()].toSorted(
+		(left, right) => left.start - right.start,
+	)
+}
+
+function openingTagAdoptionRequest(
+	context: AnalyzeContext,
+	node: ComponentJsxOpening,
+): AdoptionRequest | undefined {
+	const exactDirectivePattern = new RegExp(
+		String.raw`^\/\*\s*${ADOPT_SUBTREE_DIRECTIVE}\s*\*\/$`,
+	)
+	const directiveCandidatePattern = new RegExp(
+		String.raw`^\/\*\s*${ADOPT_SUBTREE_DIRECTIVE}(?![\w-])`,
+	)
+	const legacyDirectiveCandidatePattern = new RegExp(
+		String.raw`^\/\*\s*${LEGACY_OWN_SUBTREE_DIRECTIVE}(?![\w-])`,
+	)
+	let adoption: AdoptionRequest | undefined
+
+	for (const range of openingTagCommentRanges(context, node)) {
+		const commentText = context.sourceFile.text.slice(range.start, range.end)
+
+		if (legacyDirectiveCandidatePattern.test(commentText)) {
+			invalidAdoptionDirective(
+				context,
+				range,
+				`${LEGACY_OWN_SUBTREE_DIRECTIVE} is no longer supported; place /* ${ADOPT_SUBTREE_DIRECTIVE} */ inside the component opening tag.`,
+			)
+			continue
+		}
+
+		if (!directiveCandidatePattern.test(commentText)) continue
+
+		if (!exactDirectivePattern.test(commentText)) {
+			invalidAdoptionDirective(
+				context,
+				range,
+				`the directive must be the only content in its opening-tag block comment.`,
+			)
+			continue
+		}
+
+		if (adoption) {
+			invalidAdoptionDirective(
+				context,
+				range,
+				`the directive may appear only once in a component opening tag.`,
+			)
+			continue
+		}
+
+		adoption = { range }
+	}
+
+	return adoption
+}
 
 function jsxAttributes(node: ComponentJsxNode): ts.JsxAttributes {
 	return ts.isJsxElement(node)
@@ -1239,28 +1322,17 @@ function analyzeSolidTransparentChildren(
 	node: ComponentJsxNode,
 	stack: string[],
 ): StoryChild[] {
-	return analyzeJsxChildrenWith(
-		context,
-		jsxChildren(node),
-		(child, adoption) => {
-			if (ts.isJsxExpression(child) && child.expression) {
-				const functionBody = functionBodyFromExpression(child.expression)
+	return analyzeJsxChildrenWith(context, jsxChildren(node), (child) => {
+		if (ts.isJsxExpression(child) && child.expression) {
+			const functionBody = functionBodyFromExpression(child.expression)
 
-				if (functionBody) {
-					if (adoption) {
-						invalidAdoptionTarget(
-							context,
-							adoption,
-							`the directive must be followed by one imported component instance.`,
-						)
-					}
-					return analyzeFunctionBody(context, functionBody, stack)
-				}
+			if (functionBody) {
+				return analyzeFunctionBody(context, functionBody, stack)
 			}
+		}
 
-			return analyzeJsxChild(context, child, stack, adoption)
-		},
-	)
+		return analyzeJsxChild(context, child, stack)
+	})
 }
 
 function analyzeSolidRepeatedChildren(
@@ -1276,17 +1348,9 @@ function analyzeSolidRepeatedChildren(
 	const analyzedChildren = analyzeJsxChildrenWith(
 		context,
 		children,
-		(child, adoption) => {
+		(child) => {
 			if (ts.isJsxText(child)) return []
 			if (ts.isJsxExpression(child) && !child.expression) return []
-
-			if (adoption) {
-				invalidAdoptionTarget(
-					context,
-					adoption,
-					`framework repetition render branches cannot be adopted directly.`,
-				)
-			}
 
 			if (ts.isJsxExpression(child) && child.expression) {
 				const functionBody = functionBodyFromExpression(child.expression)
@@ -1333,38 +1397,9 @@ function analyzeSolidSwitchAlternatives(
 	stack: string[],
 ): StoryChild[][] {
 	const alternatives: StoryChild[][] = []
-	let pendingAdoption: AdoptionRequest | undefined
 
 	for (const child of children) {
-		const directive = adoptionDirective(context, child)
-
-		if (directive?.kind === `invalid`) {
-			invalidAdoptionDirective(context, directive.range)
-			continue
-		}
-
-		if (directive?.kind === `ready`) {
-			if (pendingAdoption) {
-				invalidAdoptionTarget(
-					context,
-					pendingAdoption,
-					`the directive is not followed by a component instance.`,
-				)
-			}
-			pendingAdoption = directive.adoption
-			continue
-		}
-
-		if (pendingAdoption && isIgnorableJsxChild(child)) continue
-
-		if (pendingAdoption) {
-			invalidAdoptionTarget(
-				context,
-				pendingAdoption,
-				`framework switch branches cannot be adopted directly.`,
-			)
-			pendingAdoption = undefined
-		}
+		if (misplacedAdoptionDirective(context, child)) continue
 
 		if (ts.isJsxText(child)) continue
 		if (ts.isJsxExpression(child) && !child.expression) continue
@@ -1397,14 +1432,6 @@ function analyzeSolidSwitchAlternatives(
 		alternatives.push([
 			opaque(`non-Match child in Solid Switch`, context.sourceFile, child),
 		])
-	}
-
-	if (pendingAdoption) {
-		invalidAdoptionTarget(
-			context,
-			pendingAdoption,
-			`the directive is not followed by a component instance.`,
-		)
 	}
 
 	return alternatives
@@ -1572,8 +1599,8 @@ function analyzeJsxElement(
 	context: AnalyzeContext,
 	node: ts.JsxElement,
 	stack: string[],
-	adoption?: AdoptionRequest,
 ): StoryChild[] {
+	const adoption = openingTagAdoptionRequest(context, node.openingElement)
 	const tagName = getJsxTagText(context.sourceFile, node.openingElement.tagName)
 
 	if (isFragmentJsxTag(tagName)) {
@@ -1581,7 +1608,7 @@ function analyzeJsxElement(
 			invalidAdoptionTarget(
 				context,
 				adoption,
-				`the directive must be followed by an imported component instance, not a fragment.`,
+				`a fragment cannot be adopted; the target must be an imported component instance.`,
 			)
 		}
 		return analyzeJsxChildren(context, node.children, stack)
@@ -1624,7 +1651,7 @@ function analyzeJsxElement(
 		invalidAdoptionTarget(
 			context,
 			adoption,
-			`the following <${tagName}> is intrinsic; only an imported component instance can be adopted.`,
+			`the target <${tagName}> is intrinsic; only an imported component instance can be adopted.`,
 		)
 	}
 
@@ -1643,8 +1670,8 @@ function analyzeJsxSelfClosingElement(
 	context: AnalyzeContext,
 	node: ts.JsxSelfClosingElement,
 	stack: string[],
-	adoption?: AdoptionRequest,
 ): StoryChild[] {
+	const adoption = openingTagAdoptionRequest(context, node)
 	const tagName = getJsxTagText(context.sourceFile, node.tagName)
 
 	if (isFragmentJsxTag(tagName)) {
@@ -1652,7 +1679,7 @@ function analyzeJsxSelfClosingElement(
 			invalidAdoptionTarget(
 				context,
 				adoption,
-				`the directive must be followed by an imported component instance, not a fragment.`,
+				`a fragment cannot be adopted; the target must be an imported component instance.`,
 			)
 		}
 		return []
@@ -1695,7 +1722,7 @@ function analyzeJsxSelfClosingElement(
 		invalidAdoptionTarget(
 			context,
 			adoption,
-			`the following <${tagName}> is intrinsic; only an imported component instance can be adopted.`,
+			`the target <${tagName}> is intrinsic; only an imported component instance can be adopted.`,
 		)
 	}
 
@@ -1772,7 +1799,7 @@ function analyzeComponentTag(
 		invalidAdoptionTarget(
 			context,
 			adoption,
-			`the following <${tagName}> is not bound to an import.`,
+			`the target <${tagName}> is not bound to an import.`,
 		)
 	}
 
@@ -1807,77 +1834,65 @@ function analyzeJsxChild(
 	context: AnalyzeContext,
 	child: ts.JsxChild,
 	stack: string[],
-	adoption?: AdoptionRequest,
 ): StoryChild[] {
 	if (ts.isJsxText(child)) return []
 
 	if (ts.isJsxExpression(child)) {
-		if (adoption) {
-			invalidAdoptionTarget(
-				context,
-				adoption,
-				`the directive must be followed by one imported component instance.`,
-			)
-		}
 		return child.expression
 			? analyzeExpression(context, child.expression, stack)
 			: []
 	}
 
 	if (ts.isJsxElement(child)) {
-		return analyzeJsxElement(context, child, stack, adoption)
+		return analyzeJsxElement(context, child, stack)
 	}
 
 	if (ts.isJsxSelfClosingElement(child)) {
-		return analyzeJsxSelfClosingElement(context, child, stack, adoption)
+		return analyzeJsxSelfClosingElement(context, child, stack)
 	}
 
 	if (ts.isJsxFragment(child)) {
-		if (adoption) {
-			invalidAdoptionTarget(
-				context,
-				adoption,
-				`the directive must be followed by an imported component instance, not a fragment.`,
-			)
-		}
 		return analyzeJsxChildren(context, child.children, stack)
 	}
 
 	return [opaque(`unsupported JSX child`, context.sourceFile, child)]
 }
 
-function adoptionDirective(
+function misplacedAdoptionDirective(
 	context: AnalyzeContext,
 	child: ts.JsxChild,
-): AdoptionDirective | undefined {
-	if (!ts.isJsxExpression(child) || child.expression) return
+): boolean {
+	if (!ts.isJsxExpression(child) || child.expression) return false
 
 	const sourceText = context.sourceFile.text.slice(
 		child.getStart(context.sourceFile),
 		child.getEnd(),
 	)
-	const exactPattern = new RegExp(
-		String.raw`^\{\s*\/\*\s*${OWN_SUBTREE_DIRECTIVE}\s*\*\/\s*\}$`,
+	const directiveCandidatePattern = new RegExp(
+		String.raw`^\{\s*\/\*\s*${ADOPT_SUBTREE_DIRECTIVE}(?![\w-])`,
 	)
-	const candidatePattern = new RegExp(
-		String.raw`^\{\s*\/\*\s*${OWN_SUBTREE_DIRECTIVE}(?![\w-])`,
+	const legacyDirectiveCandidatePattern = new RegExp(
+		String.raw`^\{\s*\/\*\s*${LEGACY_OWN_SUBTREE_DIRECTIVE}(?![\w-])`,
 	)
 	const range = rangeOf(context.sourceFile, child)
 
-	if (exactPattern.test(sourceText)) {
-		return { adoption: { range }, kind: `ready` }
+	if (legacyDirectiveCandidatePattern.test(sourceText)) {
+		invalidAdoptionDirective(
+			context,
+			range,
+			`${LEGACY_OWN_SUBTREE_DIRECTIVE} is no longer supported; place /* ${ADOPT_SUBTREE_DIRECTIVE} */ inside the component opening tag.`,
+		)
+		return true
 	}
 
-	return candidatePattern.test(sourceText)
-		? { kind: `invalid`, range }
-		: undefined
-}
+	if (!directiveCandidatePattern.test(sourceText)) return false
 
-function isIgnorableJsxChild(child: ts.JsxChild): boolean {
-	return (
-		(ts.isJsxText(child) && child.text.trim().length === 0) ||
-		(ts.isJsxExpression(child) && !child.expression)
+	invalidAdoptionDirective(
+		context,
+		range,
+		`the directive must appear inside the target component's opening tag.`,
 	)
+	return true
 }
 
 function analyzeJsxChildren(
@@ -1885,54 +1900,22 @@ function analyzeJsxChildren(
 	children: readonly ts.JsxChild[],
 	stack: string[],
 ): StoryChild[] {
-	return analyzeJsxChildrenWith(context, children, (child, adoption) =>
-		analyzeJsxChild(context, child, stack, adoption),
+	return analyzeJsxChildrenWith(context, children, (child) =>
+		analyzeJsxChild(context, child, stack),
 	)
 }
 
 function analyzeJsxChildrenWith(
 	context: AnalyzeContext,
 	children: readonly ts.JsxChild[],
-	analyzeChild: (
-		child: ts.JsxChild,
-		adoption?: AdoptionRequest,
-	) => StoryChild[],
+	analyzeChild: (child: ts.JsxChild) => StoryChild[],
 ): StoryChild[] {
 	const storyChildren: StoryChild[] = []
-	let pendingAdoption: AdoptionRequest | undefined
 
 	for (const child of children) {
-		const directive = adoptionDirective(context, child)
+		if (misplacedAdoptionDirective(context, child)) continue
 
-		if (directive?.kind === `invalid`) {
-			invalidAdoptionDirective(context, directive.range)
-			continue
-		}
-
-		if (directive?.kind === `ready`) {
-			if (pendingAdoption) {
-				invalidAdoptionTarget(
-					context,
-					pendingAdoption,
-					`the directive is not followed by a component instance.`,
-				)
-			}
-			pendingAdoption = directive.adoption
-			continue
-		}
-
-		if (pendingAdoption && isIgnorableJsxChild(child)) continue
-
-		storyChildren.push(...analyzeChild(child, pendingAdoption))
-		pendingAdoption = undefined
-	}
-
-	if (pendingAdoption) {
-		invalidAdoptionTarget(
-			context,
-			pendingAdoption,
-			`the directive is not followed by a component instance.`,
-		)
+		storyChildren.push(...analyzeChild(child))
 	}
 
 	return storyChildren
