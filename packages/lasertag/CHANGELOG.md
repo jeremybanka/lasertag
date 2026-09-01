@@ -1,5 +1,11 @@
 # lasertag
 
+## 0.8.0
+
+### Minor Changes
+
+- 1dce8ee: Replace the sibling `@lasertag-own-subtree` annotation with the opening-tag `@lasertag-adopt-subtree` directive, including migration diagnostics for the retired syntax.
+
 ## 0.7.2
 
 ### Patch Changes
