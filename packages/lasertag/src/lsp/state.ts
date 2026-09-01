@@ -26,6 +26,7 @@ import {
 	CSS_MODULE_SUFFIX,
 	findCssClassRenderRoots,
 	isAstroPath,
+	isRenderSourcePath,
 	isTsxPath,
 	siblingRenderSourceCandidates,
 	scopeRenderStoryToCssClassRoots,
@@ -37,6 +38,7 @@ import {
 	type CssSelectorReachabilityAnalysis,
 	type Reachability,
 	type RenderStory,
+	type RenderStoryWarning,
 	type SelectorPath,
 	type StoryChild,
 } from "../refractor/index.ts"
@@ -45,11 +47,7 @@ import {
 	type LasertagRenderStoryView,
 } from "./render-story-view.ts"
 
-export {
-	isAstroPath,
-	isRenderSourcePath,
-	isTsxPath,
-} from "../refractor/index.ts"
+export { isAstroPath, isRenderSourcePath, isTsxPath }
 
 const WATCHED_CSS_PATTERN = `**/*.module.css`
 const WATCHED_TSX_PATTERN = `**/*.tsx`
@@ -200,6 +198,40 @@ export function mapRefractorDiagnosticToLsp(
 		range: {
 			start: offsetToPosition(cssSource, startOffset),
 			end: offsetToPosition(cssSource, endOffset),
+		},
+		severity: DiagnosticSeverity.Warning,
+		source: `lasertag`,
+	}
+}
+
+function isAdoptionWarning(
+	warning: RenderStoryWarning,
+): warning is RenderStoryWarning & {
+	code:
+		| `adoption-source-unavailable`
+		| `invalid-adoption-directive`
+		| `invalid-adoption-target`
+} {
+	return (
+		warning.code === `adoption-source-unavailable` ||
+		warning.code === `invalid-adoption-directive` ||
+		warning.code === `invalid-adoption-target`
+	)
+}
+
+export function mapRenderStoryWarningToLsp(
+	sourceText: string,
+	warning: RenderStoryWarning,
+): Diagnostic {
+	const startOffset = warning.range?.start ?? 0
+	const endOffset = warning.range?.end ?? startOffset
+
+	return {
+		code: warning.code,
+		message: warning.message,
+		range: {
+			start: offsetToPosition(sourceText, startOffset),
+			end: offsetToPosition(sourceText, endOffset),
 		},
 		severity: DiagnosticSeverity.Warning,
 		source: `lasertag`,
@@ -611,12 +643,39 @@ const lspDiagnosticSelectors = selectorFamily<Diagnostic[], string>({
 
 			const diagnostics = get(refractorDiagnosticSelectors, cssPath)
 
-			return diagnostics.map((diagnostic) =>
-				mapRefractorDiagnosticToLsp(cssSource, diagnostic),
+			return diagnostics.flatMap((diagnostic) =>
+				diagnostic.renderSourcePath && diagnostic.renderSourceRange
+					? []
+					: [mapRefractorDiagnosticToLsp(cssSource, diagnostic)],
 			)
 		},
 	key: `lspDiagnostic`,
 })
+
+const renderSourceLspDiagnosticSelectors = selectorFamily<Diagnostic[], string>(
+	{
+		get:
+			(sourcePath) =>
+			({ get }) => {
+				const sourceText = get(fileTextSelectors, sourcePath)
+
+				if (sourceText === null) return []
+
+				const analysis = get(unscopedRenderStorySelectors, sourcePath)
+
+				if (analysis.kind !== `ready`) return []
+
+				return analysis.renderStory.warnings.flatMap((warning) =>
+					isAdoptionWarning(warning) &&
+					warning.sourcePath === sourcePath &&
+					warning.range
+						? [mapRenderStoryWarningToLsp(sourceText, warning)]
+						: [],
+				)
+			},
+		key: `renderSourceLspDiagnostic`,
+	},
+)
 
 const affectedCssPathsByRenderSourceSelectors = selectorFamily<
 	string[],
@@ -762,6 +821,7 @@ function createSilo(): Silo {
 		cssReachabilityAnalysisSelectors,
 		refractorDiagnosticSelectors,
 		lspDiagnosticSelectors,
+		renderSourceLspDiagnosticSelectors,
 		affectedCssPathsByRenderSourceSelectors,
 		indexWorkspaceFilesTransaction,
 		upsertOpenDocumentTransaction,
@@ -1045,12 +1105,31 @@ export function createLasertagLspState(
 			]
 		},
 		getAnalysisTrace,
-		getDiagnostics(cssPath: string): Diagnostic[] {
-			const normalizedPath = normalizeFilePath(cssPath)
+		getDiagnostics(filePath: string): Diagnostic[] {
+			const normalizedPath = normalizeFilePath(filePath)
+
+			if (isRenderSourcePath(normalizedPath)) {
+				ensureFileSnapshot(normalizedPath)
+
+				return [
+					...silo.getState(renderSourceLspDiagnosticSelectors, normalizedPath),
+				]
+			}
+
+			if (!isCssModulePath(normalizedPath)) return []
 
 			ensureCssDependencies(normalizedPath)
 
 			return [...silo.getState(lspDiagnosticSelectors, normalizedPath)]
+		},
+		getRenderSourcePath(cssPath: string): string | undefined {
+			const normalizedPath = normalizeFilePath(cssPath)
+
+			ensureCssDependencies(normalizedPath)
+
+			const source = silo.getState(siblingRenderSourceSelectors, normalizedPath)
+
+			return source.kind === `ready` ? source.sourcePath : undefined
 		},
 		getDocumentUri(filePath: string): string {
 			return silo.getState(documentUriSelectors, normalizeFilePath(filePath))

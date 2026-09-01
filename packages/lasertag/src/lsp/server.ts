@@ -116,9 +116,14 @@ export function createRefractorDiagnostics(
 	document: TextDocument,
 	options: LasertagLspReadOptions = {},
 ): Diagnostic[] {
-	const cssPath = getDocumentFilePath(document, options)
+	const filePath = getDocumentFilePath(document, options)
 
-	if (!cssPath || !isCssModulePath(cssPath)) return []
+	if (
+		!filePath ||
+		(!isCssModulePath(filePath) && !isRenderSourcePath(filePath))
+	) {
+		return []
+	}
 
 	const state = createLasertagLspState({
 		fileExists: options.fileExists ?? existsSync,
@@ -126,9 +131,9 @@ export function createRefractorDiagnostics(
 			options.readFile ?? ((filePath) => readFileSync(filePath, `utf-8`)),
 	})
 
-	state.openDocument(createDocumentInput(document, cssPath))
+	state.openDocument(createDocumentInput(document, filePath))
 
-	return state.getDiagnostics(cssPath)
+	return state.getDiagnostics(filePath)
 }
 
 export function createInitializeResult(
@@ -453,44 +458,48 @@ export function createLasertagLspServer(
 		})
 	}
 
-	function clearPendingDiagnostics(cssPath: string): void {
-		const timer = diagnosticTimers.get(cssPath)
+	function clearPendingDiagnostics(filePath: string): void {
+		const timer = diagnosticTimers.get(filePath)
 
 		if (timer) {
 			clearTimeout(timer)
-			diagnosticTimers.delete(cssPath)
-			logger.debug(`diagnostics`, `cleared pending timer`, { cssPath })
+			diagnosticTimers.delete(filePath)
+			logger.debug(`diagnostics`, `cleared pending timer`, { filePath })
 		}
 	}
 
-	function publishDiagnostics(cssPath: string): void {
-		if (!isCssModulePath(cssPath)) return
+	function publishDiagnostics(filePath: string): void {
+		const isCssModule = isCssModulePath(filePath)
+
+		if (!isCssModule && !isRenderSourcePath(filePath)) return
 
 		const startedAt = performance.now()
 		const logLevel = logger.getLevel()
 		const chronicle = logLevel === `debug` ? logger.makeChronicle() : undefined
 
 		chronicle?.mark(`diagnostics started`)
-		const diagnostics = state.getDiagnostics(cssPath)
+		const diagnostics = state.getDiagnostics(filePath)
 		chronicle?.mark(`diagnostics resolved`)
 		const analysisTrace =
-			logLevel === `debug` || logLevel === `info`
-				? state.getAnalysisTrace(cssPath)
+			isCssModule && (logLevel === `debug` || logLevel === `info`)
+				? state.getAnalysisTrace(filePath)
 				: undefined
 		chronicle?.mark(`analysis trace resolved`)
-		const uri = state.getDocumentUri(cssPath)
+		const uri = state.getDocumentUri(filePath)
 
 		void connection.sendDiagnostics({
 			diagnostics,
 			uri,
 		})
-		void connection.sendNotification(
-			LASERTAG_RENDER_STORY_CHANGED_NOTIFICATION,
-			{ uri } satisfies LasertagRenderStoryChangedNotification,
-		)
+		if (isCssModule) {
+			void connection.sendNotification(
+				LASERTAG_RENDER_STORY_CHANGED_NOTIFICATION,
+				{ uri } satisfies LasertagRenderStoryChangedNotification,
+			)
+		}
 		chronicle?.mark(`diagnostics queued`)
 		logger.info(`diagnostics`, `published`, {
-			cssPath,
+			filePath,
 			diagnosticCount: diagnostics.length,
 			durationMs: durationMs(startedAt),
 			uri,
@@ -498,43 +507,51 @@ export function createLasertagLspServer(
 		if (analysisTrace) logAnalysisTrace(logger, analysisTrace)
 		chronicle?.mark(`analysis logged`)
 		chronicle?.logMarks()
+
+		if (isCssModule) {
+			const sourcePath = state.getRenderSourcePath(filePath)
+
+			if (sourcePath) publishDiagnostics(sourcePath)
+		}
 	}
 
-	function scheduleDiagnostics(cssPath: string): void {
-		if (!isCssModulePath(cssPath)) return
+	function scheduleDiagnostics(filePath: string): void {
+		if (!isCssModulePath(filePath) && !isRenderSourcePath(filePath)) return
 
-		clearPendingDiagnostics(cssPath)
+		clearPendingDiagnostics(filePath)
 
 		if (debounceMs <= 0) {
-			logger.debug(`diagnostics`, `publishing immediately`, { cssPath })
-			publishDiagnostics(cssPath)
+			logger.debug(`diagnostics`, `publishing immediately`, { filePath })
+			publishDiagnostics(filePath)
 			return
 		}
 
-		logger.debug(`diagnostics`, `scheduled`, { cssPath, debounceMs })
+		logger.debug(`diagnostics`, `scheduled`, { filePath, debounceMs })
 		diagnosticTimers.set(
-			cssPath,
+			filePath,
 			setTimeout(() => {
-				diagnosticTimers.delete(cssPath)
-				publishDiagnostics(cssPath)
+				diagnosticTimers.delete(filePath)
+				publishDiagnostics(filePath)
 			}, debounceMs),
 		)
 	}
 
 	function clearDiagnostics(
-		cssPath: string,
-		uri = state.getDocumentUri(cssPath),
+		filePath: string,
+		uri = state.getDocumentUri(filePath),
 	): void {
-		clearPendingDiagnostics(cssPath)
+		clearPendingDiagnostics(filePath)
 		void connection.sendDiagnostics({
 			diagnostics: [],
 			uri,
 		})
-		void connection.sendNotification(
-			LASERTAG_RENDER_STORY_CHANGED_NOTIFICATION,
-			{ uri } satisfies LasertagRenderStoryChangedNotification,
-		)
-		logger.info(`diagnostics`, `cleared`, { cssPath, uri })
+		if (isCssModulePath(filePath)) {
+			void connection.sendNotification(
+				LASERTAG_RENDER_STORY_CHANGED_NOTIFICATION,
+				{ uri } satisfies LasertagRenderStoryChangedNotification,
+			)
+		}
+		logger.info(`diagnostics`, `cleared`, { filePath, uri })
 	}
 
 	function scheduleAffectedCssForRenderSource(sourcePath: string): void {
@@ -642,6 +659,7 @@ export function createLasertagLspServer(
 		}
 
 		if (isRenderSourcePath(filePath)) {
+			scheduleDiagnostics(filePath)
 			scheduleAffectedCssForRenderSource(filePath)
 		}
 	}
@@ -794,6 +812,14 @@ export function createLasertagLspServer(
 			}
 
 			if (isRenderSourcePath(filePath)) {
+				const isOpen = state.getOpenDocumentPaths().includes(filePath)
+
+				if (change.type === FileChangeType.Deleted && !isOpen) {
+					clearDiagnostics(filePath, change.uri)
+				} else {
+					scheduleDiagnostics(filePath)
+				}
+
 				const affectedCssPaths = new Set([
 					...affectedCssBeforeChange,
 					...state.getAffectedCssPathsForRenderSource(filePath),
@@ -833,6 +859,7 @@ export function createLasertagLspServer(
 		}
 
 		if (isRenderSourcePath(filePath)) {
+			scheduleDiagnostics(filePath)
 			scheduleAffectedCssForRenderSource(filePath)
 		}
 	})

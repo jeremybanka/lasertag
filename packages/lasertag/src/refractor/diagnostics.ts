@@ -53,6 +53,8 @@ export type RenderStoryWarning = {
 		| `adoption-source-unavailable`
 		| `component-cycle`
 		| `component-not-found`
+		| `invalid-adoption-directive`
+		| `invalid-adoption-target`
 		| `multiple-main-components`
 		| `unknown-expression`
 	message: string
@@ -78,6 +80,8 @@ export type CssReachabilityDiagnostic = {
 		| `disable-explanation-too-short`
 		| `expect-error-explanation-too-short`
 		| `impossible-local-class`
+		| `invalid-adoption-directive`
+		| `invalid-adoption-target`
 		| `opaque-component-root-may-collide`
 		| `selector-matches-foreign-component-root`
 		| `selector-crosses-ownership-boundary`

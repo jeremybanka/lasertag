@@ -460,4 +460,157 @@ describe(`validated render-story adoption`, () => {
 			),
 		).toEqual([`adoption-source-unavailable`])
 	})
+
+	it.each([
+		{
+			label: `intrinsic element`,
+			target: `<section />`,
+		},
+		{
+			label: `fragment`,
+			target: `<><section /></>`,
+		},
+		{
+			label: `expression`,
+			target: `{true && <section />}`,
+		},
+		{
+			label: `local component`,
+			prefix: `function LocalPanel() { return <local-panel /> }`,
+			target: `<LocalPanel />`,
+		},
+		{
+			label: `no following instance`,
+			target: ``,
+		},
+	])(
+		`reports an invalid adoption target for a $label`,
+		({ prefix, target }) => {
+			expect(
+				diagnosticCodes(
+					`
+					${prefix ?? ``}
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								{/* @lasertag-own-subtree */}
+								${target}
+							</app-panel>
+						)
+					}
+				`,
+					`app-panel.class {}`,
+				),
+			).toEqual([`invalid-adoption-target`])
+		},
+	)
+
+	it(`reports a recognized directive with extra comment content`, () => {
+		expect(
+			diagnosticCodes(
+				`
+					import { HeadlessEditor } from "./HeadlessEditor.tsx"
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								{/* @lasertag-own-subtree: the editor is headless */}
+								<HeadlessEditor />
+							</app-panel>
+						)
+					}
+				`,
+				`app-panel.class {}`,
+			),
+		).toEqual([`invalid-adoption-directive`])
+	})
+
+	it(`does not mistake a similarly named comment for the directive`, () => {
+		expect(
+			diagnosticCodes(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								{/* @lasertag-own-subtree-ish */}
+								<section />
+							</app-panel>
+						)
+					}
+				`,
+				`app-panel.class {}`,
+			),
+		).toEqual([])
+	})
+
+	it(`adopts an imported component through transparent Solid control flow`, () => {
+		expect(
+			diagnosticCodes(
+				`
+					import { Show } from "solid-js"
+					import { HeadlessEditor } from "./HeadlessEditor.tsx"
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<Show when={true}>
+									{/* @lasertag-own-subtree */}
+									<HeadlessEditor />
+								</Show>
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						> headless-editor > editable-region > caret-layer {}
+					}
+				`,
+			),
+		).toEqual([])
+	})
+
+	it.each([
+		{
+			component: `For`,
+			contents: `{() => <section />}`,
+			props: `each={[]}`,
+		},
+		{
+			component: `Switch`,
+			contents: `<Match when={true}><section /></Match>`,
+			imports: `Switch, Match`,
+			props: ``,
+		},
+	])(
+		`reports adoption directly around Solid $component control flow`,
+		({ component, contents, imports = component, props }) => {
+			expect(
+				diagnosticCodes(
+					`
+						import { ${imports} } from "solid-js"
+						import css from "./AppPanel.module.css"
+
+						export function AppPanel() {
+							return (
+								<app-panel className={css.class}>
+									<${component} ${props}>
+										{/* @lasertag-own-subtree */}
+										${contents}
+									</${component}>
+								</app-panel>
+							)
+						}
+					`,
+					`app-panel.class {}`,
+				),
+			).toEqual([`invalid-adoption-target`])
+		},
+	)
 })

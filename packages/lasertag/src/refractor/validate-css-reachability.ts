@@ -153,7 +153,9 @@ function adoptionDiagnostics(
 	renderStory: RenderStory,
 ): CssReachabilityDiagnostic[] {
 	return renderStory.warnings.flatMap((warning) =>
-		warning.code === `adoption-source-unavailable`
+		warning.code === `adoption-source-unavailable` ||
+		warning.code === `invalid-adoption-directive` ||
+		warning.code === `invalid-adoption-target`
 			? [
 					{
 						code: warning.code,

@@ -853,6 +853,10 @@ type AdoptionRequest = {
 	range: SourceRange
 }
 
+type AdoptionDirective =
+	| { kind: `invalid`; range: SourceRange }
+	| { kind: `ready`; adoption: AdoptionRequest }
+
 type MappedComponentStoryResolution =
 	| { kind: `missing` }
 	| { kind: `ambiguous`; sourcePaths: string[] }
@@ -1011,9 +1015,21 @@ function invalidAdoptionTarget(
 	detail: string,
 ): void {
 	context.warnings.push({
-		code: `adoption-source-unavailable`,
+		code: `invalid-adoption-target`,
 		message: `Could not apply ${OWN_SUBTREE_DIRECTIVE}: ${detail}`,
 		range: adoption.range,
+		sourcePath: context.sourceFile.fileName,
+	})
+}
+
+function invalidAdoptionDirective(
+	context: AnalyzeContext,
+	range: SourceRange,
+): void {
+	context.warnings.push({
+		code: `invalid-adoption-directive`,
+		message: `${OWN_SUBTREE_DIRECTIVE} must be the only content in its JSX comment.`,
+		range,
 		sourcePath: context.sourceFile.fileName,
 	})
 }
@@ -1223,15 +1239,28 @@ function analyzeSolidTransparentChildren(
 	node: ComponentJsxNode,
 	stack: string[],
 ): StoryChild[] {
-	return jsxChildren(node).flatMap((child) => {
-		if (ts.isJsxExpression(child) && child.expression) {
-			const functionBody = functionBodyFromExpression(child.expression)
+	return analyzeJsxChildrenWith(
+		context,
+		jsxChildren(node),
+		(child, adoption) => {
+			if (ts.isJsxExpression(child) && child.expression) {
+				const functionBody = functionBodyFromExpression(child.expression)
 
-			if (functionBody) return analyzeFunctionBody(context, functionBody, stack)
-		}
+				if (functionBody) {
+					if (adoption) {
+						invalidAdoptionTarget(
+							context,
+							adoption,
+							`the directive must be followed by one imported component instance.`,
+						)
+					}
+					return analyzeFunctionBody(context, functionBody, stack)
+				}
+			}
 
-		return analyzeJsxChild(context, child, stack)
-	})
+			return analyzeJsxChild(context, child, stack, adoption)
+		},
+	)
 }
 
 function analyzeSolidRepeatedChildren(
@@ -1240,32 +1269,50 @@ function analyzeSolidRepeatedChildren(
 	stack: string[],
 ): StoryChild[] {
 	const children = jsxChildren(node)
-	const meaningfulChildren = children.filter(
+	const hasMeaningfulChild = children.some(
 		(child) =>
 			!ts.isJsxText(child) && !(ts.isJsxExpression(child) && !child.expression),
 	)
+	const analyzedChildren = analyzeJsxChildrenWith(
+		context,
+		children,
+		(child, adoption) => {
+			if (ts.isJsxText(child)) return []
+			if (ts.isJsxExpression(child) && !child.expression) return []
 
-	if (meaningfulChildren.length === 0) {
+			if (adoption) {
+				invalidAdoptionTarget(
+					context,
+					adoption,
+					`framework repetition render branches cannot be adopted directly.`,
+				)
+			}
+
+			if (ts.isJsxExpression(child) && child.expression) {
+				const functionBody = functionBodyFromExpression(child.expression)
+
+				if (functionBody) {
+					return analyzeFunctionBody(context, functionBody, stack)
+				}
+			}
+
+			return [
+				opaque(
+					`Solid loop without an inline render function`,
+					context.sourceFile,
+					child,
+				),
+			]
+		},
+	)
+
+	if (!hasMeaningfulChild) {
 		return [
 			opaque(`Solid loop without a render function`, context.sourceFile, node),
 		]
 	}
 
-	return meaningfulChildren.flatMap((child) => {
-		if (ts.isJsxExpression(child) && child.expression) {
-			const functionBody = functionBodyFromExpression(child.expression)
-
-			if (functionBody) return analyzeFunctionBody(context, functionBody, stack)
-		}
-
-		return [
-			opaque(
-				`Solid loop without an inline render function`,
-				context.sourceFile,
-				child,
-			),
-		]
-	})
+	return analyzedChildren
 }
 
 function analyzeSolidFallback(
@@ -1285,12 +1332,48 @@ function analyzeSolidSwitchAlternatives(
 	children: readonly ts.JsxChild[],
 	stack: string[],
 ): StoryChild[][] {
-	return children.flatMap((child): StoryChild[][] => {
-		if (ts.isJsxText(child)) return []
-		if (ts.isJsxExpression(child) && !child.expression) return []
+	const alternatives: StoryChild[][] = []
+	let pendingAdoption: AdoptionRequest | undefined
+
+	for (const child of children) {
+		const directive = adoptionDirective(context, child)
+
+		if (directive?.kind === `invalid`) {
+			invalidAdoptionDirective(context, directive.range)
+			continue
+		}
+
+		if (directive?.kind === `ready`) {
+			if (pendingAdoption) {
+				invalidAdoptionTarget(
+					context,
+					pendingAdoption,
+					`the directive is not followed by a component instance.`,
+				)
+			}
+			pendingAdoption = directive.adoption
+			continue
+		}
+
+		if (pendingAdoption && isIgnorableJsxChild(child)) continue
+
+		if (pendingAdoption) {
+			invalidAdoptionTarget(
+				context,
+				pendingAdoption,
+				`framework switch branches cannot be adopted directly.`,
+			)
+			pendingAdoption = undefined
+		}
+
+		if (ts.isJsxText(child)) continue
+		if (ts.isJsxExpression(child) && !child.expression) continue
 
 		if (ts.isJsxFragment(child)) {
-			return analyzeSolidSwitchAlternatives(context, child.children, stack)
+			alternatives.push(
+				...analyzeSolidSwitchAlternatives(context, child.children, stack),
+			)
+			continue
 		}
 
 		if (ts.isJsxElement(child) || ts.isJsxSelfClosingElement(child)) {
@@ -1304,14 +1387,27 @@ function analyzeSolidSwitchAlternatives(
 				binding?.moduleName === `solid-js` &&
 				binding.importedName === `Match`
 			) {
-				return [analyzeSolidTransparentChildren(context, child, stack)]
+				alternatives.push(
+					analyzeSolidTransparentChildren(context, child, stack),
+				)
+				continue
 			}
 		}
 
-		return [
-			[opaque(`non-Match child in Solid Switch`, context.sourceFile, child)],
-		]
-	})
+		alternatives.push([
+			opaque(`non-Match child in Solid Switch`, context.sourceFile, child),
+		])
+	}
+
+	if (pendingAdoption) {
+		invalidAdoptionTarget(
+			context,
+			pendingAdoption,
+			`the directive is not followed by a component instance.`,
+		)
+	}
+
+	return alternatives
 }
 
 function dynamicComponentValue(
@@ -1753,19 +1849,27 @@ function analyzeJsxChild(
 function adoptionDirective(
 	context: AnalyzeContext,
 	child: ts.JsxChild,
-): AdoptionRequest | undefined {
+): AdoptionDirective | undefined {
 	if (!ts.isJsxExpression(child) || child.expression) return
 
 	const sourceText = context.sourceFile.text.slice(
 		child.getStart(context.sourceFile),
 		child.getEnd(),
 	)
-	const pattern = new RegExp(
+	const exactPattern = new RegExp(
 		String.raw`^\{\s*\/\*\s*${OWN_SUBTREE_DIRECTIVE}\s*\*\/\s*\}$`,
 	)
+	const candidatePattern = new RegExp(
+		String.raw`^\{\s*\/\*\s*${OWN_SUBTREE_DIRECTIVE}(?![\w-])`,
+	)
+	const range = rangeOf(context.sourceFile, child)
 
-	return pattern.test(sourceText)
-		? { range: rangeOf(context.sourceFile, child) }
+	if (exactPattern.test(sourceText)) {
+		return { adoption: { range }, kind: `ready` }
+	}
+
+	return candidatePattern.test(sourceText)
+		? { kind: `invalid`, range }
 		: undefined
 }
 
@@ -1778,8 +1882,21 @@ function isIgnorableJsxChild(child: ts.JsxChild): boolean {
 
 function analyzeJsxChildren(
 	context: AnalyzeContext,
-	children: ts.NodeArray<ts.JsxChild>,
+	children: readonly ts.JsxChild[],
 	stack: string[],
+): StoryChild[] {
+	return analyzeJsxChildrenWith(context, children, (child, adoption) =>
+		analyzeJsxChild(context, child, stack, adoption),
+	)
+}
+
+function analyzeJsxChildrenWith(
+	context: AnalyzeContext,
+	children: readonly ts.JsxChild[],
+	analyzeChild: (
+		child: ts.JsxChild,
+		adoption?: AdoptionRequest,
+	) => StoryChild[],
 ): StoryChild[] {
 	const storyChildren: StoryChild[] = []
 	let pendingAdoption: AdoptionRequest | undefined
@@ -1787,7 +1904,12 @@ function analyzeJsxChildren(
 	for (const child of children) {
 		const directive = adoptionDirective(context, child)
 
-		if (directive) {
+		if (directive?.kind === `invalid`) {
+			invalidAdoptionDirective(context, directive.range)
+			continue
+		}
+
+		if (directive?.kind === `ready`) {
 			if (pendingAdoption) {
 				invalidAdoptionTarget(
 					context,
@@ -1795,15 +1917,13 @@ function analyzeJsxChildren(
 					`the directive is not followed by a component instance.`,
 				)
 			}
-			pendingAdoption = directive
+			pendingAdoption = directive.adoption
 			continue
 		}
 
 		if (pendingAdoption && isIgnorableJsxChild(child)) continue
 
-		storyChildren.push(
-			...analyzeJsxChild(context, child, stack, pendingAdoption),
-		)
+		storyChildren.push(...analyzeChild(child, pendingAdoption))
 		pendingAdoption = undefined
 	}
 
