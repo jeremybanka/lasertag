@@ -169,7 +169,12 @@ export function LexicalMarkdownEditor(props: EditorProps) {
 
 The comment has no runtime output. It applies only to the next imported
 component instance; another instance of the same component remains a foreign
-ownership boundary unless it has its own comment.
+ownership boundary unless it has its own comment. Lasertag reports
+`invalid-adoption-target` when the comment is dangling or followed by anything
+other than one imported component instance. The directive must be the only
+content in its JSX comment; trailing explanation reports
+`invalid-adoption-directive`. These warnings point to the JSX comment in editor
+diagnostics.
 
 Adoption retains the component's provable render story instead of retaining
 only its foreign outer root. The consumer's CSS Module can therefore describe

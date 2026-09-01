@@ -774,6 +774,47 @@ import css from "./AppPanel.module.css"
 		expect(state.getDiagnostics(cssPath)).toEqual([])
 	})
 
+	it(`places adoption warnings on the TSX directive instead of the CSS file`, () => {
+		const marker = `{/* @lasertag-own-subtree */}`
+		const sourceText = `
+			import css from "./AppPanel.module.css"
+
+			export function AppPanel() {
+				return (
+					<app-panel className={css.class}>
+						${marker}
+						<section />
+					</app-panel>
+				)
+			}
+		`
+		const fileSystem = createMemoryFileSystem({
+			[cssPath]: `app-panel.class {}`,
+			[tsxPath]: sourceText,
+		})
+		const state = createLasertagLspState(fileSystem.environment)
+		const document = TextDocument.create(
+			fileUri(tsxPath),
+			`typescriptreact`,
+			1,
+			sourceText,
+		)
+		const markerStart = sourceText.indexOf(marker)
+
+		expect(state.getDiagnostics(tsxPath)).toMatchObject([
+			{
+				code: `invalid-adoption-target`,
+				range: {
+					end: document.positionAt(markerStart + marker.length),
+					start: document.positionAt(markerStart),
+				},
+				severity: DiagnosticSeverity.Warning,
+				source: `lasertag`,
+			},
+		])
+		expect(state.getDiagnostics(cssPath)).toEqual([])
+	})
+
 	it(`emits subscribed diagnostics when a disk TSX file refreshes`, () => {
 		const fileSystem = createMemoryFileSystem({
 			[tsxPath]: createTsxSource(`header`),
