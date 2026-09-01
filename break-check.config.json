@@ -1,0 +1,6 @@
+{
+	"tagPattern": "lasertag@",
+	"testPattern": "packages/lasertag/tests/public/**",
+	"testCommand": "pnpm --filter lasertag run build && pnpm --filter lasertag run test:public",
+	"certifyCommand": "grep -q -F '\"lasertag\": minor' .changeset/*.md"
+}
