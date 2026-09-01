@@ -1,6 +1,6 @@
 {
 	"name": "lasertag",
-	"version": "0.7.0",
+	"version": "0.7.1",
 	"description": "zero-runtime structural css for jsx with css modules",
 	"license": "MPL-2.0",
 	"repository": {
