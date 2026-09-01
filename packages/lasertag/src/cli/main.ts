@@ -55,6 +55,7 @@ const DEFAULT_IGNORE_PATTERNS = [
 	`**/build/**`,
 	`**/coverage/**`,
 	`**/tests/refractor/corpus/providers/**`,
+	`**/tests/private/refractor/corpus/providers/**`,
 ]
 const FORMAT_OPTIONS = [`stylish`, `json`] as const
 const DEFAULT_MAX_DETAIL_FILES = 10

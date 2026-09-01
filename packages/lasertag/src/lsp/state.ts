@@ -60,6 +60,7 @@ const DEFAULT_IGNORE_PATTERNS = [
 	`**/build/**`,
 	`**/coverage/**`,
 	`**/tests/refractor/corpus/providers/**`,
+	`**/tests/private/refractor/corpus/providers/**`,
 ]
 
 export type FileSnapshot = {

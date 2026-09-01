@@ -1,0 +1,2066 @@
+import { afterAll, describe, expect, it } from "vitest"
+
+import { createTypescriptAstSession } from "../../../src/refractor/typescript-ast.ts"
+import { validateCssReachability as validateCssReachabilityOnce } from "../../../src/refractor/validate-css-reachability.ts"
+
+const typescriptSession = createTypescriptAstSession()
+
+afterAll(() => typescriptSession.close())
+
+function validateCssReachability(
+	options: Parameters<typeof validateCssReachabilityOnce>[0],
+) {
+	return validateCssReachabilityOnce(options, typescriptSession)
+}
+
+function diagnosticCodes(tsxSource: string, cssSource: string): string[] {
+	return validateCssReachability({
+		tsxPath: `/project/src/AppPanel.tsx`,
+		cssPath: `/project/src/AppPanel.module.css`,
+		tsxSource,
+		cssSource,
+	}).diagnostics.map((diagnostic) => diagnostic.code)
+}
+
+function diagnosticSelectors(tsxSource: string, cssSource: string): string[] {
+	return validateCssReachability({
+		tsxPath: `/project/src/AppPanel.tsx`,
+		cssPath: `/project/src/AppPanel.module.css`,
+		tsxSource,
+		cssSource,
+	}).diagnostics.map((diagnostic) => diagnostic.selector)
+}
+
+function diagnosticSummaries(tsxSource: string, cssSource: string) {
+	return validateCssReachability({
+		tsxPath: `/project/src/AppPanel.tsx`,
+		cssPath: `/project/src/AppPanel.module.css`,
+		tsxSource,
+		cssSource,
+	}).diagnostics.map((diagnostic) => ({
+		code: String(diagnostic.code),
+		selector: diagnostic.selector,
+	}))
+}
+
+describe(`render story css reachability`, () => {
+	it(`suppresses diagnostics on the line after a lasertag expect-error directive`, () => {
+		expect(
+			diagnosticSelectors(
+				`export function AppPanel() { return <app-panel className={css.class}><header /></app-panel> }`,
+				`app-panel.class {
+	/* @lasertag-expect-error: gets appended via useEffect */
+	> canvas {}
+	> footer {}
+}`,
+			),
+		).toEqual([`app-panel.class > footer`])
+	})
+
+	it(`suppresses separate selector-list branches without reporting used directives as unused`, () => {
+		expect(
+			diagnosticSummaries(
+				`export function AppPanel() { return <app-panel className={css.class} /> }`,
+				`app-panel.class {
+	/* @lasertag-expect-error: this is general styling for common layouts */
+	> h1,
+	/* @lasertag-expect-error: this is general styling for common layouts */
+	> h2,
+	> h3 {
+		padding: 0 15px;
+		overflow-x: scroll;
+		overflow-y: hidden;
+	}
+}`,
+			),
+		).toEqual([
+			{
+				code: `dead-selector`,
+				selector: `app-panel.class > h3`,
+			},
+		])
+	})
+
+	it(`disables one diagnostic code until its matching enable directive`, () => {
+		expect(
+			diagnosticSummaries(
+				`export function AppPanel() { return <app-panel className={css.class}><header /></app-panel> }`,
+				`app-panel.class {
+	> aside {}
+	/* @lasertag-disable [dead-selector] runtime elements share this layout */
+	> footer {}
+	.legacy {}
+	/* @lasertag-enable [dead-selector] */
+	> nav {}
+}`,
+			),
+		).toEqual([
+			{
+				code: `dead-selector`,
+				selector: `app-panel.class > aside`,
+			},
+			{
+				code: `impossible-local-class`,
+				selector: `app-panel.class .legacy`,
+			},
+			{
+				code: `dead-selector`,
+				selector: `app-panel.class > nav`,
+			},
+		])
+	})
+
+	it(`supports overlapping disable regions for different diagnostic codes`, () => {
+		expect(
+			diagnosticCodes(
+				`export function AppPanel() { return <app-panel className={css.class} /> }`,
+				`app-panel.class {
+	/* @lasertag-disable [dead-selector] runtime elements share this layout */
+	/* @lasertag-disable [impossible-local-class] runtime classes share this layout */
+	> footer {}
+	.legacy {}
+	/* @lasertag-enable [dead-selector] */
+	.legacy-again {}
+	/* @lasertag-enable [impossible-local-class] */
+}`,
+			),
+		).toEqual([])
+	})
+
+	it(`disables a diagnostic code through the end of the file without an enable`, () => {
+		expect(
+			diagnosticCodes(
+				`export function AppPanel() { return <app-panel className={css.class} /> }`,
+				`app-panel.class {
+	/* @lasertag-disable [dead-selector] runtime elements share this layout */
+	> footer {}
+}`,
+			),
+		).toEqual([])
+	})
+
+	it.each([``, `no`])(
+		`requires a disable explanation of at least three characters`,
+		(explanation) => {
+			const explanationSuffix = explanation ? ` ${explanation}` : ``
+			const directive = `/* @lasertag-disable [dead-selector]${explanationSuffix} */`
+
+			expect(
+				diagnosticSummaries(
+					`export function AppPanel() { return <app-panel className={css.class} /> }`,
+					`app-panel.class {
+	${directive}
+	> footer {}
+	/* @lasertag-enable [dead-selector] */
+}`,
+				),
+			).toEqual([
+				{
+					code: `disable-explanation-too-short`,
+					selector: directive,
+				},
+			])
+		},
+	)
+
+	it(`reports a disable directive that suppresses no matching diagnostics`, () => {
+		expect(
+			diagnosticSummaries(
+				`export function AppPanel() { return <app-panel className={css.class}><header /></app-panel> }`,
+				`app-panel.class {
+	/* @lasertag-disable [dead-selector] runtime elements share this layout */
+	> header {}
+	/* @lasertag-enable [dead-selector] */
+}`,
+			),
+		).toEqual([
+			{
+				code: `unused-disable`,
+				selector: `/* @lasertag-disable [dead-selector] runtime elements share this layout */`,
+			},
+		])
+	})
+
+	it(`reports a disable directive when its diagnostic code is already disabled`, () => {
+		expect(
+			diagnosticSummaries(
+				`export function AppPanel() { return <app-panel className={css.class} /> }`,
+				`app-panel.class {
+	/* @lasertag-disable [dead-selector] first runtime layout region */
+	/* @lasertag-disable [dead-selector] redundant runtime layout region */
+	> footer {}
+	/* @lasertag-enable [dead-selector] */
+}`,
+			),
+		).toEqual([
+			{
+				code: `unused-disable`,
+				selector: `/* @lasertag-disable [dead-selector] redundant runtime layout region */`,
+			},
+		])
+	})
+
+	it(`reports an enable directive outside a matching disable region`, () => {
+		expect(
+			diagnosticSummaries(
+				`export function AppPanel() { return <app-panel className={css.class} /> }`,
+				`app-panel.class {
+	/* @lasertag-disable [impossible-local-class] runtime classes share this layout */
+	/* @lasertag-enable [dead-selector] */
+	.legacy {}
+	/* @lasertag-enable [impossible-local-class] */
+}`,
+			),
+		).toEqual([
+			{
+				code: `unused-enable`,
+				selector: `/* @lasertag-enable [dead-selector] */`,
+			},
+		])
+	})
+
+	it(`reports an unused lasertag expect-error directive`, () => {
+		const cssSource = `app-panel.class {
+	/* @lasertag-expect-error: header is conditionally rendered */
+	> header {}
+}`
+		const result = validateCssReachability({
+			cssPath: `/project/src/AppPanel.module.css`,
+			cssSource,
+			tsxPath: `/project/src/AppPanel.tsx`,
+			tsxSource: `export function AppPanel() { return <app-panel className={css.class}><header /></app-panel> }`,
+		})
+
+		expect(result.diagnostics).toMatchObject([
+			{
+				code: `unused-expect-error`,
+				selector: `/* @lasertag-expect-error: header is conditionally rendered */`,
+			},
+		])
+		expect(
+			cssSource.slice(
+				result.diagnostics[0]?.range?.start,
+				result.diagnostics[0]?.range?.end,
+			),
+		).toBe(`/* @lasertag-expect-error: header is conditionally rendered */`)
+	})
+
+	it(`requires a lasertag expect-error explanation of at least three characters`, () => {
+		expect(
+			diagnosticCodes(
+				`export function AppPanel() { return <app-panel className={css.class} /> }`,
+				`app-panel.class {
+	/* @lasertag-expect-error: no */
+	> footer {}
+}`,
+			),
+		).toEqual([`expect-error-explanation-too-short`])
+
+		expect(
+			diagnosticCodes(
+				`export function AppPanel() { return <app-panel className={css.class} /> }`,
+				`app-panel.class {
+	/* @lasertag-expect-error: yep */
+	> footer {}
+}`,
+			),
+		).toEqual([])
+	})
+
+	it(`targets only the immediately following line`, () => {
+		expect(
+			diagnosticCodes(
+				`export function AppPanel() { return <app-panel className={css.class} /> }`,
+				`app-panel.class {
+	/* @lasertag-expect-error: rendered by a portal */
+
+	> footer {}
+}`,
+			),
+		).toEqual([`unused-expect-error`, `dead-selector`])
+	})
+
+	it(`allows selectors that match direct rendered tag paths`, () => {
+		const result = validateCssReachability({
+			tsxPath: `/project/src/AppPanel.tsx`,
+			cssPath: `/project/src/AppPanel.module.css`,
+			tsxSource: `
+				import css from "./AppPanel.module.css"
+
+				export function AppPanel() {
+					return (
+						<app-panel className={css.class}>
+							<header>
+								<h1>Project</h1>
+							</header>
+						</app-panel>
+					)
+				}
+			`,
+			cssSource: `
+				app-panel.class {
+					> header {
+						> h1 {}
+					}
+				}
+			`,
+		})
+
+		expect(result.diagnostics).toEqual([])
+	})
+
+	it(`reports a dead selector when no render story contains the path`, () => {
+		const result = validateCssReachability({
+			tsxPath: `/project/src/AppPanel.tsx`,
+			cssPath: `/project/src/AppPanel.module.css`,
+			tsxSource: `
+				import css from "./AppPanel.module.css"
+
+				export function AppPanel() {
+					return (
+						<app-panel className={css.class}>
+							<header />
+						</app-panel>
+					)
+				}
+			`,
+			cssSource: `
+				app-panel.class {
+					> footer {}
+				}
+			`,
+		})
+
+		expect(result.diagnostics).toMatchObject([
+			{
+				code: `dead-selector`,
+				selector: `app-panel.class > footer`,
+			},
+		])
+	})
+
+	it(`scopes TSX reachability to the node carrying css.class`, () => {
+		const result = validateCssReachability({
+			cssPath: `/project/src/AppPanel.module.css`,
+			cssSource: `app-panel.class {
+	> footer {}
+}`,
+			tsxPath: `/project/src/AppPanel.tsx`,
+			tsxSource: `
+				import css from "./AppPanel.module.css"
+				import { ExternalIsland } from "./ExternalIsland.tsx"
+
+				export function AppPanel() {
+					return (
+						<>
+							<ExternalIsland />
+							<layout-shell>
+								<app-panel className={css.class}><header /></app-panel>
+							</layout-shell>
+						</>
+					)
+				}
+			`,
+		})
+
+		expect(result.renderStory.roots).toMatchObject([
+			{
+				attributes: [{ expression: `css.class`, name: `class` }],
+				kind: `element`,
+				tagName: `app-panel`,
+			},
+		])
+		expect(result.diagnostics).toMatchObject([
+			{ code: `dead-selector`, selector: `app-panel.class > footer` },
+		])
+	})
+
+	it(`distinguishes direct-child selectors from descendant selectors`, () => {
+		const result = validateCssReachability({
+			tsxPath: `/project/src/AppPanel.tsx`,
+			cssPath: `/project/src/AppPanel.module.css`,
+			tsxSource: `
+				import css from "./AppPanel.module.css"
+
+				export function AppPanel() {
+					return (
+						<app-panel className={css.class}>
+							<section>
+								<footer />
+							</section>
+						</app-panel>
+					)
+				}
+			`,
+			cssSource: `
+				app-panel.class {
+					> footer {}
+					footer {}
+				}
+			`,
+		})
+
+		expect(result.diagnostics).toMatchObject([
+			{
+				code: `dead-selector`,
+				selector: `app-panel.class > footer`,
+			},
+		])
+	})
+
+	it(`inlines same-file local components into the render story`, () => {
+		const result = validateCssReachability({
+			tsxPath: `/project/src/AppPanel.tsx`,
+			cssPath: `/project/src/AppPanel.module.css`,
+			tsxSource: `
+				import css from "./AppPanel.module.css"
+
+				const PanelActions = () => (
+					<actions-row>
+						<button type="button">Save</button>
+					</actions-row>
+				)
+
+				export function AppPanel() {
+					return (
+						<app-panel className={css.class}>
+							<PanelActions />
+						</app-panel>
+					)
+				}
+			`,
+			cssSource: `
+				app-panel.class {
+					> actions-row {
+						> button {}
+						> a {}
+					}
+				}
+			`,
+		})
+
+		expect(result.diagnostics).toMatchObject([
+			{
+				code: `dead-selector`,
+				selector: `app-panel.class > actions-row > a`,
+			},
+		])
+	})
+
+	it(`treats conditional branches as alternate reachable paths`, () => {
+		const result = validateCssReachability({
+			tsxPath: `/project/src/AppPanel.tsx`,
+			cssPath: `/project/src/AppPanel.module.css`,
+			tsxSource: `
+				import css from "./AppPanel.module.css"
+
+				export function AppPanel({ showFooter }: { showFooter: boolean }) {
+					return (
+						<app-panel className={css.class}>
+							{showFooter ? <footer /> : <header />}
+						</app-panel>
+					)
+				}
+			`,
+			cssSource: `
+				app-panel.class {
+					> header {}
+					> footer {}
+				}
+			`,
+		})
+
+		expect(result.diagnostics).toEqual([])
+	})
+
+	it(`treats simple map callback returns as repeated reachable branches`, () => {
+		const result = validateCssReachability({
+			tsxPath: `/project/src/AppPanel.tsx`,
+			cssPath: `/project/src/AppPanel.module.css`,
+			tsxSource: `
+				import css from "./AppPanel.module.css"
+
+				export function AppPanel({ items }: { items: string[] }) {
+					return (
+						<app-panel className={css.class}>
+							{items.map((item) => <item-row>{item}</item-row>)}
+						</app-panel>
+					)
+				}
+			`,
+			cssSource: `
+				app-panel.class {
+					> item-row {}
+					> missing-row {}
+				}
+			`,
+		})
+
+		expect(result.diagnostics).toMatchObject([
+			{
+				code: `dead-selector`,
+				selector: `app-panel.class > missing-row`,
+			},
+		])
+	})
+
+	it(`treats Solid control-flow components as transparent branches`, () => {
+		const result = validateCssReachability({
+			tsxPath: `/project/src/AppPanel.tsx`,
+			cssPath: `/project/src/AppPanel.module.css`,
+			tsxSource: `
+				import { ErrorBoundary, For, Match, Show, Suspense, SuspenseList, Switch } from "solid-js"
+				import { NoHydration } from "solid-js/web"
+				import css from "./AppPanel.module.css"
+
+				export function AppPanel(props: { items: string[], ready: boolean }) {
+					return (
+						<app-panel class={css.class}>
+							<Show when={props.ready} fallback={<loading-state />}>
+								<ready-state />
+							</Show>
+							<For each={props.items} fallback={<empty-state />}>
+								{(item) => <item-row>{item}</item-row>}
+							</For>
+							<Switch>
+								<Match when={props.ready}><matched-state /></Match>
+							</Switch>
+							<ErrorBoundary fallback={() => <error-state />}>
+								<stable-state />
+							</ErrorBoundary>
+							<SuspenseList>
+								<Suspense fallback={<pending-state />}><loaded-state /></Suspense>
+							</SuspenseList>
+							<NoHydration><static-state /></NoHydration>
+						</app-panel>
+					)
+				}
+			`,
+			cssSource: `
+				app-panel.class {
+					> ready-state {}
+					> loading-state {}
+					> item-row {}
+					> empty-state {}
+					> matched-state {}
+					> error-state {}
+					> stable-state {}
+					> pending-state {}
+					> loaded-state {}
+					> static-state {}
+					> impossible-state {}
+				}
+			`,
+		})
+
+		expect(result.diagnostics).toMatchObject([
+			{
+				code: `dead-selector`,
+				selector: `app-panel.class > impossible-state`,
+			},
+		])
+	})
+
+	it(`reports nested local classes as impossible under the lasertag module contract`, () => {
+		const result = validateCssReachability({
+			tsxPath: `/project/src/AppPanel.tsx`,
+			cssPath: `/project/src/AppPanel.module.css`,
+			tsxSource: `
+				import css from "./AppPanel.module.css"
+
+				export function AppPanel() {
+					return (
+						<app-panel className={css.class}>
+							<label />
+						</app-panel>
+					)
+				}
+			`,
+			cssSource: `
+				app-panel.class {
+					> .label {}
+				}
+			`,
+		})
+
+		expect(result.diagnostics).toMatchObject([
+			{
+				code: `impossible-local-class`,
+				selector: `app-panel.class > .label`,
+			},
+		])
+	})
+
+	it(`reports a possible collision with an unresolved imported component`, () => {
+		const result = validateCssReachability({
+			tsxPath: `/project/src/AppPanel.tsx`,
+			cssPath: `/project/src/AppPanel.module.css`,
+			tsxSource: `
+				import css from "./AppPanel.module.css"
+				import { UserMenu } from "./UserMenu.tsx"
+
+				export function AppPanel() {
+					return (
+						<app-panel className={css.class}>
+							<UserMenu />
+						</app-panel>
+					)
+				}
+			`,
+			cssSource: `
+				app-panel.class {
+					> user-menu {}
+				}
+			`,
+		})
+
+		expect(result.diagnostics).toMatchObject([
+			{
+				code: `opaque-component-root-may-collide`,
+				selector: `app-panel.class > user-menu`,
+			},
+		])
+	})
+
+	it(`skips unsupported selectors instead of reporting them as dead`, () => {
+		expect(
+			diagnosticCodes(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<header />
+								<footer />
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						> header + footer {}
+					}
+				`,
+			),
+		).toEqual([])
+	})
+})
+
+describe(`module.css dead code assessment`, () => {
+	it(`reports an unreachable root selector for a component that always renders one tag`, () => {
+		expect(
+			diagnosticSelectors(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return <app-panel className={css.class} />
+					}
+				`,
+				`
+					app-panel.class {}
+					other-panel.class {}
+				`,
+			),
+		).toEqual([`other-panel.class`])
+	})
+
+	it(`reports a dead direct child for a root with one stable child`, () => {
+		expect(
+			diagnosticSelectors(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<header />
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						> header {}
+						> footer {}
+					}
+				`,
+			),
+		).toEqual([`app-panel.class > footer`])
+	})
+
+	it(`checks selector-list entries independently`, () => {
+		expect(
+			diagnosticSelectors(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<header />
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class > header,
+					app-panel.class > aside {}
+				`,
+			),
+		).toEqual([`app-panel.class > aside`])
+	})
+
+	it(`expands ampersand nesting before checking selector reachability`, () => {
+		expect(
+			diagnosticSelectors(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<header />
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						& > header {}
+						& > nav {}
+					}
+				`,
+			),
+		).toEqual([`app-panel.class > nav`])
+	})
+
+	it(`checks nested rules inside at-rules`, () => {
+		expect(
+			diagnosticSelectors(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<section />
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						@media (width >= 48rem) {
+							> section {}
+							> nav {}
+						}
+					}
+				`,
+			),
+		).toEqual([`app-panel.class > nav`])
+	})
+
+	it(`treats fragments as transparent and null branches as empty`, () => {
+		expect(
+			diagnosticSelectors(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel({ open }: { open: boolean }) {
+						if (!open) return null
+
+						return (
+							<>
+								<app-panel className={css.class}>
+									<dialog-body />
+								</app-panel>
+							</>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						> dialog-body {}
+						> dialog-footer {}
+					}
+				`,
+			),
+		).toEqual([`app-panel.class > dialog-footer`])
+	})
+
+	it(`treats logical-and branches as reachable alternate paths`, () => {
+		expect(
+			diagnosticSelectors(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel({ expanded }: { expanded: boolean }) {
+						return (
+							<app-panel className={css.class}>
+								{expanded && (
+									<details-panel>
+										<button type="button" />
+									</details-panel>
+								)}
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						> details-panel {
+							> button {}
+						}
+
+						> summary-panel {}
+					}
+				`,
+			),
+		).toEqual([`app-panel.class > summary-panel`])
+	})
+
+	it(`handles map callbacks with block bodies and null returns`, () => {
+		expect(
+			diagnosticSelectors(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel({ items }: { items: Array<string | null> }) {
+						return (
+							<app-panel className={css.class}>
+								{items.map((item) => {
+									if (!item) return null
+
+									return (
+										<item-row>
+											<span>{item}</span>
+										</item-row>
+									)
+								})}
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						> item-row {
+							> span {}
+							> button {}
+						}
+					}
+				`,
+			),
+		).toEqual([`app-panel.class > item-row > button`])
+	})
+
+	it(`inlines same-file components wrapped in common component factories`, () => {
+		expect(
+			diagnosticSelectors(
+				`
+					import * as React from "react"
+					import css from "./AppPanel.module.css"
+
+					const Toolbar = React.memo(() => (
+						<toolbar-row>
+							<button type="button" />
+						</toolbar-row>
+					))
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<Toolbar />
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						> toolbar-row {
+							> button {}
+							> a {}
+						}
+					}
+				`,
+			),
+		).toEqual([`app-panel.class > toolbar-row > a`])
+	})
+
+	it(`handles a multi-component render story with nested conditionals and maps`, () => {
+		const result = validateCssReachability({
+			tsxPath: `/project/src/DashboardPanel.tsx`,
+			cssPath: `/project/src/DashboardPanel.module.css`,
+			tsxSource: `
+				import css from "./DashboardPanel.module.css"
+
+				type Item = {
+					disabled?: boolean
+					href: string
+					label: string
+				}
+
+				function PanelHeader({ dense }: { dense: boolean }) {
+					return (
+						<panel-header>
+							{dense ? (
+								<compact-actions>
+									<button type="button" />
+								</compact-actions>
+							) : (
+								<wide-actions>
+									<button type="button" />
+									<a href="/settings">Settings</a>
+								</wide-actions>
+							)}
+						</panel-header>
+					)
+				}
+
+				function PanelBody(
+					{ items, mode }: { items: Item[]; mode: "empty" | "ready" },
+				) {
+					if (mode === "empty") {
+						return (
+							<empty-state>
+								<p />
+							</empty-state>
+						)
+					}
+
+					return (
+						<content-list>
+							{items.map((item) =>
+								item.disabled ? (
+									<disabled-row>
+										<span>{item.label}</span>
+									</disabled-row>
+								) : (
+									<active-row>
+										<a href={item.href}>{item.label}</a>
+									</active-row>
+								)
+							)}
+						</content-list>
+					)
+				}
+
+				function PanelFooter() {
+					return (
+						<panel-footer>
+							<small />
+						</panel-footer>
+					)
+				}
+
+				export function DashboardPanel(
+					props: {
+						dense: boolean
+						items: Item[]
+						mode: "empty" | "ready"
+						ready: boolean
+						showFooter: boolean
+					},
+				) {
+					return (
+						<dashboard-panel className={css.class}>
+							{props.ready ? (
+								<>
+									<PanelHeader dense={props.dense} />
+									<PanelBody items={props.items} mode={props.mode} />
+								</>
+							) : (
+								<loading-state />
+							)}
+							{props.showFooter && <PanelFooter />}
+						</dashboard-panel>
+					)
+				}
+			`,
+			cssSource: `
+				dashboard-panel.class {
+					> panel-header {
+						> compact-actions {
+							> button {}
+						}
+
+						> wide-actions {
+							> button {}
+							> a {}
+						}
+
+						> search-box {}
+					}
+
+					> empty-state {
+						> p {}
+					}
+
+					> content-list {
+						> active-row {
+							> a {}
+						}
+
+						> disabled-row {
+							> span {}
+						}
+
+						> archived-row {}
+					}
+
+					> loading-state {}
+
+					> panel-footer {
+						> small {}
+						> button {}
+					}
+
+					> error-state {}
+				}
+			`,
+		})
+
+		expect(result.diagnostics).toMatchObject([
+			{
+				code: `dead-selector`,
+				selector: `dashboard-panel.class > panel-header > search-box`,
+			},
+			{
+				code: `dead-selector`,
+				selector: `dashboard-panel.class > content-list > archived-row`,
+			},
+			{
+				code: `dead-selector`,
+				selector: `dashboard-panel.class > panel-footer > button`,
+			},
+			{
+				code: `dead-selector`,
+				selector: `dashboard-panel.class > error-state`,
+			},
+		])
+	})
+})
+
+describe(`module.css pseudo selector reachability`, () => {
+	it(`allows ampersand pseudo-classes on the owning selector`, () => {
+		expect(
+			diagnosticSelectors(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<header />
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						&:hover {}
+						&:focus-visible {
+							> header {}
+						}
+					}
+				`,
+			),
+		).toEqual([])
+	})
+
+	it(`checks selectors nested underneath ampersand pseudo-classes`, () => {
+		expect(
+			diagnosticSelectors(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<header>
+									<h1 />
+								</header>
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						&:focus-visible {
+							> header {
+								> h1 {}
+								> nav {}
+							}
+						}
+					}
+				`,
+			),
+		).toEqual([`app-panel.class:focus-visible > header > nav`])
+	})
+
+	it(`allows ampersand pseudo-elements on the owning selector`, () => {
+		expect(
+			diagnosticSelectors(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return <app-panel className={css.class} />
+					}
+				`,
+				`
+					app-panel.class {
+						&::before {}
+						&::after {}
+					}
+				`,
+			),
+		).toEqual([])
+	})
+
+	it(`checks selectors nested underneath ampersand pseudo-elements`, () => {
+		expect(
+			diagnosticSelectors(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<header>
+									<h1 />
+								</header>
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						&::before {
+							> header {
+								> h1 {}
+								> button {}
+							}
+						}
+					}
+				`,
+			),
+		).toEqual([`app-panel.class::before > header > button`])
+	})
+})
+
+describe(`module.css selector refinement reachability`, () => {
+	it(`treats non-structural functional pseudo-classes as host refinements`, () => {
+		expect(
+			diagnosticSelectors(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<button type="button" />
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						> button:not(.disabled):nth-child(1) {}
+						> a:not(.disabled) {}
+					}
+				`,
+			),
+		).toEqual([`app-panel.class > a:not(.disabled)`])
+	})
+
+	it(`treats :is tag arguments as structural alternatives`, () => {
+		expect(
+			diagnosticSelectors(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<header>
+									<h1 />
+								</header>
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						> :is(header, footer) {
+							> h1 {}
+							> nav {}
+						}
+					}
+				`,
+			),
+		).toEqual([`app-panel.class > :is(header, footer) > nav`])
+	})
+
+	it(`treats :where tag arguments as structural alternatives`, () => {
+		expect(
+			diagnosticSelectors(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<header />
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						> :where(header, footer) {}
+						> :where(nav, aside) {}
+					}
+				`,
+			),
+		).toEqual([`app-panel.class > :where(nav, aside)`])
+	})
+
+	it(`treats attribute selectors as host refinements`, () => {
+		expect(
+			diagnosticSelectors(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<button type="button" data-icon=".external" />
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						> button[type="button"][data-icon=".external"] {}
+						> a[href] {}
+					}
+				`,
+			),
+		).toEqual([`app-panel.class > a[href]`])
+	})
+})
+
+describe(`module.css selector unknowns and escapes`, () => {
+	it(`skips selectors that cross a :global escape hatch`, () => {
+		expect(
+			diagnosticSelectors(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return <app-panel className={css.class} />
+					}
+				`,
+				`
+					app-panel.class {
+						:global(.radix-popover-content) {
+							> button {}
+						}
+					}
+				`,
+			),
+		).toEqual([])
+	})
+
+	it(`checks wildcard selectors and skips tagless selectors`, () => {
+		expect(
+			diagnosticSelectors(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return <app-panel className={css.class} />
+					}
+				`,
+				`
+					app-panel.class {
+						> * {}
+						> [role="button"] {}
+					}
+				`,
+			),
+		).toEqual([`app-panel.class > *`])
+	})
+
+	it(`skips unsupported structural selectors`, () => {
+		expect(
+			diagnosticSelectors(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<header />
+								<footer />
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						> header + footer {}
+						> header ~ footer {}
+						> header:has(button) {}
+						svg|a {}
+					}
+				`,
+			),
+		).toEqual([])
+	})
+})
+
+describe(`module.css nesting and at-rule reachability`, () => {
+	it(`checks multiple root selector alternatives independently`, () => {
+		expect(
+			diagnosticSelectors(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<header />
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class,
+					other-panel.class {
+						> header {}
+					}
+				`,
+			),
+		).toEqual([`other-panel.class`, `other-panel.class > header`])
+	})
+
+	it(`checks nested rules inside modern at-rules`, () => {
+		expect(
+			diagnosticSelectors(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<header />
+							</app-panel>
+						)
+					}
+				`,
+				`
+					@supports (container-type: inline-size) {
+						app-panel.class {
+							@container (width > 20rem) {
+								@layer components {
+									> header {}
+									> footer {}
+								}
+							}
+						}
+					}
+				`,
+			),
+		).toEqual([`app-panel.class > footer`])
+	})
+
+	it(`reports nested self class selectors as impossible local classes`, () => {
+		expect(
+			diagnosticCodes(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<app-panel />
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						& & {}
+					}
+				`,
+			),
+		).toEqual([`impossible-local-class`])
+	})
+
+	it(`allows ampersand root alternatives inside :is`, () => {
+		expect(
+			diagnosticSelectors(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<header />
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						:is(&, other-panel.class) {
+							> header {}
+							> footer {}
+						}
+					}
+				`,
+			),
+		).toEqual([`:is(app-panel.class, other-panel.class) > footer`])
+	})
+})
+
+describe(`tag-named JSX component namespaces`, () => {
+	it(`allows the asserted component root but warns when a selector enters it`, () => {
+		expect(
+			diagnosticSummaries(
+				`
+					import css from "./AppPanel.module.css"
+
+					function MagnifyingGlassIcon() {
+						return <svg><path /></svg>
+					}
+
+					const svg = {
+						MagnifyingGlass: MagnifyingGlassIcon,
+					}
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<svg.MagnifyingGlass />
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						> svg {}
+						> svg > path {}
+					}
+				`,
+			),
+		).toEqual([
+			{
+				code: `selector-crosses-ownership-boundary`,
+				selector: `app-panel.class > svg > path`,
+			},
+		])
+	})
+
+	it(`keeps separately owned sibling selectors unambiguous`, () => {
+		expect(
+			diagnosticSummaries(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<svg.MagnifyingGlass />
+								<input />
+								<kbd>⌘K</kbd>
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						> input {}
+						> kbd {}
+					}
+				`,
+			),
+		).toEqual([])
+	})
+
+	it.each([`svg`, `span`, `header`, `article`, `div`])(
+		`recognizes the %s intrinsic namespace assertion`,
+		(tagName) => {
+			expect(
+				diagnosticSummaries(
+					`
+						import css from "./AppPanel.module.css"
+
+						export function AppPanel() {
+							return (
+								<app-panel className={css.class}>
+									<${tagName}.ExternalComponent />
+								</app-panel>
+							)
+						}
+					`,
+					`
+						app-panel.class {
+							> ${tagName} {}
+						}
+					`,
+				),
+			).toEqual([])
+		},
+	)
+
+	it(`keeps arbitrary and custom-element namespaces opaque`, () => {
+		expect(
+			diagnosticSummaries(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<icons.MagnifyingGlass />
+								<app-icon.ExternalComponent />
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						> svg {}
+						> app-icon {}
+					}
+				`,
+			),
+		).toEqual([
+			{
+				code: `opaque-component-root-may-collide`,
+				selector: `app-panel.class > svg`,
+			},
+			{
+				code: `opaque-component-root-may-collide`,
+				selector: `app-panel.class > svg`,
+			},
+			{
+				code: `opaque-component-root-may-collide`,
+				selector: `app-panel.class > app-icon`,
+			},
+			{
+				code: `opaque-component-root-may-collide`,
+				selector: `app-panel.class > app-icon`,
+			},
+		])
+	})
+})
+
+describe(`module.css ownership boundaries`, () => {
+	it(`reports a universal descendant selector that can enter an unresolved imported component`, () => {
+		expect(
+			diagnosticSummaries(
+				`
+					import css from "./AppPanel.module.css"
+					import { UserMenu } from "./UserMenu.tsx"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<UserMenu />
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						* {}
+					}
+				`,
+			),
+		).toEqual([
+			{
+				code: `opaque-component-root-may-collide`,
+				selector: `app-panel.class *`,
+			},
+		])
+	})
+
+	it(`reports a direct universal child selector that can style children roots`, () => {
+		expect(
+			diagnosticSummaries(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel({ children }: { children: React.ReactNode }) {
+						return (
+							<app-panel className={css.class}>
+								{children}
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						> * {}
+					}
+				`,
+			),
+		).toEqual([
+			{
+				code: `selector-crosses-ownership-boundary`,
+				selector: `app-panel.class > *`,
+			},
+		])
+	})
+
+	it(`reports a named descendant selector that can enter an imported component`, () => {
+		expect(
+			diagnosticSummaries(
+				`
+					import css from "./AppPanel.module.css"
+					import { UserMenu } from "./UserMenu.tsx"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<section>
+									<UserMenu />
+								</section>
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						> section {
+							button {}
+						}
+					}
+				`,
+			),
+		).toEqual([
+			{
+				code: `opaque-component-root-may-collide`,
+				selector: `app-panel.class > section button`,
+			},
+		])
+	})
+
+	it(`reports a selector that matches owned DOM but can also enter foreign DOM`, () => {
+		expect(
+			diagnosticSummaries(
+				`
+					import css from "./AppPanel.module.css"
+					import { UserMenu } from "./UserMenu.tsx"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<button />
+								<UserMenu />
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						button {}
+					}
+				`,
+			),
+		).toEqual([
+			{
+				code: `opaque-component-root-may-collide`,
+				selector: `app-panel.class button`,
+			},
+		])
+	})
+
+	it(`allows universal descendant selectors in dead-end components`, () => {
+		expect(
+			diagnosticSummaries(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<header>
+									<h1>Account</h1>
+								</header>
+								<button>Save</button>
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						* {}
+					}
+				`,
+			),
+		).toEqual([])
+	})
+
+	it(`reports when an unresolved component can collide with an owned sibling`, () => {
+		expect(
+			diagnosticSummaries(
+				`
+					import css from "./AppPanel.module.css"
+					import { UserMenu } from "./UserMenu.tsx"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<header>
+									<h1>Account</h1>
+								</header>
+								<UserMenu />
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						> header {
+							* {}
+						}
+					}
+				`,
+			),
+		).toEqual([
+			{
+				code: `opaque-component-root-may-collide`,
+				selector: `app-panel.class > header`,
+			},
+		])
+	})
+
+	it(`reports an unknown external sibling that can overlap an owned direct-child path`, () => {
+		expect(
+			diagnosticSummaries(
+				`
+					import { External } from "external-package"
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<file-name>
+									<button type="button">
+										<svg />
+									</button>
+								</file-name>
+								<External />
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						> file-name {
+							> button {
+								> svg {}
+								&:hover::before {}
+							}
+						}
+					}
+				`,
+			),
+		).toEqual([
+			{
+				code: `opaque-component-root-may-collide`,
+				selector: `app-panel.class > file-name`,
+			},
+		])
+	})
+
+	it(`reports a dynamic component sibling that can overlap same-module component paths`, () => {
+		expect(
+			diagnosticSummaries(
+				`
+					import css from "./DocsNavigation.module.css"
+					import { Toggle } from "./Toggle.tsx"
+
+					export function DocsNavigation() {
+						return (
+							<docs-navigation className={css.class}>
+								<SiteDirectory />
+								<OnThisPage />
+								<Toggle.Button />
+							</docs-navigation>
+						)
+					}
+
+					function SiteDirectory() {
+						return <site-directory><nav><header>Guide</header></nav></site-directory>
+					}
+
+					function OnThisPage() {
+						return <on-this-page><nav><header>On this page</header></nav></on-this-page>
+					}
+				`,
+				`
+					docs-navigation.class {
+						> site-directory {}
+						> on-this-page {}
+						> site-directory > nav > header {}
+						> on-this-page > nav > header {}
+					}
+				`,
+			),
+		).toEqual([
+			{
+				code: `opaque-component-root-may-collide`,
+				selector: `docs-navigation.class > site-directory`,
+			},
+			{
+				code: `opaque-component-root-may-collide`,
+				selector: `docs-navigation.class > on-this-page`,
+			},
+		])
+	})
+
+	it(`keeps dynamic component siblings diagnostic for incomplete owned paths`, () => {
+		expect(
+			diagnosticSummaries(
+				`
+					import css from "./DocsNavigation.module.css"
+					import { Toggle } from "./Toggle.tsx"
+
+					export function DocsNavigation() {
+						return (
+							<docs-navigation className={css.class}>
+								<SiteDirectory />
+								<Toggle.Button />
+							</docs-navigation>
+						)
+					}
+
+					function SiteDirectory() {
+						return <site-directory><nav /></site-directory>
+					}
+				`,
+				`
+					docs-navigation.class {
+						> site-directory > footer {}
+					}
+				`,
+			),
+		).toEqual([
+			{
+				code: `opaque-component-root-may-collide`,
+				selector: `docs-navigation.class > site-directory`,
+			},
+		])
+	})
+
+	it(`still reports descendants that can enter an unknown external sibling`, () => {
+		expect(
+			diagnosticSummaries(
+				`
+					import { SyntaxHighlighter } from "external-package"
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<file-name>
+									<span>example.ts</span>
+								</file-name>
+								<SyntaxHighlighter />
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						> file-name > span {}
+						> file-name > code {}
+						span {}
+					}
+				`,
+			),
+		).toEqual([
+			{
+				code: `opaque-component-root-may-collide`,
+				selector: `app-panel.class > file-name`,
+			},
+			{
+				code: `opaque-component-root-may-collide`,
+				selector: `app-panel.class span`,
+			},
+		])
+	})
+
+	it(`keeps universal and unresolved foreign child matches diagnostic`, () => {
+		expect(
+			diagnosticSummaries(
+				`
+					import { External } from "external-package"
+					import { UserMenu } from "./UserMenu.tsx"
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<header />
+								<user-menu />
+								<External />
+								<UserMenu />
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						> * {}
+						> user-menu {}
+					}
+				`,
+			),
+		).toEqual([
+			{
+				code: `opaque-component-root-may-collide`,
+				selector: `app-panel.class > *`,
+			},
+			{
+				code: `opaque-component-root-may-collide`,
+				selector: `app-panel.class > *`,
+			},
+			{
+				code: `opaque-component-root-may-collide`,
+				selector: `app-panel.class > user-menu`,
+			},
+			{
+				code: `opaque-component-root-may-collide`,
+				selector: `app-panel.class > user-menu`,
+			},
+		])
+	})
+
+	it(`keeps matching direct-child selectors diagnostic for children`, () => {
+		expect(
+			diagnosticSummaries(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel({ children }: { children: React.ReactNode }) {
+						return (
+							<app-panel className={css.class}>
+								<header />
+								{children}
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						> header {}
+					}
+				`,
+			),
+		).toEqual([
+			{
+				code: `selector-crosses-ownership-boundary`,
+				selector: `app-panel.class > header`,
+			},
+		])
+	})
+
+	it(`treats components defined in the same file as owned`, () => {
+		expect(
+			diagnosticSummaries(
+				`
+					import css from "./AppPanel.module.css"
+
+					function LocalActions() {
+						return <action-list><button>Save</button></action-list>
+					}
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								<LocalActions />
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						* {}
+					}
+				`,
+			),
+		).toEqual([])
+	})
+
+	it(`reports foreign output returned by a render prop`, () => {
+		expect(
+			diagnosticSummaries(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel(
+						props: { footer?: () => React.ReactNode },
+					) {
+						return (
+							<app-panel className={css.class}>
+								{props.footer?.()}
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						footer button {}
+					}
+				`,
+			),
+		).toEqual([
+			{
+				code: `selector-crosses-ownership-boundary`,
+				selector: `app-panel.class footer button`,
+			},
+		])
+	})
+
+	it(`does not treat portal output as a descendant ownership boundary`, () => {
+		expect(
+			diagnosticSummaries(
+				`
+					import { createPortal } from "react-dom"
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return (
+							<app-panel className={css.class}>
+								{createPortal(<footer />, document.body)}
+							</app-panel>
+						)
+					}
+				`,
+				`
+					app-panel.class {
+						> footer {}
+						footer button {}
+					}
+				`,
+			),
+		).toEqual([
+			{
+				code: `dead-selector`,
+				selector: `app-panel.class > footer`,
+			},
+			{
+				code: `dead-selector`,
+				selector: `app-panel.class footer button`,
+			},
+		])
+	})
+})

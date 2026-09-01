@@ -6,7 +6,7 @@ view should show the failed location without making alternate renders look like
 simultaneous siblings.
 
 The experimental ANSI gallery lives in
-`tests/cli/render-story-visualizer.experimental.test.ts`. It uses three scenarios:
+`tests/private/cli/render-story-visualizer.experimental.test.ts`. It uses three scenarios:
 
 - a profile selector with an incorrect plural `avatars` tag, where `avatar` exists in
   only the ready reality;

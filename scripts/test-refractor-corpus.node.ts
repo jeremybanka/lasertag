@@ -171,7 +171,7 @@ const scriptDir = path.dirname(fileURLToPath(import.meta.url))
 const workspaceRoot = path.resolve(scriptDir, `..`)
 const corpusRoot = path.join(
 	workspaceRoot,
-	`packages/lasertag/tests/refractor/corpus`,
+	`packages/lasertag/tests/private/refractor/corpus`,
 )
 const manifestPath = path.join(corpusRoot, `manifest.json`)
 const providersRoot = path.join(corpusRoot, `providers`)
