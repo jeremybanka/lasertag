@@ -151,8 +151,8 @@ infers `<dialog>` from the export name.
 ### Adopt a Headless Component's Render Story
 
 A headless component can deliberately make its rendered structure part of one
-consumer component's styling contract. Put an `@lasertag-own-subtree` JSX
-comment immediately before the imported component instance:
+consumer component's styling contract. Put an `@lasertag-adopt-subtree`
+opening-tag directive on the imported component instance:
 
 ```tsx
 import { MosaicLexicalTextEditor } from "@mosaic/lexical"
@@ -160,21 +160,25 @@ import { MosaicLexicalTextEditor } from "@mosaic/lexical"
 export function LexicalMarkdownEditor(props: EditorProps) {
 	return (
 		<lexical-markdown-editor className={css.class}>
-			{/* @lasertag-own-subtree */}
-			<MosaicLexicalTextEditor {...props} />
+			<MosaicLexicalTextEditor
+				/* @lasertag-adopt-subtree */
+				{...props}
+			/>
 		</lexical-markdown-editor>
 	)
 }
 ```
 
-The comment has no runtime output. It applies only to the next imported
-component instance; another instance of the same component remains a foreign
-ownership boundary unless it has its own comment. Lasertag reports
-`invalid-adoption-target` when the comment is dangling or followed by anything
-other than one imported component instance. The directive must be the only
-content in its JSX comment; trailing explanation reports
-`invalid-adoption-directive`. These warnings point to the JSX comment in editor
-diagnostics.
+The block comment has no runtime output. It can appear anywhere among the
+opening tag's attributes and applies only to that component instance; another
+instance of the same component remains a foreign ownership boundary unless its
+opening tag has its own directive. Lasertag reports `invalid-adoption-target`
+when the directive is on anything other than an imported component instance.
+The directive must be the only content in its block comment, may appear only
+once, and must be inside the opening tag. Violations report
+`invalid-adoption-directive`. The earlier sibling-comment syntax,
+`{/* @lasertag-own-subtree */}`, also reports that diagnostic with migration
+guidance. These warnings point to the source comment in editor diagnostics.
 
 Adoption retains the component's provable render story instead of retaining
 only its foreign outer root. The consumer's CSS Module can therefore describe
