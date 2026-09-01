@@ -45,6 +45,15 @@ paths. Foreign opaque paths carry ownership metadata so selectors that may
 match their DOM can be distinguished from selectors that are merely
 inconclusive. Unsupported selector shapes are unknown too.
 
+An `@lasertag-own-subtree` JSX comment immediately before an imported component
+instance requests validated adoption of that instance's render story. Directly
+resolved TSX and original TSX named by declaration source maps are accepted as
+evidence. The adopted provable nodes join the consumer's ownership story, while
+nested imported components, children, render props, slots, portals, and other
+opaque branches keep their existing boundaries. A request without a single
+analyzable implementation reports `adoption-source-unavailable`; it never
+grants unchecked ownership.
+
 For Solid TSX, Refractor recognizes imports from `solid-js` and lowers `Show`,
 `For`, `Index`, `Switch`/`Match`, `ErrorBoundary`, `Suspense`, and
 `SuspenseList` into their possible child branches. It also recognizes `Dynamic`

@@ -149,13 +149,33 @@ function combineReachability(results: Reachability[]): Reachability {
 	return `unreachable`
 }
 
+function adoptionDiagnostics(
+	renderStory: RenderStory,
+): CssReachabilityDiagnostic[] {
+	return renderStory.warnings.flatMap((warning) =>
+		warning.code === `adoption-source-unavailable`
+			? [
+					{
+						code: warning.code,
+						message: warning.message,
+						...(warning.sourcePath
+							? { renderSourcePath: warning.sourcePath }
+							: {}),
+						...(warning.range ? { renderSourceRange: warning.range } : {}),
+						selector: `@lasertag-own-subtree`,
+					},
+				]
+			: [],
+	)
+}
+
 export function analyzeCssReachability({
 	cssSource,
 	includeStoryEvidence = false,
 	renderStory,
 	selectorAnalyses,
 }: CreateCssReachabilityDiagnosticsOptions): CssReachabilityAnalysis {
-	const diagnostics: CssReachabilityDiagnostic[] = []
+	const diagnostics = adoptionDiagnostics(renderStory)
 	const selectorReachability: CssSelectorReachabilityAnalysis[] = []
 	const opaqueCollisions = new Map<string, OpaqueCollision>()
 

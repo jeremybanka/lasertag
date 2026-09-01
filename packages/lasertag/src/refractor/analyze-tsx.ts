@@ -12,6 +12,7 @@ import type {
 	StoryNode,
 } from "./diagnostics.ts"
 import { scopeRenderStoryToCssClassRoots } from "./render-story-root.ts"
+import { mappedRenderSourcesFromDeclarations } from "./render-story-source-map.ts"
 import { isStandardIntrinsicTagName } from "./standard-intrinsic-tag-names.ts"
 import {
 	createTypescriptAstSession,
@@ -61,11 +62,13 @@ type AnalyzeContext = {
 	namespaceImports: Map<string, string>
 	warnings: RenderStoryWarning[]
 	maxComponentDepth: number
+	typescriptSdkPath?: string
 	typescriptAnalysis: TypescriptAstAnalysis
 	foreignComponentStack: ReadonlySet<string>
 }
 
 const DEFAULT_MAX_COMPONENT_DEPTH = 25
+const OWN_SUBTREE_DIRECTIVE = `@lasertag-own-subtree`
 
 type NodeWithModifiers = ts.Node & {
 	modifiers?: ts.NodeArray<ts.ModifierLike>
@@ -704,14 +707,39 @@ type ResolvedForeignComponent = {
 	sourceFile: ts.SourceFile
 }
 
+type ForeignComponentResolution = {
+	declarations: ts.Node[]
+	implementation?: ResolvedForeignComponent
+}
+
+type ResolvedComponentStory = {
+	roots: StoryChild[]
+	sourcePath: string
+	warnings: RenderStoryWarning[]
+}
+
+function componentNameFromDeclaration(
+	declaration: ts.Node,
+): string | undefined {
+	if (ts.isFunctionDeclaration(declaration)) return declaration.name?.text
+
+	if (
+		ts.isVariableDeclaration(declaration) &&
+		ts.isIdentifier(declaration.name)
+	) {
+		return declaration.name.text
+	}
+}
+
 function resolveForeignComponent(
 	context: AnalyzeContext,
 	tagNameNode: ts.JsxTagNameExpression,
 	componentName: string,
-): ResolvedForeignComponent | undefined {
-	for (const declaration of context.typescriptAnalysis.resolveAliasedDeclarations(
-		tagNameNode,
-	)) {
+): ForeignComponentResolution {
+	const declarations =
+		context.typescriptAnalysis.resolveAliasedDeclarations(tagNameNode)
+
+	for (const declaration of declarations) {
 		const sourceFile = declaration.getSourceFile()
 		const definition = componentDefinitionFromDeclaration(
 			sourceFile,
@@ -719,8 +747,15 @@ function resolveForeignComponent(
 			componentName,
 		)
 
-		if (definition) return { definition, sourceFile }
+		if (definition) {
+			return {
+				declarations,
+				implementation: { definition, sourceFile },
+			}
+		}
 	}
+
+	return { declarations }
 }
 
 function foreignRootsFromResolvedStory(
@@ -759,17 +794,11 @@ function foreignRootsFromResolvedStory(
 	})
 }
 
-function analyzeForeignComponent(
+function analyzeResolvedComponentStory(
 	context: AnalyzeContext,
-	tagName: string,
-	tagNameNode: ts.JsxTagNameExpression,
-	node: ComponentJsxNode,
-): StoryChild[] | undefined {
+	resolved: ResolvedForeignComponent,
+): ResolvedComponentStory | undefined {
 	if (context.foreignComponentStack.size >= context.maxComponentDepth) return
-
-	const resolved = resolveForeignComponent(context, tagNameNode, tagName)
-
-	if (!resolved) return
 
 	const resolutionKey = `${resolved.sourceFile.fileName}:${resolved.definition.range.start}`
 
@@ -789,12 +818,271 @@ function analyzeForeignComponent(
 		maxComponentDepth: context.maxComponentDepth,
 		namespaceImports: index.namespaceImports,
 		sourceFile: resolved.sourceFile,
+		...(context.typescriptSdkPath
+			? { typescriptSdkPath: context.typescriptSdkPath }
+			: {}),
 		typescriptAnalysis: context.typescriptAnalysis,
 		warnings: [],
 	}
 	const roots = analyzeComponent(importedContext, resolved.definition.name, [])
 
-	return foreignRootsFromResolvedStory(context, roots, tagName, node)
+	return {
+		roots,
+		sourcePath: resolved.sourceFile.fileName,
+		warnings: importedContext.warnings,
+	}
+}
+
+function analyzeForeignComponent(
+	context: AnalyzeContext,
+	tagName: string,
+	tagNameNode: ts.JsxTagNameExpression,
+	node: ComponentJsxNode,
+): StoryChild[] | undefined {
+	const resolution = resolveForeignComponent(context, tagNameNode, tagName)
+	const story = resolution.implementation
+		? analyzeResolvedComponentStory(context, resolution.implementation)
+		: undefined
+
+	return story
+		? foreignRootsFromResolvedStory(context, story.roots, tagName, node)
+		: undefined
+}
+
+type AdoptionRequest = {
+	range: SourceRange
+}
+
+type MappedComponentStoryResolution =
+	| { kind: `missing` }
+	| { kind: `ambiguous`; sourcePaths: string[] }
+	| { kind: `ready`; story: ResolvedComponentStory }
+
+function hasProvableElement(children: readonly StoryChild[]): boolean {
+	return children.some((child) => {
+		if (child.kind === `element`) return true
+		if (child.kind === `opaque`) return false
+
+		return child.alternatives.some(hasProvableElement)
+	})
+}
+
+function componentWasFound(renderStory: RenderStory): boolean {
+	return !(
+		renderStory.roots.length === 1 &&
+		renderStory.roots[0]?.kind === `opaque` &&
+		renderStory.roots[0].reason === `main component not found`
+	)
+}
+
+function declarationSources(
+	declarations: readonly ts.Node[],
+): Array<{ filePath: string; sourceText: string }> {
+	const sources = new Map<string, { filePath: string; sourceText: string }>()
+
+	for (const declaration of declarations) {
+		const sourceFile = declaration.getSourceFile()
+
+		sources.set(sourceFile.fileName, {
+			filePath: sourceFile.fileName,
+			sourceText: sourceFile.text,
+		})
+	}
+
+	return [...sources.values()]
+}
+
+function resolveMappedComponentStory(
+	context: AnalyzeContext,
+	resolution: ForeignComponentResolution,
+	componentName: string,
+): MappedComponentStoryResolution {
+	const mappedSources = mappedRenderSourcesFromDeclarations(
+		declarationSources(resolution.declarations),
+	)
+
+	if (mappedSources.length === 0) return { kind: `missing` }
+
+	const componentNames = new Set([
+		componentName,
+		...resolution.declarations.flatMap((declaration) => {
+			const name = componentNameFromDeclaration(declaration)
+
+			return name ? [name] : []
+		}),
+	])
+	const stories = new Map<string, ResolvedComponentStory>()
+	const typescriptSession = createTypescriptAstSession(
+		context.typescriptSdkPath
+			? { typescriptSdkPath: context.typescriptSdkPath }
+			: {},
+	)
+
+	try {
+		for (const source of mappedSources) {
+			for (const candidateName of componentNames) {
+				const renderStory = analyzeTsxRenderStory(
+					{
+						componentName: candidateName,
+						filePath: source.filePath,
+						maxComponentDepth: context.maxComponentDepth,
+						scopeToCssClassRoots: false,
+						sourceText: source.sourceText,
+					},
+					typescriptSession,
+				)
+
+				if (!componentWasFound(renderStory)) continue
+
+				stories.set(`${source.filePath}\0${renderStory.componentName}`, {
+					roots: renderStory.roots,
+					sourcePath: source.filePath,
+					warnings: renderStory.warnings,
+				})
+			}
+		}
+	} finally {
+		typescriptSession.close()
+	}
+
+	const matches = [...stories.values()]
+
+	if (matches.length === 0) return { kind: `missing` }
+	if (matches.length === 1 && matches[0]) {
+		return { kind: `ready`, story: matches[0] }
+	}
+
+	return {
+		kind: `ambiguous`,
+		sourcePaths: [...new Set(matches.map((match) => match.sourcePath))],
+	}
+}
+
+function withStorySourcePath(
+	children: readonly StoryChild[],
+	sourcePath: string,
+): StoryChild[] {
+	return children.map((child): StoryChild => {
+		const childSourcePath = child.sourcePath ?? sourcePath
+
+		if (child.kind === `opaque`) {
+			return {
+				...child,
+				ownership: `foreign`,
+				sourcePath: childSourcePath,
+			}
+		}
+
+		if (child.kind === `choice`) {
+			return {
+				...child,
+				alternatives: child.alternatives.map((alternative) =>
+					withStorySourcePath(alternative, childSourcePath),
+				),
+				sourcePath: childSourcePath,
+			}
+		}
+
+		return {
+			...child,
+			children: withStorySourcePath(child.children, childSourcePath),
+			sourcePath: childSourcePath,
+		}
+	})
+}
+
+function adoptionFailure(
+	context: AnalyzeContext,
+	componentName: string,
+	adoption: AdoptionRequest,
+	detail: string,
+): void {
+	context.warnings.push({
+		code: `adoption-source-unavailable`,
+		message: `Could not adopt the render story for ${componentName}: ${detail}`,
+		range: adoption.range,
+		sourcePath: context.sourceFile.fileName,
+	})
+}
+
+function invalidAdoptionTarget(
+	context: AnalyzeContext,
+	adoption: AdoptionRequest,
+	detail: string,
+): void {
+	context.warnings.push({
+		code: `adoption-source-unavailable`,
+		message: `Could not apply ${OWN_SUBTREE_DIRECTIVE}: ${detail}`,
+		range: adoption.range,
+		sourcePath: context.sourceFile.fileName,
+	})
+}
+
+function analyzeAdoptedForeignComponent(
+	context: AnalyzeContext,
+	componentName: string,
+	tagNameNode: ts.JsxTagNameExpression,
+	adoption: AdoptionRequest,
+): StoryChild[] | undefined {
+	const resolution = resolveForeignComponent(
+		context,
+		tagNameNode,
+		componentName,
+	)
+	let resolvedStory = resolution.implementation
+		? analyzeResolvedComponentStory(context, resolution.implementation)
+		: undefined
+
+	if (!resolvedStory) {
+		const mappedResolution = resolveMappedComponentStory(
+			context,
+			resolution,
+			componentName,
+		)
+
+		if (mappedResolution.kind === `ambiguous`) {
+			adoptionFailure(
+				context,
+				componentName,
+				adoption,
+				`declaration source maps identify multiple component implementations (${mappedResolution.sourcePaths.join(`, `)}).`,
+			)
+			return
+		}
+
+		if (mappedResolution.kind === `ready`) {
+			resolvedStory = mappedResolution.story
+		}
+	}
+
+	if (!resolvedStory) {
+		adoptionFailure(
+			context,
+			componentName,
+			adoption,
+			`no analyzable JSX or TSX implementation was resolved directly or through declaration source-map evidence.`,
+		)
+		return
+	}
+
+	if (!hasProvableElement(resolvedStory.roots)) {
+		adoptionFailure(
+			context,
+			componentName,
+			adoption,
+			`the resolved implementation has no provable JSX root.`,
+		)
+		return
+	}
+
+	context.warnings.push(
+		...resolvedStory.warnings.map((warning) => ({
+			...warning,
+			sourcePath: warning.sourcePath ?? resolvedStory.sourcePath,
+		})),
+	)
+
+	return withStorySourcePath(resolvedStory.roots, resolvedStory.sourcePath)
 }
 
 function isIntrinsicJsxTag(tagName: string): boolean {
@@ -1188,10 +1476,18 @@ function analyzeJsxElement(
 	context: AnalyzeContext,
 	node: ts.JsxElement,
 	stack: string[],
+	adoption?: AdoptionRequest,
 ): StoryChild[] {
 	const tagName = getJsxTagText(context.sourceFile, node.openingElement.tagName)
 
 	if (isFragmentJsxTag(tagName)) {
+		if (adoption) {
+			invalidAdoptionTarget(
+				context,
+				adoption,
+				`the directive must be followed by an imported component instance, not a fragment.`,
+			)
+		}
 		return analyzeJsxChildren(context, node.children, stack)
 	}
 
@@ -1199,6 +1495,15 @@ function analyzeJsxElement(
 
 	if (assertedRootTagName) {
 		const componentName = assertedForeignComponentName(tagName)
+
+		if (adoption) {
+			adoptionFailure(
+				context,
+				componentName,
+				adoption,
+				`an intrinsic-root assertion supplies only shallow, unchecked root evidence.`,
+			)
+		}
 
 		return [
 			addressableForeignRoot(
@@ -1212,11 +1517,19 @@ function analyzeJsxElement(
 	}
 
 	if (tagName.includes(`.`)) {
-		return analyzeComponentTag(context, tagName, node, stack)
+		return analyzeComponentTag(context, tagName, node, stack, adoption)
 	}
 
 	if (!isIntrinsicJsxTag(tagName)) {
-		return analyzeComponentTag(context, tagName, node, stack)
+		return analyzeComponentTag(context, tagName, node, stack, adoption)
+	}
+
+	if (adoption) {
+		invalidAdoptionTarget(
+			context,
+			adoption,
+			`the following <${tagName}> is intrinsic; only an imported component instance can be adopted.`,
+		)
 	}
 
 	return [
@@ -1234,10 +1547,18 @@ function analyzeJsxSelfClosingElement(
 	context: AnalyzeContext,
 	node: ts.JsxSelfClosingElement,
 	stack: string[],
+	adoption?: AdoptionRequest,
 ): StoryChild[] {
 	const tagName = getJsxTagText(context.sourceFile, node.tagName)
 
 	if (isFragmentJsxTag(tagName)) {
+		if (adoption) {
+			invalidAdoptionTarget(
+				context,
+				adoption,
+				`the directive must be followed by an imported component instance, not a fragment.`,
+			)
+		}
 		return []
 	}
 
@@ -1245,6 +1566,15 @@ function analyzeJsxSelfClosingElement(
 
 	if (assertedRootTagName) {
 		const componentName = assertedForeignComponentName(tagName)
+
+		if (adoption) {
+			adoptionFailure(
+				context,
+				componentName,
+				adoption,
+				`an intrinsic-root assertion supplies only shallow, unchecked root evidence.`,
+			)
+		}
 
 		return [
 			addressableForeignRoot(
@@ -1258,11 +1588,19 @@ function analyzeJsxSelfClosingElement(
 	}
 
 	if (tagName.includes(`.`)) {
-		return analyzeComponentTag(context, tagName, node, stack)
+		return analyzeComponentTag(context, tagName, node, stack, adoption)
 	}
 
 	if (!isIntrinsicJsxTag(tagName)) {
-		return analyzeComponentTag(context, tagName, node, stack)
+		return analyzeComponentTag(context, tagName, node, stack, adoption)
+	}
+
+	if (adoption) {
+		invalidAdoptionTarget(
+			context,
+			adoption,
+			`the following <${tagName}> is intrinsic; only an imported component instance can be adopted.`,
+		)
 	}
 
 	return [
@@ -1281,19 +1619,43 @@ function analyzeComponentTag(
 	tagName: string,
 	node: ComponentJsxNode,
 	stack: string[],
+	adoption?: AdoptionRequest,
 ): StoryChild[] {
 	const loweredChildren = lowerSolidComponent(context, tagName, node, stack)
 
-	if (loweredChildren) return loweredChildren
+	if (loweredChildren) {
+		if (adoption) {
+			invalidAdoptionTarget(
+				context,
+				adoption,
+				`framework control-flow components cannot be adopted.`,
+			)
+		}
+		return loweredChildren
+	}
 
 	const binding = resolveImportBinding(context, tagName)
 
 	if (binding) {
 		const componentName = tagName.slice(tagName.lastIndexOf(`.`) + 1)
+		const tagNameNode = ts.isJsxElement(node)
+			? node.openingElement.tagName
+			: node.tagName
+		const adoptedStory = adoption
+			? analyzeAdoptedForeignComponent(
+					context,
+					componentName,
+					tagNameNode,
+					adoption,
+				)
+			: undefined
+
+		if (adoptedStory) return adoptedStory
+
 		const resolvedRoots = analyzeForeignComponent(
 			context,
 			componentName,
-			ts.isJsxElement(node) ? node.openingElement.tagName : node.tagName,
+			tagNameNode,
 			node,
 		)
 
@@ -1307,6 +1669,14 @@ function analyzeComponentTag(
 					componentName,
 				),
 			]
+		)
+	}
+
+	if (adoption) {
+		invalidAdoptionTarget(
+			context,
+			adoption,
+			`the following <${tagName}> is not bound to an import.`,
 		)
 	}
 
@@ -1341,28 +1711,69 @@ function analyzeJsxChild(
 	context: AnalyzeContext,
 	child: ts.JsxChild,
 	stack: string[],
+	adoption?: AdoptionRequest,
 ): StoryChild[] {
 	if (ts.isJsxText(child)) return []
 
 	if (ts.isJsxExpression(child)) {
+		if (adoption) {
+			invalidAdoptionTarget(
+				context,
+				adoption,
+				`the directive must be followed by one imported component instance.`,
+			)
+		}
 		return child.expression
 			? analyzeExpression(context, child.expression, stack)
 			: []
 	}
 
 	if (ts.isJsxElement(child)) {
-		return analyzeJsxElement(context, child, stack)
+		return analyzeJsxElement(context, child, stack, adoption)
 	}
 
 	if (ts.isJsxSelfClosingElement(child)) {
-		return analyzeJsxSelfClosingElement(context, child, stack)
+		return analyzeJsxSelfClosingElement(context, child, stack, adoption)
 	}
 
 	if (ts.isJsxFragment(child)) {
+		if (adoption) {
+			invalidAdoptionTarget(
+				context,
+				adoption,
+				`the directive must be followed by an imported component instance, not a fragment.`,
+			)
+		}
 		return analyzeJsxChildren(context, child.children, stack)
 	}
 
 	return [opaque(`unsupported JSX child`, context.sourceFile, child)]
+}
+
+function adoptionDirective(
+	context: AnalyzeContext,
+	child: ts.JsxChild,
+): AdoptionRequest | undefined {
+	if (!ts.isJsxExpression(child) || child.expression) return
+
+	const sourceText = context.sourceFile.text.slice(
+		child.getStart(context.sourceFile),
+		child.getEnd(),
+	)
+	const pattern = new RegExp(
+		String.raw`^\{\s*\/\*\s*${OWN_SUBTREE_DIRECTIVE}\s*\*\/\s*\}$`,
+	)
+
+	return pattern.test(sourceText)
+		? { range: rangeOf(context.sourceFile, child) }
+		: undefined
+}
+
+function isIgnorableJsxChild(child: ts.JsxChild): boolean {
+	return (
+		(ts.isJsxText(child) && child.text.trim().length === 0) ||
+		(ts.isJsxExpression(child) && !child.expression)
+	)
 }
 
 function analyzeJsxChildren(
@@ -1370,7 +1781,41 @@ function analyzeJsxChildren(
 	children: ts.NodeArray<ts.JsxChild>,
 	stack: string[],
 ): StoryChild[] {
-	return children.flatMap((child) => analyzeJsxChild(context, child, stack))
+	const storyChildren: StoryChild[] = []
+	let pendingAdoption: AdoptionRequest | undefined
+
+	for (const child of children) {
+		const directive = adoptionDirective(context, child)
+
+		if (directive) {
+			if (pendingAdoption) {
+				invalidAdoptionTarget(
+					context,
+					pendingAdoption,
+					`the directive is not followed by a component instance.`,
+				)
+			}
+			pendingAdoption = directive
+			continue
+		}
+
+		if (pendingAdoption && isIgnorableJsxChild(child)) continue
+
+		storyChildren.push(
+			...analyzeJsxChild(context, child, stack, pendingAdoption),
+		)
+		pendingAdoption = undefined
+	}
+
+	if (pendingAdoption) {
+		invalidAdoptionTarget(
+			context,
+			pendingAdoption,
+			`the directive is not followed by a component instance.`,
+		)
+	}
+
+	return storyChildren
 }
 
 function isChildrenExpression(expression: ts.Expression): boolean {
@@ -1568,7 +2013,7 @@ function createAnalyzeContext(
 	sourceFile: ts.SourceFile,
 	index: ComponentIndex,
 	warnings: RenderStoryWarning[],
-	options: Pick<AnalyzeTsxOptions, "maxComponentDepth">,
+	options: Pick<AnalyzeTsxOptions, "maxComponentDepth" | "typescriptSdkPath">,
 	typescriptAnalysis: TypescriptAstAnalysis,
 ): AnalyzeContext {
 	return {
@@ -1579,6 +2024,9 @@ function createAnalyzeContext(
 		namespaceImports: index.namespaceImports,
 		warnings,
 		maxComponentDepth: options.maxComponentDepth ?? DEFAULT_MAX_COMPONENT_DEPTH,
+		...(options.typescriptSdkPath
+			? { typescriptSdkPath: options.typescriptSdkPath }
+			: {}),
 		typescriptAnalysis,
 	}
 }

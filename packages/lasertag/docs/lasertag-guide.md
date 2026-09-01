@@ -148,6 +148,61 @@ the root remains opaque. For example, a component named `Dialog` that actually
 returns `<section>` is treated as a foreign `<section>` root; Lasertag never
 infers `<dialog>` from the export name.
 
+### Adopt a Headless Component's Render Story
+
+A headless component can deliberately make its rendered structure part of one
+consumer component's styling contract. Put an `@lasertag-own-subtree` JSX
+comment immediately before the imported component instance:
+
+```tsx
+import { MosaicLexicalTextEditor } from "@mosaic/lexical"
+
+export function LexicalMarkdownEditor(props: EditorProps) {
+	return (
+		<lexical-markdown-editor className={css.class}>
+			{/* @lasertag-own-subtree */}
+			<MosaicLexicalTextEditor {...props} />
+		</lexical-markdown-editor>
+	)
+}
+```
+
+The comment has no runtime output. It applies only to the next imported
+component instance; another instance of the same component remains a foreign
+ownership boundary unless it has its own comment.
+
+Adoption retains the component's provable render story instead of retaining
+only its foreign outer root. The consumer's CSS Module can therefore describe
+the shipped semantic structure:
+
+```css
+lexical-markdown-editor.class {
+	> mosaic-lexical-text-editor {
+		> lexical-editor {
+			> [contenteditable="true"] {}
+			> collaborator-overlays > collaborator-caret {}
+		}
+	}
+}
+```
+
+This is validation, not a suppression. Selectors that do not occur in the
+adopted story still report `dead-selector`. Imported components nested within
+the adopted implementation remain foreign boundaries, as do `children`,
+render props, slots, and other opaque branches. Portals remain outside the
+descendant story. Intrinsic-root assertions such as `svg.SomeIcon` remain
+shallow foreign roots even when they occur inside an adopted story.
+
+Lasertag adopts only implementation evidence it can resolve. A package can
+expose TSX directly through its TypeScript module graph. A declaration-first
+package can instead ship declaration source maps whose `sources` entries point
+to the original `.tsx` or `.jsx` files; either those files or matching `sourcesContent`
+must be present. Lasertag considers only source-map-listed files and requires a
+single matching component implementation, so it does not guess from emitted
+filenames or package layout. If no sufficiently analyzable implementation is
+available, `adoption-source-unavailable` is reported and the component remains
+foreign.
+
 For external components with an intentionally stable intrinsic root, a JSX
 member expression can assert that root at the call site. Name the namespace
 after a standard HTML or SVG tag:
