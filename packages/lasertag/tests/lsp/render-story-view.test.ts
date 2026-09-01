@@ -231,6 +231,52 @@ describe(`render story sidebar view`, () => {
 		])
 	})
 
+	it(`links adopted nodes to their external render source`, () => {
+		const externalSourcePath = `/project/node_modules/headless/editor.tsx`
+		const renderStory: RenderStory = {
+			componentName: `AccountPanel`,
+			roots: [
+				{
+					children: [
+						{
+							children: [],
+							kind: `element`,
+							range: { end: 20, start: 10 },
+							sourcePath: externalSourcePath,
+							tagName: `headless-editor`,
+						},
+					],
+					kind: `element`,
+					tagName: `account-panel`,
+				},
+			],
+			warnings: [],
+		}
+		const cssSource = ``
+		const selectorAnalyses = analyzeCssModuleSelectors(cssSource)
+		const view = createRenderStoryView({
+			cssPath,
+			cssSource,
+			reachabilityAnalysis: analyzeCssReachability({
+				cssSource,
+				renderStory,
+				selectorAnalyses,
+			}),
+			renderStory,
+			sourcePath,
+		})
+		const headlessEditor = findNode(
+			view.possibilities.flatMap(({ roots }) => roots),
+			`headless-editor`,
+		)
+
+		expect(headlessEditor?.location).toEqual({
+			end: 20,
+			start: 10,
+			uri: `file://${externalSourcePath}`,
+		})
+	})
+
 	it(`caps combinatorial render stories`, () => {
 		const renderStory: RenderStory = {
 			componentName: `ManyWorlds`,

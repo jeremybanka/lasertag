@@ -171,7 +171,12 @@ function createViewNode(
 			kind: `opaque`,
 			label: `unknown branch`,
 			...(child.range
-				? { location: location(options.sourcePath, child.range) }
+				? {
+						location: location(
+							child.sourcePath ?? options.sourcePath,
+							child.range,
+						),
+					}
 				: {}),
 			support: `none`,
 			tooltip: child.reason,
@@ -197,7 +202,12 @@ function createViewNode(
 		...(selector
 			? { location: location(options.cssPath, selector.range) }
 			: child.range
-				? { location: location(options.sourcePath, child.range) }
+				? {
+						location: location(
+							child.sourcePath ?? options.sourcePath,
+							child.range,
+						),
+					}
 				: {}),
 		support: selector ? `supported` : `none`,
 		tooltip: selector

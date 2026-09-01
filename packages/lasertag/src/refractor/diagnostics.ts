@@ -22,6 +22,7 @@ export type StoryNode = {
 	componentName?: string
 	ownership?: `foreign`
 	range?: SourceRange
+	sourcePath?: string
 }
 
 export type OpaqueStoryNode = {
@@ -31,12 +32,14 @@ export type OpaqueStoryNode = {
 	expectedRootTagName?: string
 	ownership?: `foreign`
 	range?: SourceRange
+	sourcePath?: string
 }
 
 export type StoryChoiceNode = {
 	alternatives: StoryChild[][]
 	kind: `choice`
 	range?: SourceRange
+	sourcePath?: string
 }
 
 export type RenderStory = {
@@ -47,12 +50,14 @@ export type RenderStory = {
 
 export type RenderStoryWarning = {
 	code:
+		| `adoption-source-unavailable`
 		| `component-cycle`
 		| `component-not-found`
 		| `multiple-main-components`
 		| `unknown-expression`
 	message: string
 	range?: SourceRange
+	sourcePath?: string
 }
 
 export type SelectorRelation = `self` | `child` | `descendant`
@@ -68,6 +73,7 @@ export type Reachability = `reachable` | `unreachable` | `unknown`
 
 export type CssReachabilityDiagnostic = {
 	code:
+		| `adoption-source-unavailable`
 		| `dead-selector`
 		| `disable-explanation-too-short`
 		| `expect-error-explanation-too-short`
@@ -82,6 +88,8 @@ export type CssReachabilityDiagnostic = {
 	selector: string
 	storyEvidence?: RenderStoryEvidence
 	range?: SourceRange
+	renderSourcePath?: string
+	renderSourceRange?: SourceRange
 }
 
 export type RenderStoryEvidence = {
