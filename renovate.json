@@ -73,6 +73,7 @@
 			"matchPackageNames": [
 				"agents.yaml",
 				"atom.io",
+				"break-check",
 				"comline",
 				"takua",
 				"treetrunks"

@@ -11,6 +11,7 @@ minimumReleaseAge: 1440
 minimumReleaseAgeExclude:
   - agents.yaml
   - atom.io
+  - break-check
   - comline
   - takua
   - treetrunks
