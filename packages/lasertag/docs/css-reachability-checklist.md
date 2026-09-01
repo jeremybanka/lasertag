@@ -42,9 +42,9 @@ before refractor starts powering the CLI and LSP diagnostics in earnest.
 
 ## Verification
 
-Covered by `tests/refractor/css-reachability.test.ts` and verified with:
+Covered by `tests/public/refractor/css-reachability.test.ts` and verified with:
 
-- `pnpm --filter lasertag test -- tests/refractor/css-reachability.test.ts`
+- `pnpm --filter lasertag test -- tests/public/refractor/css-reachability.test.ts`
 - `pnpm --filter lasertag test`
 - `pnpm check`
 - `pnpm fmt:check`

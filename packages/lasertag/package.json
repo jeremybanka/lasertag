@@ -55,7 +55,9 @@
 		"benchmark:lsp": "node benchmarks/lsp-analysis.ts",
 		"build": "vp pack",
 		"check:eslint": "eslint",
-		"test": "vp test"
+		"test": "vp test",
+		"test:private": "vp test tests/private",
+		"test:public": "vp test tests/public"
 	},
 	"dependencies": {
 		"@astrojs/compiler": "4.0.0",
