@@ -65,8 +65,8 @@ importers:
         specifier: 0.52.2
         version: 0.52.2(@typescript-eslint/parser@8.69.0(eslint@10.9.1(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0))(eslint@10.9.1(jiti@2.7.0)(supports-color@7.2.0))(solid-js@1.9.15)
       comline:
-        specifier: 0.5.3
-        version: 0.5.3(arktype@2.2.3)(zod@4.5.4)
+        specifier: 0.5.4
+        version: 0.5.4(arktype@2.2.3)(zod@4.5.4)
       rolldown:
         specifier: 1.2.6
         version: 1.2.6
@@ -2105,17 +2105,6 @@ packages:
     resolution: {integrity: sha512-FQN4MRfuJeHf7cBbBMJFXhKSDq+2kAArBlmRBvcvFE5BB1HZKXtSFASDhdlz9zOYwxh8lDdnvmMOe/+5cdoEdg==}
     engines: {node: '>= 0.8'}
 
-  comline@0.5.3:
-    resolution: {integrity: sha512-DUhfpeMZTlOWT9jFn/10x3ToeF0bf3P5TQ6porHcw7NfwsU+jn/699VgEwwuuQFcwY1t2oipTkmav96hfiKySA==}
-    peerDependencies:
-      arktype: ^2.1.28
-      zod: ^4.2.0
-    peerDependenciesMeta:
-      arktype:
-        optional: true
-      zod:
-        optional: true
-
   comline@0.5.4:
     resolution: {integrity: sha512-BPjo0uH1abicDmlIJy2/2PT2yYSRnmRq5v4wtRtnq/UjUZvBB8PZJHECryCmpQQklBDlF2DAy7R+kes4HABGPg==}
     peerDependencies:
@@ -3430,9 +3419,6 @@ packages:
   totalist@3.0.1:
     resolution: {integrity: sha512-sf4i37nQ2LBx4m3wB74y+ubopq6W/dIzXg0FDGjsYnZHVa1Da8FH853wlL2gtUhg+xJXjfk3kUZS3BRoQeoQBQ==}
     engines: {node: '>=6'}
-
-  treetrunks@0.1.10:
-    resolution: {integrity: sha512-/L7AtQZkPAUvpL11NPo/8n6y5wmF9SSSgrPO8Xb68M23zmw5rKa4JA7OKScbCCoaalEf0Ljml0P5RBQR9HC5Ew==}
 
   treetrunks@0.1.11:
     resolution: {integrity: sha512-3L5O5w3AGZd47pGpTNEQAfp68pSIQCeundsUZnPLPtg4TYL87qmcSJsvoqLeRUXtmL8W7JycaD3gd+i2SCYQrQ==}
@@ -5366,14 +5352,6 @@ snapshots:
     dependencies:
       delayed-stream: 1.0.0
 
-  comline@0.5.3(arktype@2.2.3)(zod@4.5.4):
-    dependencies:
-      '@standard-schema/spec': 1.1.0
-      treetrunks: 0.1.10
-    optionalDependencies:
-      arktype: 2.2.3
-      zod: 4.5.4
-
   comline@0.5.4(arktype@2.2.3)(zod@4.5.4):
     dependencies:
       '@standard-schema/spec': 1.1.0
@@ -6758,8 +6736,6 @@ snapshots:
       is-number: 7.0.0
 
   totalist@3.0.1: {}
-
-  treetrunks@0.1.10: {}
 
   treetrunks@0.1.11: {}
 
