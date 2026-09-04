@@ -10,7 +10,7 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import { stripVTControlCharacters, styleText } from "node:util"
 
-import { afterEach, describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it } from "vite-plus/test"
 
 import { runLasertagCli } from "../../../src/cli/main.ts"
 import { createFixCourse } from "./fix-course.ts"

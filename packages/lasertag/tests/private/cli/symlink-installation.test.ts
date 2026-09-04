@@ -10,7 +10,7 @@ import { createRequire } from "node:module"
 import { tmpdir } from "node:os"
 import path from "node:path"
 
-import { expect, it } from "vitest"
+import { expect, it } from "vite-plus/test"
 
 const requireFromTest = createRequire(import.meta.url)
 const packageJsonPath = requireFromTest.resolve(`../../../package.json`)

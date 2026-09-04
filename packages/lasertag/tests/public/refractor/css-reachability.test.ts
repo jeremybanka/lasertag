@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from "vitest"
+import { afterAll, describe, expect, it } from "vite-plus/test"
 
 import { createTypescriptAstSession } from "../../../src/refractor/typescript-ast.ts"
 import { validateCssReachability as validateCssReachabilityOnce } from "../../../src/refractor/validate-css-reachability.ts"

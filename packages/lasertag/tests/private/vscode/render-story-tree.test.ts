@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it } from "vite-plus/test"
 
 import type { LasertagRenderStoryView } from "../../../src/lsp/render-story-view.ts"
 import { createRenderStoryTree } from "../../../src/vscode/render-story-tree.ts"

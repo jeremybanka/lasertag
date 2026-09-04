@@ -1,4 +1,4 @@
-import { afterEach, expect, it } from "vitest"
+import { afterEach, expect, it } from "vite-plus/test"
 
 import { runLasertagCli } from "../../../src/cli/main.ts"
 import { cleanUpFixtures, createFixture, createTestIO } from "./test-support.ts"
