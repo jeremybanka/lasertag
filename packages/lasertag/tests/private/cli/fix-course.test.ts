@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs"
 
-import { afterEach, expect, it } from "vitest"
+import { afterEach, expect, it } from "vite-plus/test"
 
 import { runLasertagCli } from "../../../src/cli/main.ts"
 import { createFixCourse } from "../../public/cli/fix-course.ts"

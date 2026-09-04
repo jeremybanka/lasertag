@@ -44,8 +44,7 @@
 			"matchPackageNames": [
 				"vite-plus",
 				"viteplus",
-				"@voidzero-dev/vite-plus-core",
-				"@voidzero-dev/vite-plus-test"
+				"@voidzero-dev/vite-plus-core"
 			]
 		},
 		{

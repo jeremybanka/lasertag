@@ -3,7 +3,7 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import { setEnvironmentData } from "node:worker_threads"
 
-import { expect, it } from "vitest"
+import { expect, it } from "vite-plus/test"
 
 import { runWorkStealing } from "../../../src/cli/work-stealing.ts"
 
