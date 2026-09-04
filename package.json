@@ -24,7 +24,7 @@
 		"@changesets/cli": "3.0.1",
 		"@changesets/config": "4.0.0",
 		"@dprint/json": "0.23.0",
-		"@dprint/markdown": "0.23.2",
+		"@dprint/markdown": "0.23.3",
 		"@dprint/oxc": "0.38.0",
 		"@dprint/toml": "0.8.0",
 		"break-check": "0.6.36",
