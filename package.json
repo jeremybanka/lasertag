@@ -28,7 +28,7 @@
 		"@dprint/oxc": "0.38.0",
 		"@dprint/toml": "0.8.0",
 		"break-check": "0.6.36",
-		"cspell": "10.2.1",
+		"cspell": "10.2.2",
 		"dprint": "0.57.1",
 		"dprint-plugin-malva": "0.16.0",
 		"dprint-plugin-markup": "0.27.3",
