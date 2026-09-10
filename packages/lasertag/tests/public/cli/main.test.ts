@@ -92,7 +92,7 @@ describe(`lasertag cli`, () => {
 
 	it(`prints top-level help when no command is passed`, async () => {
 		const { io, logs } = createTestIO()
-		const result = await runLasertagCli([`lasertag`], io)
+		const result = await runLasertagCli([`node`, `lasertag`], io)
 
 		expect(result.mode).toBe(`help`)
 		expect(result.exitCode).toBe(0)
@@ -105,8 +105,14 @@ describe(`lasertag cli`, () => {
 	it(`prints help when --help or -h is passed`, async () => {
 		const helpLong = createTestIO()
 		const helpShort = createTestIO()
-		const longResult = await runLasertagCli([`lasertag`, `--help`], helpLong.io)
-		const shortResult = await runLasertagCli([`lasertag`, `-h`], helpShort.io)
+		const longResult = await runLasertagCli(
+			[`node`, `lasertag`, `--help`],
+			helpLong.io,
+		)
+		const shortResult = await runLasertagCli(
+			[`node`, `lasertag`, `-h`],
+			helpShort.io,
+		)
 
 		expect(longResult.mode).toBe(`help`)
 		expect(shortResult.mode).toBe(`help`)
@@ -118,14 +124,14 @@ describe(`lasertag cli`, () => {
 		const versionLong = createTestIO()
 		const versionShort = createTestIO()
 		const longResult = await runLasertagCli(
-			[`lasertag`, `--version`],
+			[`node`, `lasertag`, `--version`],
 			versionLong.io,
 			{
 				packageVersion: `1.2.3-test`,
 			},
 		)
 		const shortResult = await runLasertagCli(
-			[`lasertag`, `-v`],
+			[`node`, `lasertag`, `-v`],
 			versionShort.io,
 			{
 				packageVersion: `1.2.3-test`,
@@ -158,7 +164,7 @@ describe(`lasertag cli`, () => {
 			`,
 		})
 		const { io, logs } = createTestIO()
-		const result = await runLasertagCli([`lasertag`, `check`], io, {
+		const result = await runLasertagCli([`node`, `lasertag`, `check`], io, {
 			cwd: fixture.root,
 		})
 
@@ -177,7 +183,7 @@ describe(`lasertag cli`, () => {
 			"src/AppPanel.tsx": `export const AppPanel = () => <app-panel />`,
 		})
 		const { errors, io } = createTestIO()
-		const result = await runLasertagCli([`lasertag`, `check`], io, {
+		const result = await runLasertagCli([`node`, `lasertag`, `check`], io, {
 			cwd: fixture.root,
 		})
 
@@ -212,7 +218,7 @@ describe(`lasertag cli`, () => {
 		})
 		const { io, logs } = createTestIO()
 		const result = await runLasertagCli(
-			[`lasertag`, `check`, `src/**/*.module.css`],
+			[`node`, `lasertag`, `check`, `src/**/*.module.css`],
 			io,
 			{
 				cwd: fixture.root,
@@ -272,7 +278,7 @@ describe(`lasertag cli`, () => {
 		})
 		const { io } = createTestIO()
 		const result = await runLasertagCli(
-			[`lasertag`, `check`, `src/**/*.module.css,test/**/*.module.css`],
+			[`node`, `lasertag`, `check`, `src/**/*.module.css,test/**/*.module.css`],
 			io,
 			{
 				cwd: fixture.root,
@@ -307,7 +313,9 @@ export function AppPanel() {
 		})
 		const { io, logs } = createTestIO()
 
-		await runLasertagCli([`lasertag`, `check`], io, { cwd: fixture.root })
+		await runLasertagCli([`node`, `lasertag`, `check`], io, {
+			cwd: fixture.root,
+		})
 
 		expect(logs).toEqual([
 			`src/AppPanel.module.css  2 warnings
@@ -358,7 +366,7 @@ export function CleanPanel() {
 		const warning = createTestIO({ echo: SHOW_TRAINING_COURSE_OUTPUT })
 
 		await runLasertagCli(
-			[`lasertag`, `check`, fixture.path(`src/AppPanel.module.css`)],
+			[`node`, `lasertag`, `check`, fixture.path(`src/AppPanel.module.css`)],
 			warning.io,
 			{ cwd: fixture.root, forceColor: true },
 		)
@@ -383,7 +391,7 @@ export function CleanPanel() {
 		const clean = createTestIO({ echo: SHOW_TRAINING_COURSE_OUTPUT })
 
 		await runLasertagCli(
-			[`lasertag`, `check`, fixture.path(`src/CleanPanel.module.css`)],
+			[`node`, `lasertag`, `check`, fixture.path(`src/CleanPanel.module.css`)],
 			clean.io,
 			{ cwd: fixture.root, forceColor: true },
 		)
@@ -422,12 +430,18 @@ export function AccountPanel({ state }: { state: "loading" | "ready" | "failure"
 		const detailed = createTestIO({ echo: SHOW_TRAINING_COURSE_OUTPUT })
 
 		await runLasertagCli(
-			[`lasertag`, `check`, fixture.path(`src/AccountPanel.module.css`)],
+			[
+				`node`,
+				`lasertag`,
+				`check`,
+				fixture.path(`src/AccountPanel.module.css`),
+			],
 			regular.io,
 			{ cwd: fixture.root },
 		)
 		await runLasertagCli(
 			[
+				`node`,
 				`lasertag`,
 				`check`,
 				`--show-story`,
@@ -474,9 +488,13 @@ export function AccountPanel({ state }: { state: "loading" | "ready" | "failure"
 		})
 		const { io } = createTestIO()
 		const cssPath = fixture.path(`src/AppPanel.module.css`)
-		const result = await runLasertagCli([`lasertag`, `check`, cssPath], io, {
-			cwd: fixture.root,
-		})
+		const result = await runLasertagCli(
+			[`node`, `lasertag`, `check`, cssPath],
+			io,
+			{
+				cwd: fixture.root,
+			},
+		)
 
 		expect(result.targets).toEqual([cssPath])
 		expect(result.files).toEqual([cssPath])
@@ -489,7 +507,13 @@ export function AccountPanel({ state }: { state: "loading" | "ready" | "failure"
 
 		await expect(
 			runLasertagCli(
-				[`lasertag`, `check`, `src/**/*.module.css`, `test/**/*.module.css`],
+				[
+					`node`,
+					`lasertag`,
+					`check`,
+					`src/**/*.module.css`,
+					`test/**/*.module.css`,
+				],
 				io,
 			),
 		).rejects.toThrow(`There are no positional arguments for lasertag`)
@@ -512,7 +536,7 @@ export function AccountPanel({ state }: { state: "loading" | "ready" | "failure"
 		})
 		const { io, logs } = createTestIO()
 		const result = await runLasertagCli(
-			[`lasertag`, `check`, `--format=json`, `src/**/*.module.css`],
+			[`node`, `lasertag`, `check`, `--format=json`, `src/**/*.module.css`],
 			io,
 			{ cwd: fixture.root },
 		)
@@ -544,7 +568,13 @@ export function AccountPanel({ state }: { state: "loading" | "ready" | "failure"
 		showTrainingCourseStage(`check warning regions`, course.lessons.length)
 
 		const result = await runLasertagCli(
-			[`lasertag`, `check`, `--max-files=all`, `course/**/*.module.css`],
+			[
+				`node`,
+				`lasertag`,
+				`check`,
+				`--max-files=all`,
+				`course/**/*.module.css`,
+			],
 			output.io,
 			{
 				checkWorkerCount: 2,
@@ -614,7 +644,7 @@ export function SamplePanel() {
 		const fixture = createFixture(files)
 		const limited = createTestIO()
 		const limitedResult = await runLasertagCli(
-			[`lasertag`, `check`, `src/**/*.module.css`],
+			[`node`, `lasertag`, `check`, `src/**/*.module.css`],
 			limited.io,
 			{ cwd: fixture.root },
 		)
@@ -640,7 +670,7 @@ export function SamplePanel() {
 
 		const unlimited = createTestIO()
 		const unlimitedResult = await runLasertagCli(
-			[`lasertag`, `check`, `--max-files=all`, `src/**/*.module.css`],
+			[`node`, `lasertag`, `check`, `--max-files=all`, `src/**/*.module.css`],
 			unlimited.io,
 			{ cwd: fixture.root },
 		)
@@ -655,7 +685,7 @@ export function SamplePanel() {
 
 		const customLimit = createTestIO()
 		const customLimitResult = await runLasertagCli(
-			[`lasertag`, `check`, `--max-files=3`, `src/**/*.module.css`],
+			[`node`, `lasertag`, `check`, `--max-files=3`, `src/**/*.module.css`],
 			customLimit.io,
 			{ cwd: fixture.root },
 		)
@@ -676,7 +706,7 @@ export function SamplePanel() {
 		const { io } = createTestIO()
 
 		await expect(
-			runLasertagCli([`lasertag`, `check`, `--max-files=0`], io),
+			runLasertagCli([`node`, `lasertag`, `check`, `--max-files=0`], io),
 		).rejects.toThrow(`expected "all" or a positive integer`)
 	})
 
@@ -695,7 +725,7 @@ export function AppPanel() {
 `,
 		})
 		const { io, logs } = createTestIO()
-		const result = await runLasertagCli([`lasertag`, `fix`], io, {
+		const result = await runLasertagCli([`node`, `lasertag`, `fix`], io, {
 			cwd: fixture.root,
 		})
 
@@ -741,7 +771,7 @@ export function AppPanel() {
 			`,
 		})
 		const { io, logs } = createTestIO()
-		const result = await runLasertagCli([`lasertag`, `check`], io, {
+		const result = await runLasertagCli([`node`, `lasertag`, `check`], io, {
 			cwd: fixture.root,
 			typescriptSdkPath: resolveTypescriptExecutable(),
 		})
@@ -762,7 +792,7 @@ export function AppPanel() {
 			editorCommand: string
 			vsixPath: string
 		}> = []
-		const result = await runLasertagCli([`lasertag`, `vsix`], io, {
+		const result = await runLasertagCli([`node`, `lasertag`, `vsix`], io, {
 			cwd: fixture.root,
 			buildVsix: async (request) => {
 				buildRequests.push({
@@ -812,7 +842,7 @@ export function AppPanel() {
 		const buildRequests: Array<{ outdir: string }> = []
 		const installRequests: Array<{ editorCommand: string }> = []
 		const result = await runLasertagCli(
-			[`lasertag`, `vsix`, `-o`, `tmp/vsix`, `-t`, `code-insiders`],
+			[`node`, `lasertag`, `vsix`, `-o`, `tmp/vsix`, `-t`, `code-insiders`],
 			io,
 			{
 				buildVsix: async (request) => {
@@ -854,7 +884,7 @@ export function AppPanel() {
 		const buildRequests: Array<{ outdir: string; packageRoot?: string }> = []
 		let installed = false
 		const result = await runLasertagCli(
-			[`lasertag`, `vsix`, `-o`, `.`, `--build-only`],
+			[`node`, `lasertag`, `vsix`, `-o`, `.`, `--build-only`],
 			io,
 			{
 				buildVsix: async (request) => {
@@ -893,7 +923,7 @@ export function AppPanel() {
 			"package.json": JSON.stringify({ version: `1.0.0` }),
 		})
 		const { errors, io } = createTestIO()
-		const result = await runLasertagCli([`lasertag`, `vsix`], io, {
+		const result = await runLasertagCli([`node`, `lasertag`, `vsix`], io, {
 			buildVsix: async () => ({
 				buildRoot: fixture.path(`dist/.lasertag-vsix`),
 				vscodeTarget: `linux-x64`,
