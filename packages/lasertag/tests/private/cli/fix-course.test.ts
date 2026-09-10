@@ -31,7 +31,7 @@ it(`runs the generated fix course through real workers with readable chronicle p
 	showTrainingCourseStage(`fix cleanup pass`, course.lessons.length)
 
 	const result = await runLasertagCli(
-		[`lasertag`, `fix`, `course/**/*.module.css`],
+		[`node`, `lasertag`, `fix`, `course/**/*.module.css`],
 		firstRun.io,
 		{
 			cwd: fixture.root,
@@ -96,7 +96,7 @@ it(`runs the generated fix course through real workers with readable chronicle p
 	showTrainingCourseStage(`fix idempotence pass`, course.lessons.length)
 
 	const idempotentResult = await runLasertagCli(
-		[`lasertag`, `fix`, `course/**/*.module.css`],
+		[`node`, `lasertag`, `fix`, `course/**/*.module.css`],
 		secondRun.io,
 		{
 			cwd: fixture.root,

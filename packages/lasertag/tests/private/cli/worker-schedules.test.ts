@@ -71,7 +71,7 @@ it(`keeps imported root evidence stable across worker schedules`, async () => {
 
 	for (const workerCount of [1, 2]) {
 		const { io } = createTestIO()
-		const result = await runLasertagCli([`lasertag`, `check`], io, {
+		const result = await runLasertagCli([`node`, `lasertag`, `check`], io, {
 			checkWorkerCount: workerCount,
 			cwd: fixture.root,
 		})
