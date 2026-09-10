@@ -1,5 +1,11 @@
 # lasertag
 
+## 0.8.1
+
+### Patch Changes
+
+- 6c803b3: Update CLI tests to pass full runtime argument arrays, matching real command invocations and supporting both comline 0.5.4 and 0.6.0.
+
 ## 0.8.0
 
 ### Minor Changes
