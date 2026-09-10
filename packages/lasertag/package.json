@@ -71,7 +71,7 @@
 		"vscode-languageclient": "10.1.1",
 		"vscode-languageserver": "10.1.1",
 		"vscode-languageserver-textdocument": "1.0.14",
-		"zod": "4.6.0"
+		"zod": "4.6.1"
 	},
 	"devDependencies": {
 		"@eslint/core": "1.2.1",
