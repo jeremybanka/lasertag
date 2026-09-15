@@ -170,6 +170,42 @@ ignores `node_modules`, `dist`, `build`, and `coverage`. A diagnostic or file
 failure produces a nonzero exit code, which makes `check` suitable for CI. Use
 `pnpm lasertag --help` for the current command syntax.
 
+Use `--` before a target starting with a dash, for example
+`pnpm lasertag check -- -example.module.css`. Unknown options and options for a
+different command produce warnings on stderr. These warnings do not change a
+successful exit code, and `--format=json` output on stdout remains valid JSON.
+
+### Shell completion
+
+With `lasertag` available on your shell's `PATH`, install completion for your
+shell:
+
+```sh
+lasertag completion install bash
+lasertag completion install zsh
+lasertag completion install fish
+lasertag completion install nushell
+lasertag completion install carapace
+```
+
+Choose the integration you use. Bash requires Bash 4+ with bash-completion 2.18+
+enabled; Zsh requires `compinit`; Fish requires Fish 4+; Nushell requires external
+completions enabled. Carapace requires its existing shell integration. If you
+already use Carapace in Nushell, install only the Carapace integration.
+
+Installation discovers the shell's completion directory, writes the Lasertag
+completion file, and reports its path. It reads normal shell startup settings
+without editing shell profiles. Open a new shell afterward. Run the same command
+to update the integration, or delete the reported file to remove it. For manual
+installation, `lasertag completion <shell>` prints the integration file.
+
+Tab completion suggests commands and their options, `stylish` and `json` formats,
+`all` for `--max-files`, file paths for check/fix targets, directories for
+`--outdir`, and common editor commands for `--target`. Editor suggestions do not
+restrict which command you can supply. Options already supplied are hidden from
+suggestions. Completion does not run checks, apply fixes, or build/install the
+VS Code extension.
+
 ### Check output
 
 The default `stylish` output groups warnings under their CSS Module. It shows

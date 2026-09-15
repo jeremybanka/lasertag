@@ -223,8 +223,8 @@ importers:
         specifier: 0.53.1
         version: 0.53.1(@typescript-eslint/parser@8.70.0(eslint@10.10.0(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0))(eslint@10.10.0(jiti@2.7.0)(supports-color@7.2.0))(solid-js@1.9.15)
       comline:
-        specifier: 0.5.4
-        version: 0.5.4(arktype@2.2.3)(zod@4.6.5)
+        specifier: 0.7.0
+        version: 0.7.0(arktype@2.2.3)(zod@4.6.5)
       rolldown:
         specifier: 1.2.8
         version: 1.2.8
@@ -2079,17 +2079,6 @@ packages:
   combined-stream@1.0.8:
     resolution: {integrity: sha512-FQN4MRfuJeHf7cBbBMJFXhKSDq+2kAArBlmRBvcvFE5BB1HZKXtSFASDhdlz9zOYwxh8lDdnvmMOe/+5cdoEdg==}
     engines: {node: '>= 0.8'}
-
-  comline@0.5.4:
-    resolution: {integrity: sha512-BPjo0uH1abicDmlIJy2/2PT2yYSRnmRq5v4wtRtnq/UjUZvBB8PZJHECryCmpQQklBDlF2DAy7R+kes4HABGPg==}
-    peerDependencies:
-      arktype: ^2.1.28
-      zod: ^4.2.0
-    peerDependenciesMeta:
-      arktype:
-        optional: true
-      zod:
-        optional: true
 
   comline@0.7.0:
     resolution: {integrity: sha512-xKBcV5Aus84akxLWXUQZtalExNTXg/njodI5qMAS2/SdAHO7AOIg0+tZQEJjDOZCN7Ph8pJLs8N1/DSC8e4LIQ==}
@@ -5129,14 +5118,6 @@ snapshots:
     dependencies:
       delayed-stream: 1.0.0
 
-  comline@0.5.4(arktype@2.2.3)(zod@4.6.5):
-    dependencies:
-      '@standard-schema/spec': 1.1.0
-      treetrunks: 0.1.11
-    optionalDependencies:
-      arktype: 2.2.3
-      zod: 4.6.5
-
   comline@0.7.0(arktype@2.2.3)(zod@4.5.4):
     dependencies:
       '@standard-schema/spec': 1.1.0
@@ -5144,6 +5125,14 @@ snapshots:
     optionalDependencies:
       arktype: 2.2.3
       zod: 4.5.4
+
+  comline@0.7.0(arktype@2.2.3)(zod@4.6.5):
+    dependencies:
+      '@standard-schema/spec': 1.1.0
+      treetrunks: 0.1.11
+    optionalDependencies:
+      arktype: 2.2.3
+      zod: 4.6.5
 
   commander@12.1.0: {}
 

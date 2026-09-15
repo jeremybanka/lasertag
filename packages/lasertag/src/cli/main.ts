@@ -7,6 +7,8 @@ import { isMainThread, workerData } from "node:worker_threads"
 
 import {
 	cli,
+	completionResponse,
+	formatWarnings,
 	help,
 	noOptions,
 	options,
@@ -136,7 +138,13 @@ type CheckOptions = z.infer<typeof checkOptionsSchema>
 type FixOptions = Record<never, never>
 type VsixOptions = z.infer<typeof vsixOptionsSchema>
 
-export type LasertagCliMode = `check` | `fix` | `help` | `version` | `vsix`
+export type LasertagCliMode =
+	| `check`
+	| `completion`
+	| `fix`
+	| `help`
+	| `version`
+	| `vsix`
 
 export type LasertagCliDiagnostic = CssReachabilityDiagnostic & {
 	cssPath: string
@@ -205,18 +213,21 @@ const checkRouteOptions = options(
 	checkOptionsSchema,
 	{
 		format: {
+			completion: { repeatable: false },
 			description: `output format`,
 			flag: `f`,
 			example: `--format json`,
 			required: false,
 		},
 		"max-files": {
+			completion: { choices: [`all`], repeatable: false },
 			description: `maximum affected files shown in stylish output`,
 			example: `--max-files all`,
 			parse: parseStringOption,
 			required: false,
 		},
 		"show-story": {
+			completion: { repeatable: false },
 			description: `show closest render story possibilities for each warning`,
 			example: `--show-story`,
 			parse: parseBooleanOption,
@@ -231,12 +242,17 @@ const fixRouteOptions = noOptions(
 
 const lasertagCli = cli({
 	cliName: `lasertag`,
-	cliDescription: `Validate and fix Lasertag CSS modules or build the workspace VSCode extension.`,
+	cliDescription: `Validate and fix Lasertag CSS modules or build the workspace VSCode extension. Install shell completions with lasertag completion install <shell>.`,
 	discoverConfigPath: () => undefined,
+	positionalCompletions: {
+		"check/$glob": { fileSystem: `files` },
+		"fix/$glob": { fileSystem: `files` },
+	},
 	routes: lasertagRoutes,
 	routeOptions: {
 		"": options(`Show Lasertag command help.`, rootOptionsSchema, {
 			help: {
+				completion: { repeatable: false },
 				description: `show this help text`,
 				example: `--help`,
 				flag: `h`,
@@ -244,6 +260,7 @@ const lasertagCli = cli({
 				required: false,
 			},
 			version: {
+				completion: { repeatable: false },
 				description: `print the Lasertag CLI version`,
 				example: `--version`,
 				flag: `v`,
@@ -260,12 +277,14 @@ const lasertagCli = cli({
 			vsixOptionsSchema,
 			{
 				"build-only": {
+					completion: { repeatable: false },
 					description: `build the VSIX without installing it`,
 					example: `--build-only`,
 					parse: parseBooleanOption,
 					required: false,
 				},
 				outdir: {
+					completion: { fileSystem: `directories`, repeatable: false },
 					description: `directory for the generated VSIX`,
 					example: `--outdir dist`,
 					flag: `o`,
@@ -273,6 +292,10 @@ const lasertagCli = cli({
 					required: false,
 				},
 				target: {
+					completion: {
+						choices: [`code`, `code-insiders`, `cursor`],
+						repeatable: false,
+					},
 					description: `editor command used to install the VSIX`,
 					example: `--target code-insiders`,
 					flag: `t`,
@@ -1361,7 +1384,30 @@ export async function runLasertagCli(
 	io: LasertagCliIO = console,
 	environment: LasertagCliEnvironment = {},
 ): Promise<LasertagCliResult> {
-	const parsed = lasertagCli(args)
+	// Preserve the command-prefixed helper input used before Comline required
+	// full runtime argv. Executable invocations already pass process.argv.
+	const argv = args[0] === `lasertag` ? [process.execPath, ...args] : args
+	const completion = await completionResponse(lasertagCli.definition, argv)
+	if (completion !== undefined) {
+		io.log(completion)
+		return {
+			diagnostics: [],
+			exitCode: 0,
+			files: [],
+			mode: `completion`,
+			options: {},
+			targets: [],
+		}
+	}
+
+	const parsed = lasertagCli(argv)
+	const warnings = formatWarnings(
+		parsed.warnings,
+		environment.forceColor === undefined
+			? {}
+			: { forceColor: environment.forceColor },
+	)
+	if (warnings) io.error(warnings)
 
 	switch (parsed.inputs.case) {
 		case ``: {
