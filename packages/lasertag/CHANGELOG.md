@@ -1,5 +1,11 @@
 # lasertag
 
+## 0.8.2
+
+### Patch Changes
+
+- 43e0b73: Add shell completion and explicit completion installation for Bash, Zsh, Fish, Nushell, and Carapace, with command, option, value, file, and directory suggestions. Warn on stderr about unknown or misplaced options while preserving JSON output and successful exit codes. Upgrade Comline, support literal targets after --, and preserve command-prefixed CLI helper input.
+
 ## 0.8.1
 
 ### Patch Changes
