@@ -243,7 +243,6 @@ const fixRouteOptions = noOptions(
 const lasertagCli = cli({
 	cliName: `lasertag`,
 	cliDescription: `Validate and fix Lasertag CSS modules or build the workspace VSCode extension. Install shell completions with lasertag completion install <shell>.`,
-	discoverConfigPath: () => undefined,
 	positionalCompletions: {
 		"check/$glob": { fileSystem: `files` },
 		"fix/$glob": { fileSystem: `files` },
