@@ -1,35 +1,21 @@
 {
 	"name": "lasertag-vscode",
 	"displayName": "Lasertag",
-	"description": "CSS Modules done right: dead selectors, caught from your component's real render story.",
 	"version": "0.2.0",
-	"publisher": "jeremybanka",
 	"private": true,
-	"type": "module",
+	"description": "CSS Modules done right: dead selectors, caught from your component's real render story.",
+	"categories": [
+		"Linters",
+		"Programming Languages"
+	],
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/jeremybanka/lasertag.git",
 		"directory": "packages/lasertag/src/vscode"
 	},
 	"license": "MPL-2.0",
-	"engines": {
-		"vscode": "^1.100.0"
-	},
-	"categories": [
-		"Linters",
-		"Programming Languages"
-	],
-	"activationEvents": [
-		"onLanguage:astro",
-		"onLanguage:css",
-		"onLanguage:typescriptreact",
-		"onView:lasertag.renderStory",
-		"workspaceContains:**/*.module.css"
-	],
-	"extensionKind": [
-		"workspace"
-	],
-	"icon": "dist/LasertagIcon.png",
+	"publisher": "jeremybanka",
+	"type": "module",
 	"main": "./dist/extension.mjs",
 	"files": [
 		"dist",
@@ -131,5 +117,19 @@
 				}
 			}
 		}
-	}
+	},
+	"activationEvents": [
+		"onLanguage:astro",
+		"onLanguage:css",
+		"onLanguage:typescriptreact",
+		"onView:lasertag.renderStory",
+		"workspaceContains:**/*.module.css"
+	],
+	"engines": {
+		"vscode": "^1.100.0"
+	},
+	"icon": "dist/LasertagIcon.png",
+	"extensionKind": [
+		"workspace"
+	]
 }
