@@ -2,24 +2,12 @@
 	"name": "lasertag",
 	"version": "0.8.2",
 	"description": "zero-runtime structural css for jsx with css modules",
-	"license": "MPL-2.0",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/jeremybanka/lasertag.git",
 		"directory": "packages/lasertag"
 	},
-	"files": [
-		"LICENSE",
-		"dist/*.d.mts",
-		"dist/*.d.mts.map",
-		"dist/*.mjs",
-		"dist/*.mjs.map",
-		"docs",
-		"examples",
-		"src",
-		"templates",
-		"AGENTS.md"
-	],
+	"license": "MPL-2.0",
 	"type": "module",
 	"exports": {
 		"./package.json": "./package.json",
@@ -51,6 +39,18 @@
 		"lasertag": "./dist/cli.mjs",
 		"lasertag-lsp": "./dist/lsp.mjs"
 	},
+	"files": [
+		"LICENSE",
+		"dist/*.d.mts",
+		"dist/*.d.mts.map",
+		"dist/*.mjs",
+		"dist/*.mjs.map",
+		"docs",
+		"examples",
+		"src",
+		"templates",
+		"AGENTS.md"
+	],
 	"scripts": {
 		"benchmark:lsp": "node benchmarks/lsp-analysis.ts",
 		"build": "vp pack",
@@ -75,11 +75,11 @@
 	},
 	"devDependencies": {
 		"@eslint/core": "1.2.1",
-		"@typescript-eslint/parser": "8.70.0",
-		"@typescript-eslint/utils": "8.70.0",
 		"@types/estree": "1.0.9",
 		"@types/node": "26.6.1",
 		"@types/react": "19.3.0",
+		"@typescript-eslint/parser": "8.70.0",
+		"@typescript-eslint/utils": "8.70.0",
 		"eslint": "10.10.0",
 		"jiti": "2.7.0",
 		"preact": "10.29.8",
@@ -105,9 +105,9 @@
 			"optional": true
 		}
 	},
+	"packageManager": "pnpm@12.4.2",
 	"engines": {
 		"node": "26.8.2",
 		"pnpm": "12.4.2"
-	},
-	"packageManager": "pnpm@12.4.2"
+	}
 }
