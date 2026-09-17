@@ -2,7 +2,7 @@
 	"version": "0.2",
 	"useGitignore": true,
 	"ignorePaths": [
-		"lasertag.ai",
+		"assets/brand/lasertag.ai",
 		"pnpm-lock.yaml"
 	],
 	"words": [
@@ -40,6 +40,7 @@
 		"vite",
 		"viteplus",
 		"vitest",
-		"voidzero"
+		"voidzero",
+		"wordmark"
 	]
 }

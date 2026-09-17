@@ -1,7 +1,7 @@
 <div align="left">
 	<img
 		alt="lasertag logo"
-		src="https://raw.githubusercontent.com/jeremybanka/lasertag/main/LasertagWordmark.png"
+		src="assets/brand/LasertagWordmark.png"
 		width="600"
 		height="150"
 	>
