@@ -63,7 +63,7 @@
 		"@astrojs/compiler": "4.0.0",
 		"@vscode/vsce": "4.0.0",
 		"atom.io": "0.53.2",
-		"comline": "0.8.0",
+		"comline": "0.8.1",
 		"rolldown": "1.2.9",
 		"takua": "0.2.3",
 		"tinyglobby": "0.2.17",
