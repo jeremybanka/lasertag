@@ -220,8 +220,8 @@ importers:
         specifier: 4.0.0
         version: 4.0.0(supports-color@7.2.0)
       atom.io:
-        specifier: 0.53.1
-        version: 0.53.1(@typescript-eslint/parser@8.70.0(eslint@10.10.0(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0))(eslint@10.10.0(jiti@2.7.0)(supports-color@7.2.0))(solid-js@1.9.15)
+        specifier: 0.53.2
+        version: 0.53.2(@types/react@19.3.0)(@typescript-eslint/parser@8.70.0(eslint@10.10.0(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0))(eslint@10.10.0(jiti@2.7.0)(supports-color@7.2.0))(solid-js@1.9.15)
       comline:
         specifier: 0.8.0
         version: 0.8.0(arktype@2.2.3)(zod@4.6.5)
@@ -1929,12 +1929,13 @@ packages:
     resolution: {integrity: sha512-Izi8RQcffqCeNVgFigKli1ssklIbpHnCYc6AknXGYoB6grJqyeby7jv12JUQgmTAnIDnbck1uxksT4dzN3PWBA==}
     engines: {node: '>=12'}
 
-  atom.io@0.53.1:
-    resolution: {integrity: sha512-gDLlf6Op7cCkuebFCF37eI4424LIpWzH1kdCI0CYaHiKwBepZVjQgCGmMObZpzbOU+TVo/4AvkRVBAbHIq0KGg==}
+  atom.io@0.53.2:
+    resolution: {integrity: sha512-CLzcO/6cqryo5LnywyXFBRuZ0AZcC/1+ALAG1c+OTlIuXX/xrCPR4Nz1l68VK7nhTNyGW+la2hXdu4nsSb7SiA==}
     peerDependencies:
       '@floating-ui/react': '>=0.25.0'
       '@floating-ui/react-dom': '>=2.0.0'
       '@testing-library/react': '>=14.0.0'
+      '@types/react': ^18.0.0 || ^19.0.0
       '@typescript-eslint/parser': '>=8.0.0'
       eslint: '>=9.0.0'
       happy-dom: '>=17.4.4'
@@ -1949,6 +1950,8 @@ packages:
       '@floating-ui/react-dom':
         optional: true
       '@testing-library/react':
+        optional: true
+      '@types/react':
         optional: true
       '@typescript-eslint/parser':
         optional: true
@@ -4419,8 +4422,9 @@ snapshots:
 
   assertion-error@2.0.1: {}
 
-  atom.io@0.53.1(@typescript-eslint/parser@8.70.0(eslint@10.10.0(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0))(eslint@10.10.0(jiti@2.7.0)(supports-color@7.2.0))(solid-js@1.9.15):
+  atom.io@0.53.2(@types/react@19.3.0)(@typescript-eslint/parser@8.70.0(eslint@10.10.0(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0))(eslint@10.10.0(jiti@2.7.0)(supports-color@7.2.0))(solid-js@1.9.15):
     optionalDependencies:
+      '@types/react': 19.3.0
       '@typescript-eslint/parser': 8.70.0(eslint@10.10.0(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0)
       eslint: 10.10.0(jiti@2.7.0)(supports-color@7.2.0)
       solid-js: 1.9.15
