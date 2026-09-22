@@ -143,6 +143,8 @@ without executing the component or its data loaders. Hono `Fragment` and
 `ErrorBoundary` also contributes its `fallback` and inline `fallbackRender`
 branches. Aliases, namespace imports, and the default `hono/jsx` namespace are
 recognized. Components imported from `hono/jsx/dom` use the same analysis.
+Imported Hono `memo` and `forwardRef` wrappers preserve the render function's
+structure; arbitrary factories remain unknown.
 Unknown children, render callbacks, and imported component implementations keep
 the ordinary ownership boundaries. Streaming transport markup is not an
 authoring target for component selectors.
@@ -403,7 +405,7 @@ Put the diagnostic code in brackets. A disable also requires an explanation of a
 
 Lasertag makes no guarantees for `innerHTML` or `dangerouslySetInnerHTML`. Injected HTML is outside static analysis; CLI fixes and editor cleanup may remove selectors used only by that HTML.
 
-Lasertag preserves CSS when a render branch is unknown. An arbitrary factory such as `wrap(() => <span />)` may insert elements around its callback, so Lasertag does not treat the callback as the factory's complete output. Imported React and Preact compatibility `memo` and `forwardRef` wrappers remain supported. Custom factories can therefore produce fewer dead-selector diagnostics and more ownership-boundary warnings; cleanup leaves those uncertain selectors intact.
+Lasertag preserves CSS when a render branch is unknown. An arbitrary factory such as `wrap(() => <span />)` may insert elements around its callback, so Lasertag does not treat the callback as the factory's complete output. Imported React, Preact compatibility, and Hono `memo` and `forwardRef` wrappers remain supported. Custom factories can therefore produce fewer dead-selector diagnostics and more ownership-boundary warnings; cleanup leaves those uncertain selectors intact.
 
 Framework component recognition respects local bindings: a parameter named `Fragment` or `Show` does not inherit the behavior of a shadowed framework import. Transparent framework wrappers also account for explicit `children` props, including when the JSX body contains only comments or formatting whitespace. Spread render props remain conservative because they can supply children or fallbacks that are not visible at the call site.
 
@@ -418,8 +420,9 @@ declare module "*.module.css" {
 }
 ```
 
-lasertag ships JSX intrinsic element types for React, Preact, and Solid. Each allows arbitrary hyphenated custom elements in JSX:
+lasertag ships JSX intrinsic element types for React, Preact, Solid, and Hono. Each allows arbitrary hyphenated custom elements in JSX:
 
 - `lasertag/react-jsx`
 - `lasertag/preact-jsx`
 - `lasertag/solid-jsx`
+- `lasertag/hono-jsx`

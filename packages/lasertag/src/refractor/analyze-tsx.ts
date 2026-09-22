@@ -220,7 +220,7 @@ function isKnownComponentFactory(
 }
 
 function isComponentFactoryModule(moduleName: string): boolean {
-	return moduleName === `react` || moduleName === `preact/compat`
+	return moduleName === `react` || moduleName === `preact/compat` || isHonoJsxModule(moduleName)
 }
 
 type ExpressionValueFacts = {
@@ -1741,7 +1741,7 @@ function resolveIndexedImportBinding(
 	const moduleName =
 		index.namespaceImports.get(namespace.text) ??
 		(defaultBinding?.importedName === `default` &&
-		(isComponentFactoryModule(defaultBinding.moduleName) || isHonoJsxModule(defaultBinding.moduleName))
+		isComponentFactoryModule(defaultBinding.moduleName)
 			? defaultBinding.moduleName
 			: undefined)
 
@@ -2193,21 +2193,7 @@ function lowerHonoComponent(
 		isJsxModule && binding.importedName === `ErrorBoundary`
 	if (!isFragment && !isSuspense && !isErrorBoundary) return
 
-	const childrenAttribute = findJsxAttribute(context, node, `children`)
-	const children = jsxChildren(node)
-	const renderedChildren =
-		children.length > 0
-			? analyzeJsxChildren(context, children, stack)
-			: childrenAttribute
-				? analyzeJsxAttributeRenderValue(context, childrenAttribute, stack)
-				: []
-	const hasSpread = jsxAttributes(node).properties.some(ts.isJsxSpreadAttribute)
-
-	if (hasSpread) {
-		renderedChildren.push(
-			foreignOpaque(`spread Hono render props`, context.sourceFile, node),
-		)
-	}
+	const renderedChildren = analyzeTransparentChildren(context, node, stack)
 	if (isFragment) return renderedChildren
 
 	const alternatives = [renderedChildren]
@@ -2220,7 +2206,7 @@ function lowerHonoComponent(
 		const fallbackRender = findJsxAttribute(context, node, `fallbackRender`)
 		if (fallbackRender) {
 			alternatives.push(
-				analyzeJsxAttributeRenderValue(context, fallbackRender, stack),
+				analyzeJsxAttributeRenderValue(context, fallbackRender, stack, true),
 			)
 		}
 	}
