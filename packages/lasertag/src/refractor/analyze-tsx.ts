@@ -1474,9 +1474,22 @@ function analyzeTransparentChildren(
 			? analyzeJsxAttributeRenderValue(context, attribute, stack, allowFunction)
 			: []
 	if (jsxAttributes(node).properties.some(ts.isJsxSpreadAttribute)) {
-		rendered.push(
-			foreignOpaque(`spread component render props`, context.sourceFile, node),
-		)
+		return [
+			choice(
+				[
+					rendered,
+					[
+						foreignOpaque(
+							`spread component render props`,
+							context.sourceFile,
+							node,
+						),
+					],
+				],
+				context.sourceFile,
+				node,
+			),
+		]
 	}
 	return rendered
 }
@@ -1534,9 +1547,22 @@ function analyzeSolidRepeatedChildren(
 		]
 	}
 	if (jsxAttributes(node).properties.some(ts.isJsxSpreadAttribute)) {
-		analyzedChildren.push(
-			foreignOpaque(`spread component render props`, context.sourceFile, node),
-		)
+		return [
+			choice(
+				[
+					analyzedChildren,
+					[
+						foreignOpaque(
+							`spread component render props`,
+							context.sourceFile,
+							node,
+						),
+					],
+				],
+				context.sourceFile,
+				node,
+			),
+		]
 	}
 
 	return analyzedChildren

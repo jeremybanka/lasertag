@@ -1,5 +1,19 @@
 export const conservativeJsxCases = [
 	{
+		name: `spread replaces children above the CSS root`,
+		source: `import { Fragment } from "preact"
+export function AppPanel(props) {
+	return <Fragment children={<app-panel class={css.class}><span /></app-panel>} {...props} />
+}`,
+	},
+	{
+		name: `Solid loop spread can supply a different CSS root`,
+		source: `import { For } from "solid-js"
+export function AppPanel(props) {
+	return <For each={props.items} {...props}>{() => <app-panel class={css.class}><span /></app-panel>}</For>
+}`,
+	},
+	{
 		name: `unknown wrapped main component retains its identity`,
 		source: `function decorate(Render) { return Render }
 export const AppPanel = decorate(() => <app-panel class={css.class}><aside /></app-panel>)

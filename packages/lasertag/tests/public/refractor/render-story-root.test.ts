@@ -7,6 +7,33 @@ import {
 } from "../../../src/refractor/render-story-root.ts"
 
 describe(`CSS Module render story roots`, () => {
+	it(`retains unknown replacement alternatives through repeated scoping`, () => {
+		const story: RenderStory = {
+			componentName: `AppPanel`,
+			warnings: [],
+			roots: [
+				{
+					kind: `choice`,
+					alternatives: [
+						[
+							{
+								kind: `element`,
+								tagName: `app-panel`,
+								attributes: [{ name: `class`, expression: `css.class` }],
+								children: [],
+							},
+						],
+						[{ kind: `opaque`, reason: `unknown replacement` }],
+					],
+				},
+			],
+		}
+		expect(scopeRenderStoryToCssClassRoots(story)).toEqual(story)
+		expect(
+			scopeRenderStoryToCssClassRoots(scopeRenderStoryToCssClassRoots(story)),
+		).toEqual(story)
+	})
+
 	it(`uses the node carrying css.class as the ownership root`, () => {
 		const renderStory: RenderStory = {
 			componentName: `Page`,

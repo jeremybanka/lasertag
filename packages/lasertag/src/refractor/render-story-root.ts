@@ -84,21 +84,36 @@ export function findCssClassRenderRoots(
 function scopedCssClassRenderRoots(
 	children: readonly StoryChild[],
 	options: CssClassRenderRootOptions,
+	preserveUnknown = false,
 ): StoryChild[] {
 	return children.flatMap((child): StoryChild[] => {
-		if (child.kind === `opaque`) return []
+		if (child.kind === `opaque`) return preserveUnknown ? [child] : []
 		if (child.kind === `choice`) {
 			const alternatives = child.alternatives.map((alternative) =>
-				scopedCssClassRenderRoots(alternative, options),
+				scopedCssClassRenderRoots(alternative, options, preserveUnknown),
 			)
 
-			return alternatives.some((alternative) => alternative.length > 0)
-				? [{ ...child, alternatives }]
-				: []
+			if (!alternatives.some((alternative) => alternative.length > 0)) return []
+			// An unknown alternative may supply a different CSS root. Keep that
+			// possibility even when another branch has a statically known root.
+			return [
+				{
+					...child,
+					alternatives: alternatives.map((alternative, index) =>
+						alternative.length > 0
+							? alternative
+							: scopedCssClassRenderRoots(
+									child.alternatives[index] ?? [],
+									options,
+									true,
+								),
+					),
+				},
+			]
 		}
 		if (hasCssClassAttachment(child, options)) return [child]
 
-		return scopedCssClassRenderRoots(child.children, options)
+		return scopedCssClassRenderRoots(child.children, options, preserveUnknown)
 	})
 }
 
