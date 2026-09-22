@@ -1338,10 +1338,22 @@ function findJsxAttribute(
 	node: ComponentJsxNode,
 	name: string,
 ): ts.JsxAttribute | undefined {
-	for (const attribute of jsxAttributes(node).properties) {
+	for (const attribute of [...jsxAttributes(node).properties].reverse()) {
 		if (ts.isJsxSpreadAttribute(attribute)) continue
 		if (attribute.name.getText(context.sourceFile) === name) return attribute
 	}
+}
+
+function hasUnknownJsxProp(
+	context: AnalyzeContext,
+	node: ComponentJsxNode,
+	name: string,
+): boolean {
+	for (const attribute of [...jsxAttributes(node).properties].reverse()) {
+		if (ts.isJsxSpreadAttribute(attribute)) return true
+		if (attribute.name.getText(context.sourceFile) === name) return false
+	}
+	return false
 }
 
 function resolveImportBinding(
@@ -1454,30 +1466,22 @@ function hasMeaningfulJsxChildren(children: readonly ts.JsxChild[]): boolean {
 	})
 }
 
-function analyzeTransparentChildren(
+function analyzeJsxRenderProp(
 	context: AnalyzeContext,
 	node: ComponentJsxNode,
+	name: string,
 	stack: string[],
 	allowFunction = false,
-): StoryChild[] {
-	const children = jsxChildren(node)
-	const attribute = findJsxAttribute(context, node, `children`)
-	const rendered = hasMeaningfulJsxChildren(children)
-		? analyzeJsxChildrenWith(context, children, (child) => {
-				if (allowFunction && ts.isJsxExpression(child) && child.expression) {
-					const body = functionBodyFromExpression(child.expression)
-					if (body) return analyzeFunctionBody(context, body, stack)
-				}
-				return analyzeJsxChild(context, child, stack)
-			})
-		: attribute
-			? analyzeJsxAttributeRenderValue(context, attribute, stack, allowFunction)
-			: []
-	if (jsxAttributes(node).properties.some(ts.isJsxSpreadAttribute)) {
+): StoryChild[] | undefined {
+	const attribute = findJsxAttribute(context, node, name)
+	const rendered = attribute
+		? analyzeJsxAttributeRenderValue(context, attribute, stack, allowFunction)
+		: undefined
+	if (hasUnknownJsxProp(context, node, name)) {
 		return [
 			choice(
 				[
-					rendered,
+					rendered ?? [],
 					[
 						foreignOpaque(
 							`spread component render props`,
@@ -1492,6 +1496,28 @@ function analyzeTransparentChildren(
 		]
 	}
 	return rendered
+}
+
+function analyzeTransparentChildren(
+	context: AnalyzeContext,
+	node: ComponentJsxNode,
+	stack: string[],
+	allowFunction = false,
+): StoryChild[] {
+	const children = jsxChildren(node)
+	if (!hasMeaningfulJsxChildren(children)) {
+		return (
+			analyzeJsxRenderProp(context, node, `children`, stack, allowFunction) ??
+			[]
+		)
+	}
+	return analyzeJsxChildrenWith(context, children, (child) => {
+		if (allowFunction && ts.isJsxExpression(child) && child.expression) {
+			const body = functionBodyFromExpression(child.expression)
+			if (body) return analyzeFunctionBody(context, body, stack)
+		}
+		return analyzeJsxChild(context, child, stack)
+	})
 }
 
 function analyzeSolidTransparentChildren(
@@ -1546,25 +1572,6 @@ function analyzeSolidRepeatedChildren(
 			opaque(`Solid loop without a render function`, context.sourceFile, node),
 		]
 	}
-	if (jsxAttributes(node).properties.some(ts.isJsxSpreadAttribute)) {
-		return [
-			choice(
-				[
-					analyzedChildren,
-					[
-						foreignOpaque(
-							`spread component render props`,
-							context.sourceFile,
-							node,
-						),
-					],
-				],
-				context.sourceFile,
-				node,
-			),
-		]
-	}
-
 	return analyzedChildren
 }
 
@@ -1573,11 +1580,7 @@ function analyzeSolidFallback(
 	node: ComponentJsxNode,
 	stack: string[],
 ): StoryChild[] | undefined {
-	const fallback = findJsxAttribute(context, node, `fallback`)
-
-	return fallback
-		? analyzeJsxAttributeRenderValue(context, fallback, stack, true)
-		: undefined
+	return analyzeJsxRenderProp(context, node, `fallback`, stack, true)
 }
 
 function analyzeSolidSwitchAlternatives(
@@ -1712,9 +1715,9 @@ function lowerSolidComponent(
 				stack,
 			)
 			if (
-				(!hasMeaningfulJsxChildren(jsxChildren(node)) &&
-					findJsxAttribute(context, node, `children`)) ||
-				jsxAttributes(node).properties.some(ts.isJsxSpreadAttribute)
+				!hasMeaningfulJsxChildren(jsxChildren(node)) &&
+				(findJsxAttribute(context, node, `children`) ||
+					hasUnknownJsxProp(context, node, `children`))
 			) {
 				alternatives.push([
 					foreignOpaque(`Solid Switch render props`, context.sourceFile, node),

@@ -14,6 +14,25 @@ afterAll(() => session.close())
 
 describe(`conservative JSX reachability`, () => {
 	it.each([
+		`<Fragment {...props}><span /></Fragment>`,
+		`<Fragment {...props} children={<span />} />`,
+		`<Fragment children={<aside />} {...props}><span /></Fragment>`,
+		`<Fragment children={<aside />} {...props}>{null}</Fragment>`,
+		`<Fragment {...props} children={<span />}>{/* explanation */}</Fragment>`,
+	])(`respects fragment children precedence: %s`, (children) => {
+		const { diagnostics } = validateCssReachability(
+			{
+				tsxPath: `/project/AppPanel.tsx`,
+				tsxSource: `import { Fragment } from "preact"; export function AppPanel(props) { return <app-panel class={css.class}>${children}</app-panel> }`,
+				cssPath: `/project/AppPanel.module.css`,
+				cssSource: conservativeJsxCss,
+			},
+			session,
+		)
+		expect(diagnostics.map(({ code }) => code)).toEqual([`dead-selector`])
+	})
+
+	it.each([
 		`import { memo, forwardRef } from "react"; const LocalPanel = memo(forwardRef(() => <span />))`,
 		`import React from "react"; const LocalPanel = React.memo(() => <span />)`,
 		`import * as React from "react"; const LocalPanel = React.forwardRef(() => <span />)`,
