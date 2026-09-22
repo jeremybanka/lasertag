@@ -90,6 +90,35 @@ export function AppPanel() {
 }`,
 	},
 	{
+		name: `Solid Switch explicit children`,
+		source: `import { Switch, Match } from "solid-js"
+export function AppPanel() {
+	return <app-panel class={css.class}><Switch children={<Match when={true}><aside /></Match>}>{/* explanation */}</Switch></app-panel>
+}`,
+	},
+	{
+		name: `Solid Switch spread fallback`,
+		source: `import { Switch, Match } from "solid-js"
+export function AppPanel() {
+	return <app-panel class={css.class}><Switch {...{ fallback: <aside /> }}><Match when={false}><span /></Match></Switch></app-panel>
+}`,
+	},
+	{
+		name: `Solid For spread fallback`,
+		source: `import { For } from "solid-js"
+export function AppPanel() {
+	return <app-panel class={css.class}><For each={[]} {...{ fallback: <aside /> }}>{() => <span />}</For></app-panel>
+}`,
+	},
+	{
+		name: `Solid Dynamic shadowed local component`,
+		source: `import { Dynamic } from "solid-js/web"
+function LocalPanel() { return <span /> }
+export function AppPanel({ LocalPanel }) {
+	return <app-panel class={css.class}><Dynamic component={LocalPanel} /></app-panel>
+}`,
+	},
+	{
 		name: `shadowed portal function`,
 		source: `import { createPortal } from "react-dom"
 export function AppPanel({ createPortal }) {

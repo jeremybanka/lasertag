@@ -293,6 +293,12 @@ app-canvas.class {
 
 Put the diagnostic code in brackets. A disable also requires an explanation of at least three characters after the closing bracket; an enable does not accept an explanation. The supported reachability diagnostic codes are `dead-selector`, `impossible-local-class`, `opaque-component-root-may-collide`, `selector-crosses-ownership-boundary`, and `selector-matches-foreign-component-root`. Regions for different codes may overlap, and a disable without a matching enable remains active through the end of the file. Lasertag reports `disable-explanation-too-short` when the explanation is missing or too short, `unused-disable` when a disable suppresses no matching diagnostics, and `unused-enable` when an enable appears outside an active region for the same code.
 
+### Conservative JSX cleanup
+
+Lasertag preserves CSS when a render branch is unknown. An arbitrary factory such as `wrap(() => <span />)` may insert elements around its callback, so Lasertag does not treat the callback as the factory's complete output. Imported React and Preact compatibility `memo` and `forwardRef` wrappers remain supported. Custom factories can therefore produce fewer dead-selector diagnostics and more ownership-boundary warnings; cleanup leaves those uncertain selectors intact.
+
+Framework component recognition respects local bindings: a parameter named `Fragment` or `Show` does not inherit the behavior of a shadowed framework import. Transparent framework wrappers also account for explicit `children` props, including when the JSX body contains only comments or formatting whitespace. Spread render props remain conservative because they can supply children or fallbacks that are not visible at the call site.
+
 ## Type Support
 
 The `lasertag/css-modules` type export constrains CSS Modules to a single exported `class` member:
