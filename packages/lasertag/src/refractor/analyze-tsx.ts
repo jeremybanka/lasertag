@@ -67,6 +67,7 @@ type AnalyzeContext = {
 	maxComponentDepth: number
 	typescriptSdkPath?: string
 	typescriptAnalysis: TypescriptAstAnalysis
+	resolvedDeclarations: Map<ts.Node, ts.Node[]>
 	foreignComponentStack: ReadonlySet<string>
 }
 
@@ -782,8 +783,7 @@ function resolveForeignComponent(
 	tagNameNode: ts.JsxTagNameExpression,
 	componentName: string,
 ): ForeignComponentResolution {
-	const declarations =
-		context.typescriptAnalysis.resolveAliasedDeclarations(tagNameNode)
+	const declarations = resolveDeclarations(context, tagNameNode)
 
 	for (const declaration of declarations) {
 		const sourceFile = declaration.getSourceFile()
@@ -862,6 +862,7 @@ function analyzeResolvedComponentStory(
 		]),
 		imports: index.imports,
 		maxComponentDepth: context.maxComponentDepth,
+		resolvedDeclarations: context.resolvedDeclarations,
 		namespaceImports: index.namespaceImports,
 		sourceFile: resolved.sourceFile,
 		...(context.typescriptSdkPath
@@ -1289,6 +1290,18 @@ function jsxTagName(node: ComponentJsxNode): ts.JsxTagNameExpression {
 	return ts.isJsxElement(node) ? node.openingElement.tagName : node.tagName
 }
 
+function resolveDeclarations(
+	context: AnalyzeContext,
+	node: ts.Node,
+): ts.Node[] {
+	const cached = context.resolvedDeclarations.get(node)
+	if (cached !== undefined) return cached
+	const declarations =
+		context.typescriptAnalysis.resolveAliasedDeclarations(node)
+	context.resolvedDeclarations.set(node, declarations)
+	return declarations
+}
+
 function hasShadowedBinding(
 	context: AnalyzeContext,
 	expression: ts.Expression,
@@ -1301,25 +1314,23 @@ function hasShadowedBinding(
 		root = unwrapExpression(root.expression)
 	if (!ts.isIdentifier(root)) return false
 	const definition = context.components.get(root.text)
-	return context.typescriptAnalysis
-		.resolveAliasedDeclarations(root)
-		.some((declaration) => {
-			if (declaration.getSourceFile().fileName !== context.sourceFile.fileName)
-				return false
-			// Unresolved imports retain their local alias declaration. They still refer
-			// to the indexed import, unlike a parameter or local binding of that name.
-			if (
-				ts.isImportSpecifier(declaration) ||
-				ts.isImportClause(declaration) ||
-				ts.isNamespaceImport(declaration)
-			)
-				return false
-			return (
-				!definition ||
-				declaration.getStart(context.sourceFile) !== definition.range.start ||
-				declaration.end !== definition.range.end
-			)
-		})
+	return resolveDeclarations(context, root).some((declaration) => {
+		if (declaration.getSourceFile().fileName !== context.sourceFile.fileName)
+			return false
+		// Unresolved imports retain their local alias declaration. They still refer
+		// to the indexed import, unlike a parameter or local binding of that name.
+		if (
+			ts.isImportSpecifier(declaration) ||
+			ts.isImportClause(declaration) ||
+			ts.isNamespaceImport(declaration)
+		)
+			return false
+		return (
+			!definition ||
+			declaration.getStart(context.sourceFile) !== definition.range.start ||
+			declaration.end !== definition.range.end
+		)
+	})
 }
 
 function findJsxAttribute(
@@ -2348,6 +2359,7 @@ function createAnalyzeContext(
 		sourceFile,
 		components: index.components,
 		foreignComponentStack: new Set(),
+		resolvedDeclarations: new Map(),
 		imports: index.imports,
 		namespaceImports: index.namespaceImports,
 		warnings,
