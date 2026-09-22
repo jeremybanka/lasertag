@@ -38,7 +38,26 @@ function deadSelectors(result: ReturnType<typeof analyze>) {
 }
 
 describe(`Hono JSX reachability`, () => {
+	it(`keeps fragment children precise when they override a spread`, () => {
+		expect(
+			deadSelectors(
+				analyze(
+					`import { Fragment } from "hono/jsx"`,
+					`<Fragment {...props}><report-list /></Fragment>`,
+				),
+			),
+		).toEqual([
+			`project-card.class > loading-state`,
+			`project-card.class > error-state`,
+			`project-card.class > missing-state`,
+		])
+	})
+
 	it.each([
+		[
+			`import { default as Hono } from "hono/jsx"`,
+			`Hono /* memoize */ .memo(() => <report-list />)`,
+		],
 		[
 			`import { memo, forwardRef } from "hono/jsx"`,
 			`memo(forwardRef(() => <report-list />))`,

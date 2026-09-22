@@ -220,7 +220,11 @@ function isKnownComponentFactory(
 }
 
 function isComponentFactoryModule(moduleName: string): boolean {
-	return moduleName === `react` || moduleName === `preact/compat` || isHonoJsxModule(moduleName)
+	return (
+		moduleName === `react` ||
+		moduleName === `preact/compat` ||
+		isHonoJsxModule(moduleName)
+	)
 }
 
 type ExpressionValueFacts = {
@@ -2197,17 +2201,20 @@ function lowerHonoComponent(
 	if (isFragment) return renderedChildren
 
 	const alternatives = [renderedChildren]
-	const fallback = findJsxAttribute(context, node, `fallback`)
 	alternatives.push(
-		fallback ? analyzeJsxAttributeRenderValue(context, fallback, stack) : [],
+		analyzeJsxRenderProp(context, node, `fallback`, stack) ?? [],
 	)
 
 	if (isErrorBoundary) {
-		const fallbackRender = findJsxAttribute(context, node, `fallbackRender`)
+		const fallbackRender = analyzeJsxRenderProp(
+			context,
+			node,
+			`fallbackRender`,
+			stack,
+			true,
+		)
 		if (fallbackRender) {
-			alternatives.push(
-				analyzeJsxAttributeRenderValue(context, fallbackRender, stack, true),
-			)
+			alternatives.push(fallbackRender)
 		}
 	}
 
@@ -2383,7 +2390,9 @@ function analyzeComponentTag(
 			),
 		]
 	}
-	const loweredChildren = lowerHonoComponent(context, node, stack) ?? lowerSolidComponent(context, node, stack)
+	const loweredChildren =
+		lowerHonoComponent(context, node, stack) ??
+		lowerSolidComponent(context, node, stack)
 
 	if (loweredChildren) {
 		if (adoption) {

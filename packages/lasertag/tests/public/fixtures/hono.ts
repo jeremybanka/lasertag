@@ -37,6 +37,36 @@ export const cleanedHonoCssSource = `project-card.class {
 
 export const honoCleanupCases = [
 	{
+		name: `unknown wrapped main keeps its identity`,
+		source: `const css = { class: "class" }
+function decorate(Render) { return Render }
+export const AppPanel = decorate(() => <app-panel class={css.class}><aside /></app-panel>)
+export function LoadingPanel() { return <app-panel class={css.class}><span /></app-panel> }
+export const render = () => AppPanel()`,
+		html: `<app-panel class="class"><aside></aside></app-panel>`,
+	},
+	{
+		name: `spread replaces the entire CSS root`,
+		source: `import { Fragment } from "hono/jsx"
+const css = { class: "class" }
+export function AppPanel(props) {
+	return <Fragment children={<app-panel class={css.class}><span /></app-panel>} {...props} />
+}
+export const render = () => AppPanel({ children: <app-panel class={css.class}><aside /></app-panel> })`,
+		html: `<app-panel class="class"><aside></aside></app-panel>`,
+	},
+	...([`fallback`, `fallbackRender`] as const).map((prop) => ({
+		name: `spread supplies ErrorBoundary ${prop}`,
+		source: `import { ErrorBoundary } from "hono/jsx"
+const css = { class: "class" }
+function Report({ fail = true }) { if (fail) throw new Error("unavailable"); return <p /> }
+export function AppPanel(props) {
+	return <app-panel class={css.class}><ErrorBoundary {...props}><Report /></ErrorBoundary></app-panel>
+}
+export const render = () => AppPanel({ ${prop}: ${prop === `fallbackRender` ? `() => ` : ``}<aside /> })`,
+		html: `<app-panel class="class"><aside></aside></app-panel>`,
+	})),
+	{
 		name: `fallback factory adds an aside`,
 		source: `import { ErrorBoundary } from "hono/jsx"
 const css = { class: "class" }
