@@ -33,6 +33,11 @@ describe(`conservative JSX reachability`, () => {
 	})
 
 	it.each([
+		`import { default as React } from "react"; const LocalPanel = React.memo(() => <span />)`,
+		`import React from "react"; const LocalPanel = React /* memoize */ .memo(() => <span />)`,
+		`import React from "react"; const LocalPanel = (React.memo)(() => <span />)`,
+		`import React from "react"; const LocalPanel = React["memo"](() => <span />)`,
+		`import { default as Preact } from "preact/compat"; const LocalPanel = Preact.forwardRef(() => <span />)`,
 		`import { memo, forwardRef } from "react"; const LocalPanel = memo(forwardRef(() => <span />))`,
 		`import React from "react"; const LocalPanel = React.memo(() => <span />)`,
 		`import * as React from "react"; const LocalPanel = React.forwardRef(() => <span />)`,

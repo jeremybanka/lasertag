@@ -56,6 +56,8 @@ type ComponentIndex = {
 	defaultExportName?: string
 }
 
+type ImportIndex = Pick<ComponentIndex, `imports` | `namespaceImports`>
+
 type AnalyzeContext = {
 	sourceFile: ts.SourceFile
 	components: Map<string, ComponentDefinition>
@@ -165,7 +167,7 @@ function isFunctionExpression(
 
 function functionBodyFromExpression(
 	expression: ts.Expression,
-	componentSource?: ts.SourceFile,
+	imports?: ImportIndex,
 ): ts.ConciseBody | undefined {
 	if (isFunctionExpression(expression)) {
 		return expression.body
@@ -178,59 +180,35 @@ function functionBodyFromExpression(
 		ts.isParenthesizedExpression(expression) ||
 		ts.isTypeAssertion(expression)
 	) {
-		return functionBodyFromExpression(expression.expression, componentSource)
+		return functionBodyFromExpression(expression.expression, imports)
 	}
 
 	if (
-		componentSource &&
+		imports &&
 		ts.isCallExpression(expression) &&
-		isKnownComponentFactory(componentSource, expression)
+		isKnownComponentFactory(imports, expression)
 	) {
 		const render = expression.arguments[0]
-		return render
-			? functionBodyFromExpression(render, componentSource)
-			: undefined
+		return render ? functionBodyFromExpression(render, imports) : undefined
 	}
 }
 
 function isKnownComponentFactory(
-	sourceFile: ts.SourceFile,
+	imports: ImportIndex,
 	call: ts.CallExpression,
 ): boolean {
 	// Only documented component wrappers preserve the first argument's render
 	// structure. Arbitrary factories may add DOM or ignore the callback entirely.
-	const name = call.expression.getText(sourceFile)
-	if (name.split(`.`).length > 2) return false
-	const [namespace, member] = name.split(`.`)
-	for (const statement of sourceFile.statements) {
-		if (
-			!ts.isImportDeclaration(statement) ||
-			!ts.isStringLiteralLikeNode(statement.moduleSpecifier)
-		)
-			continue
-		const moduleName = statement.moduleSpecifier.text
-		if (moduleName !== `react` && moduleName !== `preact/compat`) continue
-		const clause = statement.importClause
-		if (!clause || clause.phaseModifier === ts.SyntaxKind.TypeKeyword) continue
-		const bindings = clause.namedBindings
-		if (!member && bindings && ts.isNamedImports(bindings)) {
-			const imported = bindings.elements.find(
-				(element) => !element.isTypeOnly && element.name.text === name,
-			)
-			const importedName =
-				imported && (imported.propertyName ?? imported.name).text
-			if (importedName === `memo` || importedName === `forwardRef`) return true
-		}
-		if (
-			(member === `memo` || member === `forwardRef`) &&
-			(clause.name?.text === namespace ||
-				(bindings &&
-					ts.isNamespaceImport(bindings) &&
-					bindings.name.text === namespace))
-		)
-			return true
-	}
-	return false
+	const binding = resolveIndexedImportBinding(imports, call.expression)
+	return (
+		binding !== undefined &&
+		isComponentFactoryModule(binding.moduleName) &&
+		(binding.importedName === `memo` || binding.importedName === `forwardRef`)
+	)
+}
+
+function isComponentFactoryModule(moduleName: string): boolean {
+	return moduleName === `react` || moduleName === `preact/compat`
 }
 
 function addVariableComponents(
@@ -244,7 +222,7 @@ function addVariableComponents(
 		if (!ts.isIdentifier(declaration.name)) continue
 		if (!declaration.initializer) continue
 
-		const body = functionBodyFromExpression(declaration.initializer, sourceFile)
+		const body = functionBodyFromExpression(declaration.initializer, index)
 
 		const name = declaration.name.text
 		if (!body && !isComponentName(name)) continue
@@ -309,14 +287,15 @@ function addExportAssignment(
 }
 
 function addImportDeclaration(
-	index: ComponentIndex,
+	index: ImportIndex,
 	statement: ts.ImportDeclaration,
 ) {
 	if (!ts.isStringLiteralLikeNode(statement.moduleSpecifier)) return
 
 	const importClause = statement.importClause
 
-	if (!importClause) return
+	if (!importClause || importClause.phaseModifier === ts.SyntaxKind.TypeKeyword)
+		return
 
 	const moduleName = statement.moduleSpecifier.text
 	const namedBindings = importClause.namedBindings
@@ -344,20 +323,24 @@ function addImportDeclaration(
 	}
 }
 
-function collectComponentIndex(sourceFile: ts.SourceFile): ComponentIndex {
-	const index: ComponentIndex = {
-		components: new Map(),
-		exportedNames: new Set(),
-		imports: new Map(),
-		namespaceImports: new Map(),
-	}
-
+function collectImportIndex(sourceFile: ts.SourceFile): ImportIndex {
+	const index: ImportIndex = { imports: new Map(), namespaceImports: new Map() }
 	for (const statement of sourceFile.statements) {
 		if (ts.isImportDeclaration(statement)) {
 			addImportDeclaration(index, statement)
-			continue
 		}
+	}
+	return index
+}
 
+function collectComponentIndex(sourceFile: ts.SourceFile): ComponentIndex {
+	const index: ComponentIndex = {
+		...collectImportIndex(sourceFile),
+		components: new Map(),
+		exportedNames: new Set(),
+	}
+
+	for (const statement of sourceFile.statements) {
 		if (ts.isFunctionDeclaration(statement)) {
 			addFunctionComponent(sourceFile, index, statement)
 			continue
@@ -735,7 +718,10 @@ function componentDefinitionFromDeclaration(
 		declaration.initializer &&
 		ts.isIdentifier(declaration.name)
 	) {
-		const body = functionBodyFromExpression(declaration.initializer, sourceFile)
+		const body = functionBodyFromExpression(
+			declaration.initializer,
+			collectImportIndex(sourceFile),
+		)
 
 		return body
 			? {
@@ -747,7 +733,10 @@ function componentDefinitionFromDeclaration(
 	}
 
 	if (ts.isExportAssignment(declaration)) {
-		const body = functionBodyFromExpression(declaration.expression, sourceFile)
+		const body = functionBodyFromExpression(
+			declaration.expression,
+			collectImportIndex(sourceFile),
+		)
 
 		return body
 			? {
@@ -1180,7 +1169,7 @@ function isFragmentJsxTag(
 	const tagName = name.getText(context.sourceFile)
 	if (isIntrinsicJsxTag(tagName) && !tagName.includes(`.`)) return false
 	if (hasShadowedBinding(context, name)) return false
-	const binding = resolveImportBinding(context, tagName, name)
+	const binding = resolveImportBinding(context, name)
 	if (binding) {
 		return (
 			binding.importedName === `Fragment` &&
@@ -1304,12 +1293,12 @@ function hasShadowedBinding(
 	context: AnalyzeContext,
 	expression: ts.Expression,
 ): boolean {
-	let root = expression
+	let root = unwrapExpression(expression)
 	while (
 		ts.isPropertyAccessExpression(root) ||
 		ts.isElementAccessExpression(root)
 	)
-		root = root.expression
+		root = unwrapExpression(root.expression)
 	if (!ts.isIdentifier(root)) return false
 	const definition = context.components.get(root.text)
 	return context.typescriptAnalysis
@@ -1358,34 +1347,56 @@ function hasUnknownJsxProp(
 
 function resolveImportBinding(
 	context: AnalyzeContext,
-	tagName: string,
-	location?: ts.Expression,
+	location: ts.Expression,
 ): ImportBinding | undefined {
-	if (location && hasShadowedBinding(context, location)) return
-	const directBinding = context.imports.get(tagName)
+	if (hasShadowedBinding(context, unwrapExpression(location))) return
+	return resolveIndexedImportBinding(context, location)
+}
 
-	if (directBinding) return directBinding
-
-	const separatorIndex = tagName.indexOf(`.`)
-
-	if (separatorIndex < 1 || tagName.indexOf(`.`, separatorIndex + 1) >= 0) {
-		return
+function unwrapExpression(expression: ts.Expression): ts.Expression {
+	while (
+		ts.isParenthesizedExpression(expression) ||
+		ts.isAsExpression(expression) ||
+		ts.isSatisfiesExpression(expression) ||
+		ts.isNonNullExpression(expression) ||
+		ts.isTypeAssertion(expression)
+	) {
+		expression = expression.expression
 	}
+	return expression
+}
 
-	const namespaceName = tagName.slice(0, separatorIndex)
-	const defaultBinding = context.imports.get(namespaceName)
+function resolveIndexedImportBinding(
+	index: ImportIndex,
+	expression: ts.Expression,
+): ImportBinding | undefined {
+	expression = unwrapExpression(expression)
+	if (ts.isIdentifier(expression)) return index.imports.get(expression.text)
+	if (
+		!ts.isPropertyAccessExpression(expression) &&
+		!ts.isElementAccessExpression(expression)
+	)
+		return
+	const namespace = unwrapExpression(expression.expression)
+	if (!ts.isIdentifier(namespace)) return
+	const member = ts.isPropertyAccessExpression(expression)
+		? expression.name.text
+		: ts.isStringLiteralLikeNode(expression.argumentExpression)
+			? expression.argumentExpression.text
+			: undefined
+	if (!member) return
+	const defaultBinding = index.imports.get(namespace.text)
 	const moduleName =
-		context.namespaceImports.get(namespaceName) ??
+		index.namespaceImports.get(namespace.text) ??
 		(defaultBinding?.importedName === `default` &&
-		(defaultBinding.moduleName === `react` ||
-			defaultBinding.moduleName === `preact/compat`)
+		isComponentFactoryModule(defaultBinding.moduleName)
 			? defaultBinding.moduleName
 			: undefined)
 
 	if (!moduleName) return
 
 	return {
-		importedName: tagName.slice(separatorIndex + 1),
+		importedName: member,
 		moduleName,
 	}
 }
@@ -1396,11 +1407,7 @@ function isImportedCall(
 	moduleName: string,
 	importedName: string,
 ): boolean {
-	const binding = resolveImportBinding(
-		context,
-		node.expression.getText(context.sourceFile),
-		node.expression,
-	)
+	const binding = resolveImportBinding(context, node.expression)
 
 	return (
 		binding?.moduleName === moduleName && binding.importedName === importedName
@@ -1604,11 +1611,7 @@ function analyzeSolidSwitchAlternatives(
 		}
 
 		if (ts.isJsxElement(child) || ts.isJsxSelfClosingElement(child)) {
-			const tagName = getJsxTagText(
-				context.sourceFile,
-				ts.isJsxElement(child) ? child.openingElement.tagName : child.tagName,
-			)
-			const binding = resolveImportBinding(context, tagName, jsxTagName(child))
+			const binding = resolveImportBinding(context, jsxTagName(child))
 
 			if (
 				binding?.moduleName === `solid-js` &&
@@ -1673,11 +1676,10 @@ function dynamicComponentValue(
 
 function lowerSolidComponent(
 	context: AnalyzeContext,
-	tagName: string,
 	node: ComponentJsxNode,
 	stack: string[],
 ): StoryChild[] | undefined {
-	const binding = resolveImportBinding(context, tagName, jsxTagName(node))
+	const binding = resolveImportBinding(context, jsxTagName(node))
 
 	if (!binding) return
 
@@ -1966,7 +1968,7 @@ function analyzeComponentTag(
 			),
 		]
 	}
-	const loweredChildren = lowerSolidComponent(context, tagName, node, stack)
+	const loweredChildren = lowerSolidComponent(context, node, stack)
 
 	if (loweredChildren) {
 		if (adoption) {
@@ -1979,7 +1981,7 @@ function analyzeComponentTag(
 		return loweredChildren
 	}
 
-	const binding = resolveImportBinding(context, tagName, jsxTagName(node))
+	const binding = resolveImportBinding(context, jsxTagName(node))
 
 	if (binding) {
 		const componentName = tagName.slice(tagName.lastIndexOf(`.`) + 1)
