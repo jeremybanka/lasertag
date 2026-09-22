@@ -1513,6 +1513,8 @@ function analyzeTransparentChildren(
 ): StoryChild[] {
 	const children = jsxChildren(node)
 	if (!hasMeaningfulJsxChildren(children)) {
+		// Comments do not override the children prop, but still carry directives.
+		analyzeJsxChildren(context, children, stack)
 		return (
 			analyzeJsxRenderProp(context, node, `children`, stack, allowFunction) ??
 			[]

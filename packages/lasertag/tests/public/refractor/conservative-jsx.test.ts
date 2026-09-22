@@ -14,6 +14,41 @@ afterAll(() => session.close())
 
 describe(`conservative JSX reachability`, () => {
 	it.each([
+		[
+			`import { Fragment } from "react"`,
+			`<Fragment>{/* @lasertag-adopt-subtree */}</Fragment>`,
+		],
+		[
+			`import { Fragment } from "preact"`,
+			`<Fragment children={<span />}>{/* @lasertag-adopt-subtree */}</Fragment>`,
+		],
+		[
+			`import { Show } from "solid-js"`,
+			`<Show when={true}>{/* @lasertag-adopt-subtree */}</Show>`,
+		],
+		[
+			`import { For } from "solid-js"`,
+			`<For each={[1]} children={() => <span />}>{/* @lasertag-adopt-subtree */}</For>`,
+		],
+	])(
+		`validates directives in comment-only wrapper bodies: %s`,
+		(imports, children) => {
+			const { renderStory } = validateCssReachability(
+				{
+					tsxPath: `/project/AppPanel.tsx`,
+					tsxSource: `${imports}; export function AppPanel() { return <app-panel class={css.class}>${children}</app-panel> }`,
+					cssPath: `/project/AppPanel.module.css`,
+					cssSource: conservativeJsxCss,
+				},
+				session,
+			)
+			expect(renderStory.warnings.map(({ code }) => code)).toEqual([
+				`invalid-adoption-directive`,
+			])
+		},
+	)
+
+	it.each([
 		`<Fragment {...props}><span /></Fragment>`,
 		`<Fragment {...props} children={<span />} />`,
 		`<Fragment children={<aside />} {...props}><span /></Fragment>`,
