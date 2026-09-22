@@ -1,5 +1,20 @@
 export const conservativeJsxCases = [
 	{
+		name: `Solid Dynamic spread overrides a literal component`,
+		source: `import { Dynamic } from "solid-js/web"
+export function AppPanel(props) {
+	return <app-panel class={css.class}><Dynamic component="span" {...props} /></app-panel>
+}`,
+	},
+	{
+		name: `Solid Dynamic spread overrides a local component`,
+		source: `import { Dynamic } from "solid-js/web"
+function LocalPanel() { return <span /> }
+export function AppPanel(props) {
+	return <app-panel class={css.class}><Dynamic component={LocalPanel} {...props} /></app-panel>
+}`,
+	},
+	{
 		name: `spread replaces children above the CSS root`,
 		source: `import { Fragment } from "preact"
 export function AppPanel(props) {

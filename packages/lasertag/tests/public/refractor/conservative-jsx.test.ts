@@ -68,6 +68,7 @@ describe(`conservative JSX reachability`, () => {
 	})
 
 	it.each([
+		`import { Dynamic } from "solid-js/web"; const LocalPanel = (props) => <Dynamic {...props} component="span" />`,
 		`import { default as React } from "react"; const LocalPanel = React.memo(() => <span />)`,
 		`import React from "react"; const LocalPanel = React /* memoize */ .memo(() => <span />)`,
 		`import React from "react"; const LocalPanel = (React.memo)(() => <span />)`,

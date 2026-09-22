@@ -1761,9 +1761,10 @@ function lowerSolidComponent(
 		binding.importedName === `Dynamic`
 	) {
 		const componentAttribute = findJsxAttribute(context, node, `component`)
-		const componentValue = componentAttribute
-			? dynamicComponentValue(context, componentAttribute)
-			: undefined
+		const componentValue =
+			componentAttribute && !hasUnknownJsxProp(context, node, `component`)
+				? dynamicComponentValue(context, componentAttribute)
+				: undefined
 
 		if (componentValue?.kind === `local`) {
 			return analyzeComponent(context, componentValue.name, stack)
