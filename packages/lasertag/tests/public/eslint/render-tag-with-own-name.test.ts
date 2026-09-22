@@ -7,6 +7,17 @@ const message = (componentName: string, expectedTagName: string) =>
 ruleTester.run(`render-tag-with-own-name`, renderTagWithOwnName, {
 	valid: [
 		{
+			name: `allow async Hono components with a CSS Module root`,
+			code: `
+				import { Fragment } from "hono/jsx"
+				import css from "./ProjectCard.module.css"
+				export async function ProjectCard(props) {
+					await Promise.resolve()
+					return <project-card class={css.class}><Fragment>{props.children}</Fragment></project-card>
+				}
+			`,
+		},
+		{
 			name: `allow function component rendering matching custom tag`,
 			code: `
 				export function AppHeaderBar() {

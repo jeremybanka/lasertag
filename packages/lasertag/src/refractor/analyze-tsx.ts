@@ -1399,6 +1399,10 @@ function assertedForeignComponentName(tagName: string): string {
 	return tagName.slice(tagName.indexOf(`.`) + 1)
 }
 
+function isHonoJsxModule(moduleName: string): boolean {
+	return moduleName === `hono/jsx` || moduleName === `hono/jsx/dom`
+}
+
 function isFragmentJsxTag(
 	context: AnalyzeContext,
 	name: ts.JsxTagNameExpression,
@@ -1737,7 +1741,7 @@ function resolveIndexedImportBinding(
 	const moduleName =
 		index.namespaceImports.get(namespace.text) ??
 		(defaultBinding?.importedName === `default` &&
-		isComponentFactoryModule(defaultBinding.moduleName)
+		(isComponentFactoryModule(defaultBinding.moduleName) || isHonoJsxModule(defaultBinding.moduleName))
 			? defaultBinding.moduleName
 			: undefined)
 
@@ -2169,6 +2173,61 @@ function lowerSolidComponent(
 	}
 }
 
+function lowerHonoComponent(
+	context: AnalyzeContext,
+	node: ComponentJsxNode,
+	stack: string[],
+): StoryChild[] | undefined {
+	const binding = resolveImportBinding(context, jsxTagName(node))
+	if (!binding) return
+
+	const isJsxModule = isHonoJsxModule(binding.moduleName)
+	const isFragment =
+		isJsxModule &&
+		(binding.importedName === `Fragment` ||
+			binding.importedName === `StrictMode`)
+	const isSuspense =
+		binding.importedName === `Suspense` &&
+		(isJsxModule || binding.moduleName === `hono/jsx/streaming`)
+	const isErrorBoundary =
+		isJsxModule && binding.importedName === `ErrorBoundary`
+	if (!isFragment && !isSuspense && !isErrorBoundary) return
+
+	const childrenAttribute = findJsxAttribute(context, node, `children`)
+	const children = jsxChildren(node)
+	const renderedChildren =
+		children.length > 0
+			? analyzeJsxChildren(context, children, stack)
+			: childrenAttribute
+				? analyzeJsxAttributeRenderValue(context, childrenAttribute, stack)
+				: []
+	const hasSpread = jsxAttributes(node).properties.some(ts.isJsxSpreadAttribute)
+
+	if (hasSpread) {
+		renderedChildren.push(
+			foreignOpaque(`spread Hono render props`, context.sourceFile, node),
+		)
+	}
+	if (isFragment) return renderedChildren
+
+	const alternatives = [renderedChildren]
+	const fallback = findJsxAttribute(context, node, `fallback`)
+	alternatives.push(
+		fallback ? analyzeJsxAttributeRenderValue(context, fallback, stack) : [],
+	)
+
+	if (isErrorBoundary) {
+		const fallbackRender = findJsxAttribute(context, node, `fallbackRender`)
+		if (fallbackRender) {
+			alternatives.push(
+				analyzeJsxAttributeRenderValue(context, fallbackRender, stack),
+			)
+		}
+	}
+
+	return [choice(alternatives, context.sourceFile, node)]
+}
+
 function analyzeJsxElement(
 	context: AnalyzeContext,
 	node: ts.JsxElement,
@@ -2338,7 +2397,7 @@ function analyzeComponentTag(
 			),
 		]
 	}
-	const loweredChildren = lowerSolidComponent(context, node, stack)
+	const loweredChildren = lowerHonoComponent(context, node, stack) ?? lowerSolidComponent(context, node, stack)
 
 	if (loweredChildren) {
 		if (adoption) {

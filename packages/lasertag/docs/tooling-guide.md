@@ -86,6 +86,16 @@ use the same effective-prop resolution before analyzing their render functions.
 or its effective `children` attribute, preserving local ownership. Unresolved
 children values and relevant spreads retain uncertainty.
 
+For Hono TSX, the same analysis supports async components and `class={css.class}`.
+Imports from `hono/jsx` and `hono/jsx/dom` identify transparent `Fragment` and
+`StrictMode` wrappers, `Suspense` content/fallback choices, and `ErrorBoundary`
+content, `fallback`, and inline `fallbackRender` choices. `Suspense` from
+`hono/jsx/streaming` is recognized too, including aliases and namespace imports.
+Unknown render props and spread props remain conservative. HTMX attributes do
+not cause route execution or discovery of future DOM. See the
+[Hono authoring guide](lasertag-guide.md#hono-jsx) for stylesheet delivery and
+fragment ownership.
+
 Render-story ownership starts at the outermost rendered nodes whose `class` or
 `class:list` expression uses `css.class`. Wrappers and unrelated sibling roots
 are excluded before selector reachability runs. Unknown local expressions,

@@ -69,6 +69,112 @@ directly exported named declarations by default. Set
 `checkAllComponentFunctions: true` to apply the component-named root convention
 to every PascalCase component function, including local components.
 
+## Hono JSX
+
+Hono components use the same sibling CSS Modules and named custom roots as
+React, Preact, and Solid components. Add these type-only entrypoints to a
+declaration file included by your TypeScript project:
+
+```ts
+import "lasertag/css-modules"
+import "lasertag/hono-jsx"
+```
+
+Configure the JSX runtime:
+
+```json
+{
+	"compilerOptions": {
+		"jsx": "react-jsx",
+		"jsxImportSource": "hono/jsx"
+	}
+}
+```
+
+`react-jsx` names TypeScript's automatic JSX transform; `hono/jsx` supplies the
+runtime. Use Hono's own `PropsWithChildren`, `FC`, and JSX types when needed.
+Lasertag's Hono entrypoint gives hyphenated tags Hono HTML attributes without
+adding React types or a global JSX namespace.
+
+```tsx
+import css from "./ProjectCard.module.css"
+
+export async function ProjectCard({
+	loadName,
+}: {
+	loadName: () => Promise<string>
+}) {
+	const name = await loadName()
+	return (
+		<project-card class={css.class}>
+			<h2>{name}</h2>
+			<button
+				type="button"
+				hx-get="/project"
+				hx-target="closest project-card"
+				hx-swap="outerHTML"
+			>
+				Refresh
+			</button>
+		</project-card>
+	)
+}
+```
+
+```css
+project-card.class {
+	display: grid;
+	gap: 1rem;
+
+	> h2 {
+		margin: 0;
+	}
+
+	> button {
+		justify-self: start;
+	}
+}
+```
+
+Async component returns, ordinary JSX conditionals, and array maps are analyzed
+without executing the component or its data loaders. Hono `Fragment` and
+`StrictMode` preserve their children. `Suspense` (including its
+`hono/jsx/streaming` export) contributes both content and fallback branches;
+`ErrorBoundary` also contributes its `fallback` and inline `fallbackRender`
+branches. Aliases, namespace imports, and the default `hono/jsx` namespace are
+recognized. Components imported from `hono/jsx/dom` use the same analysis.
+Unknown children, render callbacks, and imported component implementations keep
+the ordinary ownership boundaries. Streaming transport markup is not an
+authoring target for component selectors.
+
+### Stylesheet delivery and HTML fragments
+
+Your build tool must compile CSS Modules into class mappings and browser CSS.
+Lasertag supplies conventions, types, and analysis; importing
+`lasertag/css-modules` does not add a CSS compiler to Wrangler. Use a CSS
+Modules-capable build pipeline and serve its emitted CSS with the application.
+Include the stylesheet in the document head, including styles for components
+that may arrive later through HTMX. The server's class mappings and the served
+CSS must come from the same build.
+
+Keep the document shell (`html`, `head`, and `body`) in a route or renderer
+callback, or a local helper. Exported UI components still own their named custom
+roots. A fragment route can return `c.html(<ProjectCard ... />)` directly;
+replacing the complete `<project-card>` preserves its class and ownership root.
+When adding fragments inside a container, give each exported fragment its own
+root and stylesheet. Keep selectors scoped to the DOM that component renders.
+
+Lasertag does not infer future DOM from `hx-get`, `hx-target`, or `hx-swap`, and
+does not follow routes to assemble a page-wide render story. If external code
+inserts DOM that truly belongs to a component's styling contract, use a narrowly
+explained `@lasertag-expect-error` for a selector the static story cannot see.
+The [Hono example](../examples/hono) shows a full document and a replacement
+fragment sharing one CSS Module component. Its host must supply HTMX and serve
+the compiled stylesheet.
+
+Hono's `css` tagged templates and `<Style />` are a separate styling system;
+Refractor analyzes sibling `.module.css` files.
+
 ## Nest the Rendered Structure
 
 The stylesheet should read like the component renders. Prefer tag selectors and direct-child selectors so the CSS mirrors the JSX tree:

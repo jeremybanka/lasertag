@@ -37,6 +37,9 @@ import "lasertag/react-jsx"
 ```
 
 Use `lasertag/preact-jsx` or `lasertag/solid-jsx` instead for Preact or Solid.
+For Hono, use `lasertag/hono-jsx` with `jsxImportSource: "hono/jsx"` and
+`class={css.class}`. See the [Hono guide](docs/lasertag-guide.md#hono-jsx)
+and [example](examples/hono) for server rendering and HTML fragments.
 
 Check component-owned CSS Modules for unreachable selectors in parallel:
 
