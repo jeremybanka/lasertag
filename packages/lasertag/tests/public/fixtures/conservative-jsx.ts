@@ -1,4 +1,10 @@
 export const conservativeJsxCases = [
+	{
+		name: `unknown wrapped main component retains its identity`,
+		source: `function decorate(Render) { return Render }
+export const AppPanel = decorate(() => <app-panel class={css.class}><aside /></app-panel>)
+export function LoadingPanel() { return <app-panel class={css.class}><span /></app-panel> }`,
+	},
 	...([`react`, `preact`] as const).flatMap((runtime) => [
 		{
 			name: `${runtime} shadowed Fragment`,

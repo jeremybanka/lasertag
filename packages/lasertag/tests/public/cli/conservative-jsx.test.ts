@@ -15,13 +15,29 @@ it.each(conservativeJsxCases)(
 	async ({ source }) => {
 		const root = mkdtempSync(path.join(tmpdir(), `lasertag-conservative-`))
 		try {
+			const messages: string[] = []
 			const cssPath = path.join(root, `AppPanel.module.css`)
 			writeFileSync(path.join(root, `AppPanel.tsx`), source)
 			writeFileSync(cssPath, conservativeJsxCss)
-			await runLasertagCli(
+			const result = await runLasertagCli(
 				[`node`, `lasertag`, `fix`],
-				{ log() {}, error() {} },
+				{
+					log(message) {
+						messages.push(message)
+					},
+					error(message) {
+						messages.push(message)
+					},
+				},
 				{ cwd: root },
+			)
+			expect(result.mode).toBe(`fix`)
+			expect(result.files).toEqual([cssPath])
+			expect(result.fixedCount).toBe(0)
+			expect(result.changedFiles).toEqual([])
+			expect(result.exitCode).toBe(result.diagnostics.length > 0 ? 1 : 0)
+			expect(messages.join(`\n`)).not.toMatch(
+				/failed|skipped|no render source/i,
 			)
 			expect(readFileSync(cssPath, `utf8`)).toBe(conservativeJsxCss)
 		} finally {

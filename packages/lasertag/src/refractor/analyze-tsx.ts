@@ -38,7 +38,8 @@ export type AnalyzeTsxRenderStoriesOptions = Omit<
 
 type ComponentDefinition = {
 	name: string
-	body: ts.ConciseBody
+	body?: ts.ConciseBody
+	initializer?: ts.Expression
 	range: SourceRange
 }
 
@@ -245,13 +246,12 @@ function addVariableComponents(
 
 		const body = functionBodyFromExpression(declaration.initializer, sourceFile)
 
-		if (!body) continue
-
 		const name = declaration.name.text
+		if (!body && !isComponentName(name)) continue
 
 		index.components.set(name, {
 			name,
-			body,
+			...(body ? { body } : { initializer: declaration.initializer }),
 			range: rangeOf(sourceFile, declaration),
 		})
 
@@ -440,10 +440,14 @@ function selectComponentStories(
 	const candidateNames =
 		options.componentNames ??
 		[...index.components]
-			.filter(
-				([componentName, definition]) =>
-					isComponentName(componentName) && containsJsx(definition.body),
-			)
+			.filter(([componentName, definition]) => {
+				const source = definition.body ?? definition.initializer
+				return (
+					isComponentName(componentName) &&
+					source !== undefined &&
+					containsJsx(source)
+				)
+			})
 			.map(([componentName]) => componentName)
 	const names = candidateNames
 		.filter((componentName) => index.components.has(componentName))
@@ -495,6 +499,16 @@ function analyzeComponent(
 		})
 
 		return []
+	}
+
+	if (!definition.body) {
+		return [
+			{
+				kind: `opaque`,
+				reason: `unknown component implementation`,
+				range: definition.range,
+			},
+		]
 	}
 
 	if (stack.includes(componentName)) {
