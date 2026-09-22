@@ -1775,9 +1775,7 @@ function lowerSolidComponent(
 				createStoryNode(
 					context,
 					componentValue.tagName,
-					ts.isJsxElement(node)
-						? analyzeJsxChildren(context, node.children, stack)
-						: [],
+					analyzeSolidTransparentChildren(context, node, stack),
 					rangeOf(context.sourceFile, componentAttribute ?? node),
 					jsxAttributes(node),
 					new Set([`component`]),

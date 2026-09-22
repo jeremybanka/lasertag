@@ -1,5 +1,26 @@
 export const conservativeJsxCases = [
 	{
+		name: `Solid Dynamic explicit children`,
+		source: `import { Dynamic } from "solid-js/web"
+export function AppPanel() {
+	return <Dynamic component="app-panel" class={css.class} children={<aside />} />
+}`,
+	},
+	{
+		name: `Solid Dynamic explicit children with comment`,
+		source: `import { Dynamic } from "solid-js/web"
+export function AppPanel() {
+	return <Dynamic component="app-panel" class={css.class} children={<aside />}>{/* explanation */}</Dynamic>
+}`,
+	},
+	{
+		name: `Solid Dynamic spread children with fixed component`,
+		source: `import { Dynamic } from "solid-js/web"
+export function AppPanel(props) {
+	return <Dynamic {...props} component="app-panel" class={css.class} />
+}`,
+	},
+	{
 		name: `Solid Dynamic spread overrides a literal component`,
 		source: `import { Dynamic } from "solid-js/web"
 export function AppPanel(props) {
