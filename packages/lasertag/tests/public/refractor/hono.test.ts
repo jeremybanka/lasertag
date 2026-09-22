@@ -39,6 +39,29 @@ function deadSelectors(result: ReturnType<typeof analyze>) {
 
 describe(`Hono JSX reachability`, () => {
 	it.each([
+		[
+			`import { memo, forwardRef } from "hono/jsx"`,
+			`memo(forwardRef(() => <report-list />))`,
+		],
+		[`import Hono from "hono/jsx"`, `Hono.memo(() => <report-list />)`],
+		[
+			`import * as Hono from "hono/jsx/dom"`,
+			`Hono.forwardRef(() => <report-list />)`,
+		],
+	])(`preserves precise component wrappers with %s`, (imports, initializer) => {
+		const result = analyze(
+			imports,
+			`<LocalReports />`,
+			`const LocalReports = ${initializer}`,
+		)
+		expect(deadSelectors(result)).toEqual([
+			`project-card.class > loading-state`,
+			`project-card.class > error-state`,
+			`project-card.class > missing-state`,
+		])
+	})
+
+	it.each([
 		[`import { Fragment } from "hono/jsx"`, `Fragment`],
 		[`import { Fragment as Group } from "hono/jsx"`, `Group`],
 		[`import * as Hono from "hono/jsx"`, `Hono.Fragment`],

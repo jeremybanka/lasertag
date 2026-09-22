@@ -5,9 +5,30 @@ import { createCssModuleCompletionItems } from "../../../src/lsp/completions.ts"
 import { validateCssReachability } from "../../../src/refractor/index.ts"
 import {
 	cleanedHonoCssSource,
+	honoCleanupCases,
 	honoCssSource,
 	honoTsxSource,
 } from "../fixtures/hono.ts"
+import { conservativeJsxCss } from "../fixtures/conservative-jsx.ts"
+
+it.each(honoCleanupCases)(
+	`editor cleanup preserves Hono CSS: $name`,
+	({ source }) => {
+		const { diagnostics } = validateCssReachability({
+			tsxPath: `/project/AppPanel.tsx`,
+			tsxSource: source,
+			cssPath: `/project/AppPanel.module.css`,
+			cssSource: conservativeJsxCss,
+		})
+		const ranges = createDeadSelectorCleanupRanges(
+			conservativeJsxCss,
+			diagnostics
+				.filter(({ code }) => code === `dead-selector`)
+				.flatMap(({ range }) => (range ? [range] : [])),
+		)
+		expect(ranges).toEqual([])
+	},
+)
 
 it(`completes both Hono Suspense branches and cleans only unreachable selectors`, () => {
 	const { renderStory, diagnostics } = validateCssReachability({
