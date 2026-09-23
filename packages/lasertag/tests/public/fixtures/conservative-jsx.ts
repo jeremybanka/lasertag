@@ -3,6 +3,15 @@ import { solidPropPrecedenceCases } from "./solid-prop-precedence.ts"
 
 export const conservativeJsxCases = [
 	...jsxCleanupSafetyCases,
+	{
+		name: `a nested overloaded component still shadows the top-level binding`,
+		source: `function LocalPanel(props: { ready: boolean }) { return <span /> }
+export function AppPanel() {
+	function LocalPanel(props: { ready: true }): any;
+	function LocalPanel(props: { ready: boolean }) { return <aside /> }
+	return <app-panel class={css.class}><LocalPanel ready={true} /></app-panel>
+}`,
+	},
 	...[
 		`export class AppPanel { render() { return <app-panel class={css.class}><aside /></app-panel> } }`,
 		`class AppPanel { render() { return <app-panel class={css.class}><aside /></app-panel> } }; export { AppPanel }`,

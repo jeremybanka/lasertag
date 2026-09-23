@@ -1564,23 +1564,32 @@ function hasShadowedBinding(
 	const root = expressionRoot(expression)
 	if (!ts.isIdentifier(root)) return false
 	const definition = context.components.get(root.text)
-	return resolveDeclarations(context, root).some((declaration) => {
-		if (declaration.getSourceFile().fileName !== context.sourceFile.fileName)
-			return false
-		// Unresolved imports retain their local alias declaration. They still refer
-		// to the indexed import, unlike a parameter or local binding of that name.
-		if (
-			ts.isImportSpecifier(declaration) ||
-			ts.isImportClause(declaration) ||
-			ts.isNamespaceImport(declaration)
-		)
-			return false
-		return (
-			!definition ||
-			declaration.getStart(context.sourceFile) !== definition.range.start ||
-			declaration.end !== definition.range.end
-		)
-	})
+	const localDeclarations = resolveDeclarations(context, root).filter(
+		(declaration) => {
+			if (declaration.getSourceFile().fileName !== context.sourceFile.fileName)
+				return false
+			// Unresolved imports retain their local alias declaration. They still refer
+			// to the indexed import, unlike a parameter or local binding of that name.
+			if (
+				ts.isImportSpecifier(declaration) ||
+				ts.isImportClause(declaration) ||
+				ts.isNamespaceImport(declaration)
+			)
+				return false
+			return true
+		},
+	)
+	// Overload signatures and the implementation share a binding. A reference
+	// is shadowed only when none of its declarations is the indexed component.
+	return (
+		localDeclarations.length > 0 &&
+		(!definition ||
+			!localDeclarations.some(
+				(declaration) =>
+					declaration.getStart(context.sourceFile) === definition.range.start &&
+					declaration.end === definition.range.end,
+			))
+	)
 }
 
 type RenderPropSemantics = {

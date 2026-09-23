@@ -14,6 +14,23 @@ afterAll(() => session.close())
 
 describe(`conservative JSX reachability`, () => {
 	it.each([
+		`function LocalPanel(props: { ready: true }): any;`,
+		`function LocalPanel(props: { ready: true }): any;
+function LocalPanel(props: { ready: false }): any;`,
+	])(`resolves overloads as one local component binding: %s`, (signatures) => {
+		const { diagnostics } = validateCssReachability(
+			{
+				tsxPath: `/project/AppPanel.tsx`,
+				tsxSource: `${signatures}
+function LocalPanel(props: { ready: boolean }) { return <span /> }
+export function AppPanel() { return <app-panel class={css.class}><LocalPanel ready={true} /></app-panel> }`,
+				cssSource: conservativeJsxCss,
+			},
+			session,
+		)
+		expect(diagnostics.map(({ code }) => code)).toEqual([`dead-selector`])
+	})
+	it.each([
 		`<app-panel class={css.class} {...props}><span /></app-panel>`,
 		`<app-panel class={css.class} children={<aside />}>{null}</app-panel>`,
 		`<app-panel class={css.class} {...props} children={<span />} />`,
