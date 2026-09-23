@@ -126,6 +126,21 @@ function scopedCssClassRenderRoots(
 			]
 		}
 		if (hasCssClassAttachment(child, options)) return [child]
+		if (child.mayHaveCssClass) {
+			// The spread can attach this node or leave descendant roots in scope.
+			// Persist uncertainty on the story so serialization and repeated scoping
+			// cannot drop it, while retaining any independently known descendants.
+			return [
+				{
+					kind: `opaque`,
+					reason: `spread may supply a CSS Module class attachment`,
+					mayContainCssClassRoot: true,
+					...(child.range ? { range: child.range } : {}),
+					...(child.sourcePath ? { sourcePath: child.sourcePath } : {}),
+				},
+				...scopedCssClassRenderRoots(child.children, options, preserveUnknown),
+			]
+		}
 
 		return scopedCssClassRenderRoots(child.children, options, preserveUnknown)
 	})

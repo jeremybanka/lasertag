@@ -1,5 +1,23 @@
 export const jsxCleanupSafetyCases = [
 	...[
+		`<app-panel {...{ class: css.class }}><aside /></app-panel>`,
+		`<app-panel {...rootProps}><aside /></app-panel>`,
+		`<section {...{ class: css.class }}><app-panel class={css.class}><aside /></app-panel></section>`,
+	].map((output) => ({
+		name: `spread class supplies a sibling CSS root: ${output}`,
+		source: `const css = { class: "class" }
+const rootProps = { class: css.class }
+export function AppPanel() {
+	return <><app-panel class={css.class}><span /></app-panel>${output}</>
+}
+export const render = () => <AppPanel />`,
+		html:
+			`<app-panel class="class"><span></span></app-panel>` +
+			(output.startsWith(`<section`)
+				? `<section class="class "><app-panel class="class"><aside></aside></app-panel></section>`
+				: `<app-panel class="class "><aside></aside></app-panel>`),
+	})),
+	...[
 		`<app-panel class={css.class} children={<aside />} />`,
 		`<app-panel class={css.class} children={<aside />}></app-panel>`,
 		`<app-panel class={css.class} {...{ children: <aside /> }} />`,

@@ -25,6 +25,7 @@ function structuralChildValue(child: StoryChild): unknown {
 		children: structuralChildrenValue(child.children),
 		kind: child.kind,
 		...(child.addressable ? { addressable: child.addressable } : {}),
+		...(child.mayHaveCssClass ? { mayHaveCssClass: true } : {}),
 		...(child.componentName ? { componentName: child.componentName } : {}),
 		...(child.ownership ? { ownership: child.ownership } : {}),
 		tagName: child.tagName,

@@ -828,6 +828,9 @@ function createStoryNode(
 		tagName,
 		children,
 		range,
+		...(attributes.properties.some(ts.isJsxSpreadAttribute)
+			? { mayHaveCssClass: true as const }
+			: {}),
 	}
 
 	return storyAttributes.length > 0

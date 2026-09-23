@@ -7,6 +7,34 @@ import {
 } from "../../../src/refractor/render-story-root.ts"
 
 describe(`CSS Module render story roots`, () => {
+	it(`retains uncertain class attachments after serialization and repeated scoping`, () => {
+		const story: RenderStory = {
+			componentName: `AppPanel`,
+			warnings: [],
+			roots: [
+				{
+					kind: `element`,
+					tagName: `section`,
+					mayHaveCssClass: true,
+					children: [
+						{
+							kind: `element`,
+							tagName: `app-panel`,
+							attributes: [{ name: `class`, expression: `css.class` }],
+							children: [{ kind: `element`, tagName: `aside`, children: [] }],
+						},
+					],
+				},
+			],
+		}
+		const scoped = scopeRenderStoryToCssClassRoots(story)
+		expect(scoped.roots).toMatchObject([
+			{ kind: `opaque`, mayContainCssClassRoot: true },
+			{ kind: `element`, tagName: `app-panel` },
+		])
+		const restored: RenderStory = JSON.parse(JSON.stringify(scoped))
+		expect(scopeRenderStoryToCssClassRoots(restored)).toEqual(scoped)
+	})
 	it(`retains unknown replacement alternatives through repeated scoping`, () => {
 		const story: RenderStory = {
 			componentName: `AppPanel`,

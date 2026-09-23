@@ -78,6 +78,9 @@ Render-story ownership starts at the outermost rendered nodes whose `class` or
 are excluded before selector reachability runs. Unknown local expressions,
 spread render props, and shadowed component bindings can supply additional CSS
 roots even when their DOM has foreign ownership, so those possibilities remain.
+An intrinsic element's spread can also supply the class attachment itself.
+When that attachment is uncertain, cleanup preserves its possible CSS scope;
+this can retain selectors that would otherwise look dead beside a known root.
 When Refractor cannot discover
 an attachment, validation uses an opaque ownership root and makes no
 dead-selector claims; ESLint is responsible for reporting a missing or misplaced

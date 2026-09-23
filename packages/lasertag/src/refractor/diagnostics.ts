@@ -19,6 +19,8 @@ export type StoryNode = {
 	children: StoryChild[]
 	addressable?: true
 	attributes?: StoryAttribute[]
+	/** A spread may attach this element to the consumer's CSS Module scope. */
+	mayHaveCssClass?: true
 	componentName?: string
 	ownership?: `foreign`
 	range?: SourceRange
