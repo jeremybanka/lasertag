@@ -28,7 +28,7 @@ export type StoryNode = {
 export type OpaqueStoryNode = {
 	kind: `opaque`
 	reason: string
-	/** Unknown local output that may supply an additional CSS Module root. */
+	/** Unknown output that may supply an additional CSS Module root, independently of DOM ownership. */
 	mayContainCssClassRoot?: true
 	componentName?: string
 	expectedRootTagName?: string

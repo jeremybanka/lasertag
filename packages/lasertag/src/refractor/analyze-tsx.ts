@@ -70,6 +70,7 @@ type AnalyzeContext = {
 	typescriptAnalysis: TypescriptAstAnalysis
 	resolvedDeclarations: Map<ts.Node, ts.Node[]>
 	foreignComponentStack: ReadonlySet<string>
+	externalComponentOutput: WeakSet<OpaqueStoryNode>
 }
 
 const DEFAULT_MAX_COMPONENT_DEPTH = 25
@@ -110,6 +111,25 @@ function foreignOpaque(
 		...(componentName ? { componentName } : {}),
 		...(expectedRootTagName ? { expectedRootTagName } : {}),
 	}
+}
+
+function externalComponentOpaque(
+	context: AnalyzeContext,
+	reason: string,
+	node: ts.Node,
+	componentName?: string,
+): OpaqueStoryNode {
+	const result = foreignOpaque(
+		reason,
+		context.sourceFile,
+		node,
+		undefined,
+		componentName,
+	)
+	// Independent imported components keep their own CSS scope. This origin is
+	// separate from ownership: local spreads and shadowed bindings are also foreign.
+	context.externalComponentOutput.add(result)
+	return result
 }
 
 function choice(
@@ -699,9 +719,9 @@ function addressableForeignRoot(
 	return {
 		addressable: true,
 		children: [
-			foreignOpaque(
+			externalComponentOpaque(
+				context,
 				`asserted component implementation`,
-				context.sourceFile,
 				node,
 			),
 		],
@@ -721,7 +741,7 @@ function foreignRoot(
 ): StoryNode {
 	return {
 		children: [
-			foreignOpaque(`component implementation`, context.sourceFile, node),
+			externalComponentOpaque(context, `component implementation`, node),
 		],
 		componentName,
 		kind: `element`,
@@ -860,11 +880,10 @@ function foreignRootsFromResolvedStory(
 			)
 		}
 
-		return foreignOpaque(
+		return externalComponentOpaque(
+			context,
 			`resolved component root remains opaque`,
-			context.sourceFile,
 			node,
-			undefined,
 			componentName,
 		)
 	})
@@ -886,6 +905,7 @@ function analyzeResolvedComponentStory(
 
 	const importedContext: AnalyzeContext = {
 		components: index.components,
+		externalComponentOutput: context.externalComponentOutput,
 		foreignComponentStack: new Set([
 			...context.foreignComponentStack,
 			resolutionKey,
@@ -2166,11 +2186,10 @@ function analyzeComponentTag(
 
 		return (
 			resolvedRoots ?? [
-				foreignOpaque(
+				externalComponentOpaque(
+					context,
 					`imported or external component`,
-					context.sourceFile,
 					node,
-					undefined,
 					componentName,
 				),
 			]
@@ -2495,6 +2514,7 @@ function createAnalyzeContext(
 		sourceFile,
 		components: index.components,
 		foreignComponentStack: new Set(),
+		externalComponentOutput: new WeakSet(),
 		resolvedDeclarations: new Map(),
 		imports: index.imports,
 		namespaceImports: index.namespaceImports,
@@ -2534,7 +2554,8 @@ function analyzeIndexedComponent(
 	return options.scopeToCssClassRoots === false
 		? renderStory
 		: scopeRenderStoryToCssClassRoots(renderStory, {
-				preserveUnknownLocalRoots: true,
+				preserveUnknownRoots: (node) =>
+					!context.externalComponentOutput.has(node),
 			})
 }
 
@@ -2574,7 +2595,8 @@ export function analyzeTsxRenderStory(
 			return options.scopeToCssClassRoots === false
 				? renderStory
 				: scopeRenderStoryToCssClassRoots(renderStory, {
-						preserveUnknownLocalRoots: true,
+						preserveUnknownRoots: (node) =>
+							!context.externalComponentOutput.has(node),
 					})
 		},
 	)

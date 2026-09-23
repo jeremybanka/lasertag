@@ -1,6 +1,8 @@
+import { jsxCleanupSafetyCases } from "./jsx-cleanup-safety.ts"
 import { solidPropPrecedenceCases } from "./solid-prop-precedence.ts"
 
 export const conservativeJsxCases = [
+	...jsxCleanupSafetyCases,
 	...solidPropPrecedenceCases.filter(({ rendersAside }) => rendersAside),
 	...[
 		`const React = { Fragment: () => <aside /> }`,

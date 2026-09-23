@@ -1,4 +1,5 @@
 import type {
+	OpaqueStoryNode,
 	RenderStory,
 	StoryAttribute,
 	StoryChild,
@@ -9,7 +10,7 @@ export type CssClassRenderRootOptions = {
 	bindingName?: string
 	exportName?: string
 	missingAttachment?: `opaque` | `preserve`
-	preserveUnknownLocalRoots?: boolean
+	preserveUnknownRoots?: boolean | ((node: OpaqueStoryNode) => boolean)
 }
 
 const DEFAULT_CSS_MODULE_BINDING = `css`
@@ -90,7 +91,13 @@ function scopedCssClassRenderRoots(
 	return children.flatMap((child): StoryChild[] => {
 		if (child.kind === `opaque`) {
 			if (child.mayContainCssClassRoot || preserveUnknown) return [child]
-			if (options.preserveUnknownLocalRoots && child.ownership !== `foreign`) {
+			// Ownership describes selector boundaries, not which CSS roots the
+			// output may contain. Spread values and shadowed locals can supply one.
+			const preserve =
+				typeof options.preserveUnknownRoots === `function`
+					? options.preserveUnknownRoots(child)
+					: options.preserveUnknownRoots
+			if (preserve) {
 				return [{ ...child, mayContainCssClassRoot: true }]
 			}
 			return []
@@ -129,7 +136,7 @@ export function scopeRenderStoryToCssClassRoots(
 	options: CssClassRenderRootOptions = {},
 ): RenderStory {
 	// Preserve the unscoped story when there are no known attachments. Only
-	// promote unknown local output alongside a discovered CSS ownership root.
+	// promote unknown output alongside a discovered CSS ownership root.
 	if (findCssClassRenderRoots(renderStory.roots, options).length === 0) {
 		if (options.missingAttachment !== `opaque`) return renderStory
 	}
