@@ -1,5 +1,17 @@
 export const conservativeJsxCases = [
 	...[
+		[`{ Fragment }`, `Fragment`],
+		[`{ Fragment }`, `(Fragment as unknown)!`],
+		[`{ undefined }`, `undefined`],
+		[`{ undefined }`, `(undefined satisfies unknown)`],
+	].map(([parameters, value]) => ({
+		name: `render values with special-looking names: ${value}`,
+		source: `import { Fragment as Group } from "preact"
+export function AppPanel(${parameters}) {
+	return <app-panel class={css.class}><Group children={${value}} /></app-panel>
+}`,
+	})),
+	...[
 		`<><app-panel class={css.class}><span /></app-panel><LocalPanel /></>`,
 		`props.ready ? <><app-panel class={css.class}><span /></app-panel><LocalPanel /></> : null`,
 		`<><app-panel class={css.class}><span /></app-panel>{renderPanel()}</>`,

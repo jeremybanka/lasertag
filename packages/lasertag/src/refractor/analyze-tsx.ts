@@ -170,19 +170,8 @@ function functionBodyFromExpression(
 	expression: ts.Expression,
 	imports?: ImportIndex,
 ): ts.ConciseBody | undefined {
-	if (isFunctionExpression(expression)) {
-		return expression.body
-	}
-
-	if (
-		ts.isAsExpression(expression) ||
-		ts.isSatisfiesExpression(expression) ||
-		ts.isNonNullExpression(expression) ||
-		ts.isParenthesizedExpression(expression) ||
-		ts.isTypeAssertion(expression)
-	) {
-		return functionBodyFromExpression(expression.expression, imports)
-	}
+	expression = unwrapExpression(expression)
+	if (isFunctionExpression(expression)) return expression.body
 
 	if (
 		imports &&
@@ -1660,18 +1649,9 @@ function dynamicComponentValue(
 
 	if (!initializer || !ts.isJsxExpression(initializer)) return
 
-	let expression = initializer.expression
-
-	while (
-		expression &&
-		(ts.isParenthesizedExpression(expression) ||
-			ts.isAsExpression(expression) ||
-			ts.isSatisfiesExpression(expression) ||
-			ts.isNonNullExpression(expression) ||
-			ts.isTypeAssertion(expression))
-	) {
-		expression = expression.expression
-	}
+	const expression = initializer.expression
+		? unwrapExpression(initializer.expression)
+		: undefined
 
 	if (expression && ts.isStringLiteralLikeNode(expression)) {
 		return { kind: `literal`, tagName: expression.text }
@@ -2205,18 +2185,7 @@ function analyzeExpression(
 	expression: ts.Expression,
 	stack: string[],
 ): StoryChild[] {
-	if (ts.isParenthesizedExpression(expression)) {
-		return analyzeExpression(context, expression.expression, stack)
-	}
-
-	if (
-		ts.isAsExpression(expression) ||
-		ts.isSatisfiesExpression(expression) ||
-		ts.isNonNullExpression(expression) ||
-		ts.isTypeAssertion(expression)
-	) {
-		return analyzeExpression(context, expression.expression, stack)
-	}
+	expression = unwrapExpression(expression)
 
 	if (ts.isJsxElement(expression)) {
 		return analyzeJsxElement(context, expression, stack)
@@ -2311,7 +2280,8 @@ function analyzeExpression(
 
 	if (
 		ts.isIdentifier(expression) &&
-		(expression.text === `undefined` || expression.text === `Fragment`)
+		expression.text === `undefined` &&
+		resolveDeclarations(context, expression).length === 0
 	) {
 		return []
 	}

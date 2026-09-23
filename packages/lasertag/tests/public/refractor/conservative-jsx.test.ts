@@ -49,6 +49,8 @@ describe(`conservative JSX reachability`, () => {
 	)
 
 	it.each([
+		`<Fragment children={undefined} />`,
+		`<Fragment>{(undefined as unknown)!}</Fragment>`,
 		`<Fragment {...props}><span /></Fragment>`,
 		`<Fragment {...props} children={<span />} />`,
 		`<Fragment children={<aside />} {...props}><span /></Fragment>`,
