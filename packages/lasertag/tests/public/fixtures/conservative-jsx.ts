@@ -3,6 +3,15 @@ import { solidPropPrecedenceCases } from "./solid-prop-precedence.ts"
 
 export const conservativeJsxCases = [
 	...jsxCleanupSafetyCases,
+	...[
+		`export class AppPanel { render() { return <app-panel class={css.class}><aside /></app-panel> } }`,
+		`class AppPanel { render() { return <app-panel class={css.class}><aside /></app-panel> } }; export { AppPanel }`,
+		`export default class AppPanel { render() { return <app-panel class={css.class}><aside /></app-panel> } }`,
+	].map((declaration) => ({
+		name: `class component retains its identity: ${declaration}`,
+		source: `${declaration}
+export function LoadingPanel() { return <app-panel class={css.class}><span /></app-panel> }`,
+	})),
 	{
 		name: `unresolved map receiver remains uncertain`,
 		source: `export function AppPanel({ renderer }) {

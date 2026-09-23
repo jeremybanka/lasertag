@@ -40,6 +40,7 @@ type ComponentDefinition = {
 	name: string
 	body?: ts.ConciseBody
 	initializer?: ts.Expression
+	declaration?: ts.Node
 	range: SourceRange
 }
 
@@ -344,7 +345,16 @@ function addVariableComponents(
 	const isExported = hasModifier(statement, ts.SyntaxKind.ExportKeyword)
 
 	for (const declaration of statement.declarationList.declarations) {
-		if (!ts.isIdentifier(declaration.name)) continue
+		if (!ts.isIdentifier(declaration.name)) {
+			addUnknownComponentBindings(
+				sourceFile,
+				index,
+				declaration,
+				declaration.name,
+				isExported,
+			)
+			continue
+		}
 		if (!declaration.initializer) continue
 
 		const body = functionBodyFromExpression(declaration.initializer, index)
@@ -365,6 +375,39 @@ function addVariableComponents(
 			index.exportedNames.add(name)
 		}
 	}
+}
+
+function addUnknownComponentBindings(
+	sourceFile: ts.SourceFile,
+	index: ComponentIndex,
+	declaration: ts.Node,
+	binding: ts.BindingName,
+	isExported: boolean,
+	source: ts.Node = declaration,
+) {
+	if (!ts.isIdentifier(binding)) {
+		for (const element of binding.elements) {
+			if (ts.isBindingElement(element) && element.name)
+				addUnknownComponentBindings(
+					sourceFile,
+					index,
+					element,
+					element.name,
+					isExported,
+					source,
+				)
+		}
+		return
+	}
+	const name = binding.text
+	if (!isComponentName(name)) return
+	index.components.set(name, {
+		name,
+		declaration: source,
+		range: rangeOf(sourceFile, declaration),
+	})
+	index.mainCandidates.add(name)
+	if (isExported) index.exportedNames.add(name)
 }
 
 function addFunctionComponent(
@@ -430,6 +473,8 @@ function addDefaultExport(
 		!hasModifier(statement, ts.SyntaxKind.DefaultKeyword)
 	) {
 		return
+	} else {
+		localName = statement.name?.text
 	}
 
 	if (localName && index.components.has(localName)) {
@@ -522,6 +567,17 @@ function collectComponentIndex(sourceFile: ts.SourceFile): ComponentIndex {
 			continue
 		}
 
+		if (ts.isClassDeclaration(statement) && statement.name) {
+			addUnknownComponentBindings(
+				sourceFile,
+				index,
+				statement,
+				statement.name,
+				hasModifier(statement, ts.SyntaxKind.ExportKeyword),
+			)
+			continue
+		}
+
 		if (ts.isExportDeclaration(statement)) {
 			addExportDeclaration(index, statement)
 			continue
@@ -599,7 +655,8 @@ function selectComponentStories(
 		options.componentNames ??
 		[...index.components]
 			.filter(([componentName, definition]) => {
-				const source = definition.body ?? definition.initializer
+				const source =
+					definition.body ?? definition.initializer ?? definition.declaration
 				return (
 					(isComponentName(componentName) ||
 						componentName === index.defaultExportName) &&

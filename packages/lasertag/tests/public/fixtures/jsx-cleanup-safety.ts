@@ -1,5 +1,21 @@
 export const jsxCleanupSafetyCases = [
 	...[
+		`export const { AppPanel } = { AppPanel: () => <app-panel class={css.class}><aside /></app-panel> }`,
+		`export const { AppPanel } = { AppPanel: Render }`,
+		`export const { panel: AppPanel } = { panel: Render }`,
+		`export const { panels: [AppPanel] } = { panels: [Render] }`,
+		`const [AppPanel] = [Render]; export { AppPanel }`,
+		`const [, AppPanel] = [null, Render]; export { AppPanel }`,
+		`export const [AppPanel = Render] = []`,
+	].map((declaration) => ({
+		name: `destructured component retains its identity: ${declaration}`,
+		source: `const css = { class: "class" }
+const Render = () => <app-panel class={css.class}><aside /></app-panel>
+${declaration}
+export function LoadingPanel() { return <app-panel class={css.class}><span /></app-panel> }`,
+		html: `<app-panel class="class"><aside></aside></app-panel>`,
+	})),
+	...[
 		`<app-panel {...{ class: css.class }}><aside /></app-panel>`,
 		`<app-panel {...rootProps}><aside /></app-panel>`,
 		`<section {...{ class: css.class }}><app-panel class={css.class}><aside /></app-panel></section>`,

@@ -10,6 +10,22 @@ import { conservativeJsxCss } from "../fixtures/conservative-jsx.ts"
 const session = createTypescriptAstSession()
 afterAll(() => session.close())
 
+it(`discovers unsupported declarations with JSX without expanding them`, () => {
+	const stories = analyzeTsxRenderStories(
+		{
+			sourceText: `export class ClassPanel { render() { return <class-panel /> } }
+export const { BoundPanel } = { BoundPanel: () => <bound-panel /> }`,
+		},
+		session,
+	)
+	expect(stories.map(({ componentName }) => componentName)).toEqual([
+		`ClassPanel`,
+		`BoundPanel`,
+	])
+	for (const story of stories)
+		expect(story.roots).toMatchObject([{ kind: `opaque` }])
+})
+
 it.each([
 	`fallback || wrap(Render)`,
 	`fallback ?? wrap(Render)`,

@@ -25,5 +25,7 @@ export async function renderSolid(source: string): Promise<string> {
 	)
 	const moduleUrl = `data:text/javascript;base64,${Buffer.from(executable).toString(`base64`)}`
 	const module = await import(/* @vite-ignore */ moduleUrl)
-	return renderToString(module.render ?? (() => module.default({})))
+	return renderToString(
+		module.render ?? (() => (module.default ?? module.AppPanel)({})),
+	)
 }
