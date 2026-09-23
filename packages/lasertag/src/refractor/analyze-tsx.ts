@@ -50,6 +50,7 @@ type ImportBinding = {
 
 type ComponentIndex = {
 	components: Map<string, ComponentDefinition>
+	mainCandidates: Set<string>
 	exportedNames: Set<string>
 	imports: Map<string, ImportBinding>
 	namespaceImports: Map<string, string>
@@ -201,6 +202,36 @@ function isComponentFactoryModule(moduleName: string): boolean {
 	return moduleName === `react` || moduleName === `preact/compat`
 }
 
+function mayBeComponentInitializer(expression: ts.Expression): boolean {
+	expression = unwrapExpression(expression)
+	if (ts.isJsxElement(expression) || ts.isJsxSelfClosingElement(expression)) {
+		// Solid component JSX evaluates to the component's return value, which
+		// may itself be callable. Only intrinsic JSX is known to be non-callable.
+		const tagName = jsxTagName(expression)
+		return !ts.isIdentifier(tagName) || !isIntrinsicJsxTag(tagName.text)
+	}
+	if (ts.isConditionalExpression(expression)) {
+		return (
+			mayBeComponentInitializer(expression.whenTrue) ||
+			mayBeComponentInitializer(expression.whenFalse)
+		)
+	}
+	// Keep calls, aliases, and other unknown bindings as possible components,
+	// but do not let statically non-callable exports compete with a component.
+	return !(
+		ts.isLiteralExpression(expression) ||
+		ts.isTemplateExpression(expression) ||
+		ts.isPrefixUnaryExpression(expression) ||
+		ts.isTypeOfExpression(expression) ||
+		ts.isVoidExpression(expression) ||
+		ts.isObjectLiteralExpression(expression) ||
+		ts.isArrayLiteralExpression(expression) ||
+		expression.kind === ts.SyntaxKind.NullKeyword ||
+		expression.kind === ts.SyntaxKind.TrueKeyword ||
+		expression.kind === ts.SyntaxKind.FalseKeyword
+	)
+}
+
 function addVariableComponents(
 	sourceFile: ts.SourceFile,
 	index: ComponentIndex,
@@ -222,6 +253,9 @@ function addVariableComponents(
 			...(body ? { body } : { initializer: declaration.initializer }),
 			range: rangeOf(sourceFile, declaration),
 		})
+		if (body || mayBeComponentInitializer(declaration.initializer)) {
+			index.mainCandidates.add(name)
+		}
 
 		if (isExported) {
 			index.exportedNames.add(name)
@@ -243,6 +277,7 @@ function addFunctionComponent(
 		body: statement.body,
 		range: rangeOf(sourceFile, statement),
 	})
+	index.mainCandidates.add(name)
 
 	if (hasModifier(statement, ts.SyntaxKind.ExportKeyword)) {
 		index.exportedNames.add(name)
@@ -327,6 +362,7 @@ function collectComponentIndex(sourceFile: ts.SourceFile): ComponentIndex {
 	const index: ComponentIndex = {
 		...collectImportIndex(sourceFile),
 		components: new Map(),
+		mainCandidates: new Set(),
 		exportedNames: new Set(),
 	}
 
@@ -379,19 +415,23 @@ function selectMainComponent(
 
 	const fileStemName = toPascalishStem(options.filePath)
 
-	if (fileStemName && index.exportedNames.has(fileStemName)) {
+	if (
+		fileStemName &&
+		index.exportedNames.has(fileStemName) &&
+		index.mainCandidates.has(fileStemName)
+	) {
 		return fileStemName
 	}
 
 	if (
 		index.defaultExportName &&
-		index.components.has(index.defaultExportName)
+		index.mainCandidates.has(index.defaultExportName)
 	) {
 		return index.defaultExportName
 	}
 
 	const exportedComponentNames = [...index.exportedNames].filter((name) =>
-		index.components.has(name),
+		index.mainCandidates.has(name),
 	)
 
 	if (exportedComponentNames.length === 1) {
@@ -417,6 +457,7 @@ function selectComponentStories(
 				const source = definition.body ?? definition.initializer
 				return (
 					isComponentName(componentName) &&
+					index.mainCandidates.has(componentName) &&
 					source !== undefined &&
 					containsJsx(source)
 				)
