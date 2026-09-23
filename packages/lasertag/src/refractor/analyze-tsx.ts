@@ -228,6 +228,43 @@ type ExpressionValueFacts = {
 	mayRenderElements: boolean
 }
 
+const PRIMITIVE_BINARY_OPERATORS: ReadonlySet<ts.SyntaxKind> = new Set([
+	ts.SyntaxKind.PlusToken,
+	ts.SyntaxKind.MinusToken,
+	ts.SyntaxKind.AsteriskToken,
+	ts.SyntaxKind.AsteriskAsteriskToken,
+	ts.SyntaxKind.SlashToken,
+	ts.SyntaxKind.PercentToken,
+	ts.SyntaxKind.LessThanLessThanToken,
+	ts.SyntaxKind.GreaterThanGreaterThanToken,
+	ts.SyntaxKind.GreaterThanGreaterThanGreaterThanToken,
+	ts.SyntaxKind.AmpersandToken,
+	ts.SyntaxKind.BarToken,
+	ts.SyntaxKind.CaretToken,
+	ts.SyntaxKind.LessThanToken,
+	ts.SyntaxKind.GreaterThanToken,
+	ts.SyntaxKind.LessThanEqualsToken,
+	ts.SyntaxKind.GreaterThanEqualsToken,
+	ts.SyntaxKind.EqualsEqualsToken,
+	ts.SyntaxKind.ExclamationEqualsToken,
+	ts.SyntaxKind.EqualsEqualsEqualsToken,
+	ts.SyntaxKind.ExclamationEqualsEqualsToken,
+	ts.SyntaxKind.InKeyword,
+	ts.SyntaxKind.InstanceOfKeyword,
+	ts.SyntaxKind.PlusEqualsToken,
+	ts.SyntaxKind.MinusEqualsToken,
+	ts.SyntaxKind.AsteriskEqualsToken,
+	ts.SyntaxKind.AsteriskAsteriskEqualsToken,
+	ts.SyntaxKind.SlashEqualsToken,
+	ts.SyntaxKind.PercentEqualsToken,
+	ts.SyntaxKind.LessThanLessThanEqualsToken,
+	ts.SyntaxKind.GreaterThanGreaterThanEqualsToken,
+	ts.SyntaxKind.GreaterThanGreaterThanGreaterThanEqualsToken,
+	ts.SyntaxKind.AmpersandEqualsToken,
+	ts.SyntaxKind.BarEqualsToken,
+	ts.SyntaxKind.CaretEqualsToken,
+])
+
 function expressionValueFacts(expression: ts.Expression): ExpressionValueFacts {
 	expression = unwrapExpression(expression)
 	if (ts.isConditionalExpression(expression)) {
@@ -255,6 +292,8 @@ function expressionValueFacts(expression: ts.Expression): ExpressionValueFacts {
 		ts.isPostfixUnaryExpression(expression) ||
 		ts.isTypeOfExpression(expression) ||
 		ts.isDeleteExpression(expression) ||
+		(ts.isBinaryExpression(expression) &&
+			PRIMITIVE_BINARY_OPERATORS.has(expression.operatorToken.kind)) ||
 		expression.kind === ts.SyntaxKind.NullKeyword ||
 		expression.kind === ts.SyntaxKind.TrueKeyword ||
 		expression.kind === ts.SyntaxKind.FalseKeyword

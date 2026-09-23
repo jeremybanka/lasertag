@@ -11,6 +11,37 @@ const session = createTypescriptAstSession()
 afterAll(() => session.close())
 
 it.each([
+	`fallback || wrap(Render)`,
+	`fallback ?? wrap(Render)`,
+	`ready && wrap(Render)`,
+	`(current = wrap(Render))`,
+	`(0, wrap(Render))`,
+	`(current ||= wrap(Render))`,
+	`(current ??= wrap(Render))`,
+	`(current &&= wrap(Render))`,
+])(
+	`preserves component candidates from operand-returning operators: %s`,
+	(initializer) => {
+		const { renderStory, diagnostics } = validateCssReachability(
+			{
+				tsxPath: `/project/AppPanel.tsx`,
+				tsxSource: `let current; const fallback = undefined; const ready = true
+function wrap(Render) { return Render }
+const Render = () => <app-panel class={css.class}><aside /></app-panel>
+export const AppPanel = ${initializer}
+export function LoadingPanel() { return <app-panel class={css.class}><span /></app-panel> }`,
+				cssSource: conservativeJsxCss,
+			},
+			session,
+		)
+		expect(renderStory.componentName).toBe(`AppPanel`)
+		expect(diagnostics.filter(({ code }) => code === `dead-selector`)).toEqual(
+			[],
+		)
+	},
+)
+
+it.each([
 	`import Panel from "./unknown"; export default Panel`,
 	`export { Panel as default } from "./unknown"`,
 	`export default class { render() { return <app-panel class={css.class}><aside /></app-panel> } }`,
@@ -82,6 +113,15 @@ export function AppPanel() { return <app-panel /> }`,
 it.each(
 	[
 		`export const DEFAULT_COUNT = 3`,
+		`export const DEFAULT_COUNT = 1 + 2`,
+		`export const DEFAULT_COUNT = 1 === 1`,
+		`export const DEFAULT_COUNT = 1 < 2`,
+		`export const DEFAULT_COUNT = 1 << 2`,
+		`export const DEFAULT_COUNT = 4 ** 2`,
+		`export const DEFAULT_COUNT = "a" + "b"`,
+		`export const DEFAULT_COUNT = "key" in { key: 1 }`,
+		`export const DEFAULT_COUNT = null instanceof Object`,
+		`let count = 0; export const DEFAULT_COUNT = (count += 1)`,
 		`export const DEFAULT_COUNT = (-3 as const)`,
 		`export const DefaultOptions = { enabled: true }`,
 		`export const DEFAULT_ITEMS = [1, 2, 3]`,

@@ -1,5 +1,10 @@
 export const solidPropPrecedenceCases = [
 	{
+		name: `Solid comparison result overrides spread children`,
+		output: `<Show {...props} when={true} fallback={null}>{1 === 0}</Show>`,
+		rendersAside: false,
+	},
+	{
 		name: `Solid undefined JSX children retain spread children`,
 		output: `<Show {...props} when={true} fallback={null}>{undefined}</Show>`,
 		rendersAside: true,
