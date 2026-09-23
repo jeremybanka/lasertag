@@ -37,6 +37,45 @@ export const cleanedHonoCssSource = `project-card.class {
 
 export const honoCleanupCases = [
 	{
+		name: `spread children supply a sibling CSS root`,
+		source: `import { Fragment } from "hono/jsx"
+const css = { class: "class" }
+export function AppPanel() {
+	return <><app-panel class={css.class}><span /></app-panel><Fragment {...{ children: <app-panel class={css.class}><aside /></app-panel> }} /></>
+}
+export const render = () => AppPanel()`,
+		html: `<app-panel class="class"><span></span></app-panel><app-panel class="class"><aside></aside></app-panel>`,
+	},
+	{
+		name: `shadowed local component supplies a sibling CSS root`,
+		source: `const css = { class: "class" }
+const LocalPanel = () => <span />
+export function AppPanel() {
+	const LocalPanel = () => <app-panel class={css.class}><aside /></app-panel>
+	return <><app-panel class={css.class}><span /></app-panel><LocalPanel /></>
+}
+export const render = () => AppPanel()`,
+		html: `<app-panel class="class"><span></span></app-panel><app-panel class="class"><aside></aside></app-panel>`,
+	},
+	{
+		name: `custom map output adds an aside`,
+		source: `const css = { class: "class" }
+const renderer = { map(render) { return <aside>{render()}</aside> } }
+export function AppPanel() {
+	return <app-panel class={css.class}>{renderer.map(() => <span />)}</app-panel>
+}
+export const render = () => AppPanel()`,
+		html: `<app-panel class="class"><aside><span></span></aside></app-panel>`,
+	},
+	{
+		name: `direct default export keeps its identity`,
+		source: `const css = { class: "class" }
+const wrap = (Render) => Render
+export default wrap(() => <app-panel class={css.class}><aside /></app-panel>)
+export function LoadingPanel() { return <app-panel class={css.class}><span /></app-panel> }`,
+		html: `<app-panel class="class"><aside></aside></app-panel>`,
+	},
+	{
 		name: `unknown wrapped sibling supplies another CSS root`,
 		source: `const css = { class: "class" }
 function wrap(Render) { return Render }

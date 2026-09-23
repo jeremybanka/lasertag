@@ -14,6 +14,16 @@ afterAll(() => session.close())
 
 it.each([
 	...honoCleanupCases.map((testCase) => ({ ...testCase, dead: false })),
+	{
+		name: `literal sibling keeps dead CSS diagnosable`,
+		source: `const css = { class: "class" }
+export function AppPanel() {
+	return <><app-panel class={css.class}><span /></app-panel>{"text"}</>
+}
+export const render = () => AppPanel()`,
+		html: `<app-panel class="class"><span></span></app-panel>text`,
+		dead: true,
+	},
 	...[
 		`<Fragment {...props}>{undefined}</Fragment>`,
 		`<Fragment {...props} children={undefined} />`,
@@ -41,7 +51,8 @@ export const render = () => AppPanel({ children: <aside /> })`,
 				`from ${JSON.stringify(import.meta.resolve(specifier))}`,
 		)
 		const moduleUrl = `data:text/javascript;base64,${Buffer.from(executable).toString(`base64`)}`
-		const { render } = await import(/* @vite-ignore */ moduleUrl)
+		const module = await import(/* @vite-ignore */ moduleUrl)
+		const render = module.render ?? module.default
 		const app = new Hono()
 		app.get(`/`, (context) => context.html(render()))
 		const response = await app.request(`/`)
