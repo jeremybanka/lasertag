@@ -36,6 +36,34 @@ export const cleanedHonoCssSource = `project-card.class {
 `
 
 export const honoCleanupCases = [
+	...[
+		`<app-panel class={css.class} children={<aside />} />`,
+		`<app-panel class={css.class} children={<aside />}></app-panel>`,
+		`<app-panel class={css.class} {...{ children: <aside /> }} />`,
+		`<app-panel class={css.class} children={<aside />}>{/* explanation */}</app-panel>`,
+	].map((output) => ({
+		name: `intrinsic children props remain live: ${output}`,
+		source: `const css = { class: "class" }
+export function AppPanel() { return ${output} }
+export const render = () => AppPanel()`,
+		html: `<app-panel class="class"><aside></aside></app-panel>`,
+	})),
+	{
+		name: `spread class supplies another CSS root`,
+		source: `const css = { class: "class" }
+export function AppPanel() {
+	return <><app-panel class={css.class}><span /></app-panel><app-panel {...{ class: css.class }}><aside /></app-panel></>
+}
+export const render = () => AppPanel()`,
+		html: `<app-panel class="class"><span></span></app-panel><app-panel class="class"><aside></aside></app-panel>`,
+	},
+	{
+		name: `destructured component keeps its identity`,
+		source: `const css = { class: "class" }
+export const { AppPanel } = { AppPanel: () => <app-panel class={css.class}><aside /></app-panel> }
+export function LoadingPanel() { return <app-panel class={css.class}><span /></app-panel> }`,
+		html: `<app-panel class="class"><aside></aside></app-panel>`,
+	},
 	{
 		name: `spread children supply a sibling CSS root`,
 		source: `import { Fragment } from "hono/jsx"

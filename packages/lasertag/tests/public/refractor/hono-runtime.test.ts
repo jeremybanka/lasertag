@@ -15,6 +15,16 @@ afterAll(() => session.close())
 it.each([
 	...honoCleanupCases.map((testCase) => ({ ...testCase, dead: false })),
 	{
+		name: `overloads keep local component analysis precise`,
+		source: `const css = { class: "class" }
+function LocalPanel(props: { ready: true }): any;
+function LocalPanel(props: { ready: boolean }) { return <span /> }
+export function AppPanel() { return <app-panel class={css.class}><LocalPanel ready={true} /></app-panel> }
+export const render = () => AppPanel()`,
+		html: `<app-panel class="class"><span></span></app-panel>`,
+		dead: true,
+	},
+	{
 		name: `literal sibling keeps dead CSS diagnosable`,
 		source: `const css = { class: "class" }
 export function AppPanel() {
@@ -52,7 +62,7 @@ export const render = () => AppPanel({ children: <aside /> })`,
 		)
 		const moduleUrl = `data:text/javascript;base64,${Buffer.from(executable).toString(`base64`)}`
 		const module = await import(/* @vite-ignore */ moduleUrl)
-		const render = module.render ?? module.default
+		const render = module.render ?? module.default ?? module.AppPanel
 		const app = new Hono()
 		app.get(`/`, (context) => context.html(render()))
 		const response = await app.request(`/`)
