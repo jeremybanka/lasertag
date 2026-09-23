@@ -1,5 +1,20 @@
 export const jsxCleanupSafetyCases = [
 	...[
+		`export default wrap(() => <app-panel class={css.class}><aside /></app-panel>)`,
+		`export default () => <app-panel class={css.class}><aside /></app-panel>`,
+		`export default function () { return <app-panel class={css.class}><aside /></app-panel> }`,
+		`const component = wrap(() => <app-panel class={css.class}><aside /></app-panel>); export default component`,
+		`const component = wrap(() => <app-panel class={css.class}><aside /></app-panel>); export { component as default }`,
+	].map((declaration) => ({
+		name: `direct default component keeps its identity: ${declaration}`,
+		componentName: `default`,
+		source: `const css = { class: "class" }
+const wrap = (Render) => Render
+${declaration}
+export function LoadingPanel() { return <app-panel class={css.class}><span /></app-panel> }`,
+		html: `<app-panel class="class"><aside></aside></app-panel>`,
+	})),
+	...[
 		`<Show when={true} fallback={null} {...{ children: <app-panel class={css.class}><aside /></app-panel> }} />`,
 		`<For each={[]} {...{ fallback: <app-panel class={css.class}><aside /></app-panel> }}>{() => null}</For>`,
 		`<Index each={[]} {...{ fallback: <app-panel class={css.class}><aside /></app-panel> }}>{() => null}</Index>`,

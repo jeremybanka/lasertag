@@ -98,7 +98,8 @@ describe(`conservative JSX reachability`, () => {
 
 	it.each(conservativeJsxCases)(
 		`preserves reachable or unknown DOM: $name`,
-		({ source }) => {
+		(testCase) => {
+			const { source } = testCase
 			const { diagnostics, renderStory } = validateCssReachability(
 				{
 					tsxPath: `/project/AppPanel.tsx`,
@@ -108,7 +109,9 @@ describe(`conservative JSX reachability`, () => {
 				},
 				session,
 			)
-			expect(renderStory.componentName).toBe(`AppPanel`)
+			expect(renderStory.componentName).toBe(
+				`componentName` in testCase ? testCase.componentName : `AppPanel`,
+			)
 			expect(
 				diagnostics.filter((diagnostic) => diagnostic.code === `dead-selector`),
 			).toEqual([])

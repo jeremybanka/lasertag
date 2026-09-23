@@ -288,9 +288,10 @@ function addFunctionComponent(
 	index: ComponentIndex,
 	statement: ts.FunctionDeclaration,
 ) {
-	if (!statement.name || !statement.body) return
-
-	const name = statement.name.text
+	if (!statement.body) return
+	const isDefault = hasModifier(statement, ts.SyntaxKind.DefaultKeyword)
+	const name = statement.name?.text ?? (isDefault ? `default` : undefined)
+	if (!name) return
 
 	index.components.set(name, {
 		name,
@@ -303,7 +304,7 @@ function addFunctionComponent(
 		index.exportedNames.add(name)
 	}
 
-	if (hasModifier(statement, ts.SyntaxKind.DefaultKeyword)) {
+	if (isDefault) {
 		index.defaultExportName = name
 	}
 }
@@ -321,14 +322,54 @@ function addExportDeclaration(
 	}
 }
 
-function addExportAssignment(
+function addDefaultExport(
+	sourceFile: ts.SourceFile,
 	index: ComponentIndex,
-	statement: ts.ExportAssignment,
+	statement: ts.Statement,
 ) {
-	if (!ts.isIdentifier(statement.expression)) return
+	let expression: ts.Expression | undefined
+	let localName: string | undefined
+	if (ts.isExportAssignment(statement)) {
+		expression = unwrapExpression(statement.expression)
+		if (ts.isIdentifier(expression)) localName = expression.text
+	} else if (ts.isExportDeclaration(statement) && !statement.isTypeOnly) {
+		const clause = statement.exportClause
+		if (!clause || !ts.isNamedExports(clause)) return
+		const exported = clause.elements.find(
+			(element) => !element.isTypeOnly && element.name.text === `default`,
+		)
+		if (!exported) return
+		if (!statement.moduleSpecifier)
+			localName = (exported.propertyName ?? exported.name).text
+	} else if (
+		!ts.isClassDeclaration(statement) ||
+		!hasModifier(statement, ts.SyntaxKind.DefaultKeyword)
+	) {
+		return
+	}
 
-	index.defaultExportName = statement.expression.text
-	index.exportedNames.add(statement.expression.text)
+	if (localName && index.components.has(localName)) {
+		index.defaultExportName = localName
+		index.exportedNames.add(localName)
+		return
+	}
+
+	// `default` cannot collide with a JavaScript binding. Keep an unsupported
+	// default export here so selection cannot silently substitute a named export.
+	const name = `default`
+	const body = expression
+		? functionBodyFromExpression(expression, index)
+		: undefined
+	index.components.set(name, {
+		name,
+		...(body ? { body } : {}),
+		...(expression ? { initializer: expression } : {}),
+		range: rangeOf(sourceFile, statement),
+	})
+	if (!expression || mayBeComponentInitializer(expression))
+		index.mainCandidates.add(name)
+	index.defaultExportName = name
+	index.exportedNames.add(name)
 }
 
 function addImportDeclaration(
@@ -401,10 +442,10 @@ function collectComponentIndex(sourceFile: ts.SourceFile): ComponentIndex {
 			addExportDeclaration(index, statement)
 			continue
 		}
-
-		if (ts.isExportAssignment(statement)) {
-			addExportAssignment(index, statement)
-		}
+	}
+	// Resolve default aliases after every local declaration has been indexed.
+	for (const statement of sourceFile.statements) {
+		addDefaultExport(sourceFile, index, statement)
 	}
 
 	return index
@@ -476,7 +517,8 @@ function selectComponentStories(
 			.filter(([componentName, definition]) => {
 				const source = definition.body ?? definition.initializer
 				return (
-					isComponentName(componentName) &&
+					(isComponentName(componentName) ||
+						componentName === index.defaultExportName) &&
 					index.mainCandidates.has(componentName) &&
 					source !== undefined &&
 					containsJsx(source)

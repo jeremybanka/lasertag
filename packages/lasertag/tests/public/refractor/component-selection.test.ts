@@ -10,6 +10,42 @@ import { conservativeJsxCss } from "../fixtures/conservative-jsx.ts"
 const session = createTypescriptAstSession()
 afterAll(() => session.close())
 
+it.each([
+	`import Panel from "./unknown"; export default Panel`,
+	`export { Panel as default } from "./unknown"`,
+	`export default class { render() { return <app-panel class={css.class}><aside /></app-panel> } }`,
+])(`keeps unsupported default export identity: %s`, (declaration) => {
+	const { renderStory, diagnostics } = validateCssReachability(
+		{
+			tsxPath: `/project/AppPanel.tsx`,
+			tsxSource: `${declaration}
+export function LoadingPanel() { return <app-panel class={css.class}><span /></app-panel> }`,
+			cssSource: conservativeJsxCss,
+		},
+		session,
+	)
+	expect(renderStory.componentName).toBe(`default`)
+	expect(diagnostics.filter(({ code }) => code === `dead-selector`)).toEqual([])
+})
+
+it.each([
+	`export default () => <app-panel class={css.class}><span /></app-panel>`,
+	`export default function () { return <app-panel class={css.class}><span /></app-panel> }`,
+	`import { memo } from "react"; export default memo(() => <app-panel class={css.class}><span /></app-panel>)`,
+])(`retains precision for supported default exports: %s`, (declaration) => {
+	const { renderStory, diagnostics } = validateCssReachability(
+		{
+			tsxPath: `/project/AppPanel.tsx`,
+			tsxSource: `${declaration}
+export function LoadingPanel() { return <app-panel class={css.class}><aside /></app-panel> }`,
+			cssSource: conservativeJsxCss,
+		},
+		session,
+	)
+	expect(renderStory.componentName).toBe(`default`)
+	expect(diagnostics.map(({ code }) => code)).toEqual([`dead-selector`])
+})
+
 it(`keeps a Solid component result as a possible component binding`, () => {
 	const { diagnostics, renderStory } = validateCssReachability(
 		{
