@@ -9,6 +9,7 @@ export type CssClassRenderRootOptions = {
 	bindingName?: string
 	exportName?: string
 	missingAttachment?: `opaque` | `preserve`
+	preserveUnknownLocalRoots?: boolean
 }
 
 const DEFAULT_CSS_MODULE_BINDING = `css`
@@ -87,7 +88,13 @@ function scopedCssClassRenderRoots(
 	preserveUnknown = false,
 ): StoryChild[] {
 	return children.flatMap((child): StoryChild[] => {
-		if (child.kind === `opaque`) return preserveUnknown ? [child] : []
+		if (child.kind === `opaque`) {
+			if (child.mayContainCssClassRoot || preserveUnknown) return [child]
+			if (options.preserveUnknownLocalRoots && child.ownership !== `foreign`) {
+				return [{ ...child, mayContainCssClassRoot: true }]
+			}
+			return []
+		}
 		if (child.kind === `choice`) {
 			const alternatives = child.alternatives.map((alternative) =>
 				scopedCssClassRenderRoots(alternative, options, preserveUnknown),
@@ -121,6 +128,11 @@ export function scopeRenderStoryToCssClassRoots(
 	renderStory: RenderStory,
 	options: CssClassRenderRootOptions = {},
 ): RenderStory {
+	// Preserve the unscoped story when there are no known attachments. Only
+	// promote unknown local output alongside a discovered CSS ownership root.
+	if (findCssClassRenderRoots(renderStory.roots, options).length === 0) {
+		if (options.missingAttachment !== `opaque`) return renderStory
+	}
 	const roots = scopedCssClassRenderRoots(renderStory.roots, options)
 
 	if (roots.length > 0) return { ...renderStory, roots }

@@ -5,6 +5,7 @@ function structuralChildValue(child: StoryChild): unknown {
 		return {
 			kind: child.kind,
 			reason: child.reason,
+			...(child.mayContainCssClassRoot ? { mayContainCssClassRoot: true } : {}),
 			...(child.componentName ? { componentName: child.componentName } : {}),
 			...(child.expectedRootTagName
 				? { expectedRootTagName: child.expectedRootTagName }

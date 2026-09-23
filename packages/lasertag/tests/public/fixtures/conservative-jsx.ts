@@ -1,4 +1,15 @@
 export const conservativeJsxCases = [
+	...[
+		`<><app-panel class={css.class}><span /></app-panel><LocalPanel /></>`,
+		`props.ready ? <><app-panel class={css.class}><span /></app-panel><LocalPanel /></> : null`,
+		`<><app-panel class={css.class}><span /></app-panel>{renderPanel()}</>`,
+	].map((output) => ({
+		name: `unknown local output beside a known CSS root: ${output}`,
+		source: `function wrap(Render) { return Render }
+const LocalPanel = wrap(() => <app-panel class={css.class}><aside /></app-panel>)
+function renderPanel() { return <app-panel class={css.class}><aside /></app-panel> }
+export function AppPanel(props) { return ${output} }`,
+	})),
 	{
 		name: `Solid Dynamic explicit children`,
 		source: `import { Dynamic } from "solid-js/web"

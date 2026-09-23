@@ -2397,7 +2397,9 @@ function analyzeIndexedComponent(
 
 	return options.scopeToCssClassRoots === false
 		? renderStory
-		: scopeRenderStoryToCssClassRoots(renderStory)
+		: scopeRenderStoryToCssClassRoots(renderStory, {
+				preserveUnknownLocalRoots: true,
+			})
 }
 
 export function analyzeTsxRenderStory(
@@ -2435,7 +2437,9 @@ export function analyzeTsxRenderStory(
 
 			return options.scopeToCssClassRoots === false
 				? renderStory
-				: scopeRenderStoryToCssClassRoots(renderStory)
+				: scopeRenderStoryToCssClassRoots(renderStory, {
+						preserveUnknownLocalRoots: true,
+					})
 		},
 	)
 }
