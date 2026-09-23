@@ -73,6 +73,12 @@ similarly named user components are not given Solid semantics. Dynamic values
 remain opaque. Recognized portal-style, out-of-tree rendering is excluded from
 the component's descendant story.
 
+Intrinsic elements and supported framework components account for explicit
+`children` props and spreads as well as JSX bodies. Solid component bodies
+discard explicit children attributes even when the body contains only comments
+or formatting whitespace; spread children may still render. `For` and `Index`
+use the same effective-prop resolution before analyzing their render functions.
+
 Render-story ownership starts at the outermost rendered nodes whose `class` or
 `class:list` expression uses `css.class`. Wrappers and unrelated sibling roots
 are excluded before selector reachability runs. Unknown local expressions,

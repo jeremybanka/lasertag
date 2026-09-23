@@ -9,13 +9,19 @@ import {
 	conservativeJsxCases,
 	conservativeJsxCss,
 } from "../fixtures/conservative-jsx.ts"
+import { solidPropPrecedenceCases } from "../fixtures/solid-prop-precedence.ts"
 
 const session = createTypescriptAstSession()
 afterAll(() => session.close())
 
-it.each(conservativeJsxCases)(
-	`editor cleanup preserves live CSS for $name`,
-	({ source }) => {
+it.each([
+	...conservativeJsxCases.map((testCase) => ({ ...testCase, preserve: true })),
+	...solidPropPrecedenceCases
+		.filter(({ rendersAside }) => !rendersAside)
+		.map((testCase) => ({ ...testCase, preserve: false })),
+])(
+	`editor cleanup respects rendered children for $name`,
+	({ source, preserve }) => {
 		const { diagnostics } = validateCssReachability(
 			{
 				tsxPath: `/project/AppPanel.tsx`,
@@ -31,6 +37,6 @@ it.each(conservativeJsxCases)(
 				.filter((diagnostic) => diagnostic.code === `dead-selector`)
 				.flatMap((diagnostic) => (diagnostic.range ? [diagnostic.range] : [])),
 		)
-		expect(ranges).toEqual([])
+		expect(ranges).toHaveLength(preserve ? 0 : 1)
 	},
 )

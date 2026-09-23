@@ -9,10 +9,16 @@ import {
 	conservativeJsxCases,
 	conservativeJsxCss,
 } from "../fixtures/conservative-jsx.ts"
+import { solidPropPrecedenceCases } from "../fixtures/solid-prop-precedence.ts"
 
-it.each(conservativeJsxCases)(
-	`CLI fix preserves live CSS for $name`,
-	async ({ source }) => {
+it.each([
+	...conservativeJsxCases.map((testCase) => ({ ...testCase, preserve: true })),
+	...solidPropPrecedenceCases
+		.filter(({ rendersAside }) => !rendersAside)
+		.map((testCase) => ({ ...testCase, preserve: false })),
+])(
+	`CLI fix respects rendered children for $name`,
+	async ({ source, preserve }) => {
 		const root = mkdtempSync(path.join(tmpdir(), `lasertag-conservative-`))
 		try {
 			const messages: string[] = []
@@ -33,13 +39,15 @@ it.each(conservativeJsxCases)(
 			)
 			expect(result.mode).toBe(`fix`)
 			expect(result.files).toEqual([cssPath])
-			expect(result.fixedCount).toBe(0)
-			expect(result.changedFiles).toEqual([])
+			expect(result.fixedCount).toBe(preserve ? 0 : 1)
+			expect(result.changedFiles).toEqual(preserve ? [] : [cssPath])
 			expect(result.exitCode).toBe(result.diagnostics.length > 0 ? 1 : 0)
 			expect(messages.join(`\n`)).not.toMatch(
 				/failed|skipped|no render source/i,
 			)
-			expect(readFileSync(cssPath, `utf8`)).toBe(conservativeJsxCss)
+			const fixedCss = readFileSync(cssPath, `utf8`)
+			if (preserve) expect(fixedCss).toBe(conservativeJsxCss)
+			else expect(fixedCss).not.toContain(`> aside`)
 		} finally {
 			rmSync(root, { recursive: true, force: true })
 		}

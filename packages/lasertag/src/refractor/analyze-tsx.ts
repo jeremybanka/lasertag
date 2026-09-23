@@ -1638,13 +1638,13 @@ function resolveJsxProp(
 	const children =
 		name === `children` ? meaningfulJsxChildren(jsxChildren(node)) : []
 	const child = children[0]
-	const body = child ? jsxChildren(node) : undefined
 	// Solid's compiler can omit explicit children whenever a JSX body exists,
 	// including a comment-only body. Such an attribute cannot exclude a spread.
 	const solidChildrenBody =
 		semantics.bodyDiscardsChildrenAttribute &&
 		name === `children` &&
 		jsxChildren(node).length > 0
+	const body = child || solidChildrenBody ? jsxChildren(node) : undefined
 	if (
 		child &&
 		(!semantics.undefinedFallsThrough ||
@@ -1676,7 +1676,6 @@ function resolveJsxProp(
 			continue
 		attribute = candidate
 		const initializer = attribute.initializer
-		if (solidChildrenBody) continue
 		if (
 			!semantics.undefinedFallsThrough ||
 			!initializer ||
@@ -1815,6 +1814,7 @@ function analyzeJsxRenderProp(
 	name: string,
 	stack: string[],
 	semantics: RenderPropSemantics = {},
+	analyzeBodyChild?: (child: ts.JsxChild) => StoryChild[],
 ): StoryChild[] | undefined {
 	const { attribute, body, unknownSpread } = resolveJsxProp(
 		context,
@@ -1824,6 +1824,7 @@ function analyzeJsxRenderProp(
 	)
 	const rendered = body
 		? analyzeJsxChildrenWith(context, body, (child) => {
+				if (analyzeBodyChild) return analyzeBodyChild(child)
 				if (
 					semantics.allowFunction &&
 					ts.isJsxExpression(child) &&
@@ -1871,7 +1872,10 @@ function analyzeTransparentChildren(
 	semantics: RenderPropSemantics = {},
 ): StoryChild[] {
 	const children = jsxChildren(node)
-	if (!hasMeaningfulJsxChildren(children)) {
+	if (
+		!hasMeaningfulJsxChildren(children) &&
+		!semantics.bodyDiscardsChildrenAttribute
+	) {
 		// Comments do not override the children prop, but still carry directives.
 		analyzeJsxChildren(context, children, stack)
 	}
@@ -1891,23 +1895,12 @@ function analyzeSolidRepeatedChildren(
 	node: ComponentJsxNode,
 	stack: string[],
 ): StoryChild[] {
-	const children = jsxChildren(node)
-	const { attribute: childrenAttribute } = resolveJsxProp(
+	const analyzedChildren = analyzeJsxRenderProp(
 		context,
 		node,
 		`children`,
+		stack,
 		SOLID_RENDER_PROPS,
-	)
-	if (!hasMeaningfulJsxChildren(children) && childrenAttribute) {
-		return analyzeTransparentChildren(context, node, stack, SOLID_RENDER_PROPS)
-	}
-	const hasMeaningfulChild = children.some(
-		(child) =>
-			!ts.isJsxText(child) && !(ts.isJsxExpression(child) && !child.expression),
-	)
-	const analyzedChildren = analyzeJsxChildrenWith(
-		context,
-		children,
 		(child) => {
 			if (ts.isJsxText(child)) return []
 			if (ts.isJsxExpression(child) && !child.expression) return []
@@ -1930,7 +1923,7 @@ function analyzeSolidRepeatedChildren(
 		},
 	)
 
-	if (!hasMeaningfulChild) {
+	if (!analyzedChildren) {
 		return [
 			opaque(`Solid loop without a render function`, context.sourceFile, node),
 		]

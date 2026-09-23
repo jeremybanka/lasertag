@@ -70,13 +70,6 @@ export function AppPanel() {
 }`,
 	},
 	{
-		name: `Solid Dynamic explicit children with comment`,
-		source: `import { Dynamic } from "solid-js/web"
-export function AppPanel() {
-	return <Dynamic component="app-panel" class={css.class} children={<aside />}>{/* explanation */}</Dynamic>
-}`,
-	},
-	{
 		name: `Solid Dynamic spread children with fixed component`,
 		source: `import { Dynamic } from "solid-js/web"
 export function AppPanel(props) {
@@ -195,24 +188,10 @@ export function AppPanel() {
 }`,
 	},
 	{
-		name: `Solid children prop with comment`,
-		source: `import { Show } from "solid-js"
-export function AppPanel() {
-	return <app-panel class={css.class}><Show when={true} children={<aside />}>{/* explanation */}</Show></app-panel>
-}`,
-	},
-	{
 		name: `custom component named Fragment`,
 		source: `function Fragment() { return <aside /> }
 export function AppPanel() {
 	return <app-panel class={css.class}><Fragment><span /></Fragment></app-panel>
-}`,
-	},
-	{
-		name: `Solid Switch explicit children`,
-		source: `import { Switch, Match } from "solid-js"
-export function AppPanel() {
-	return <app-panel class={css.class}><Switch children={<Match when={true}><aside /></Match>}>{/* explanation */}</Switch></app-panel>
 }`,
 	},
 	{

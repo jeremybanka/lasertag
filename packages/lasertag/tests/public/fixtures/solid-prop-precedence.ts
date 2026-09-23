@@ -1,4 +1,17 @@
 export const solidPropPrecedenceCases = [
+	...[`{/* explanation */}`, `\n\t\t`].flatMap((body) =>
+		[
+			`<Show when={true} children={<aside />}>${body}</Show>`,
+			`<Dynamic component="app-panel" class={css.class} children={<aside />}>${body}</Dynamic>`,
+			`<Switch><Match when={true} children={<aside />}>${body}</Match></Switch>`,
+			`<For each={[]} children={() => <aside />}>${body}</For>`,
+			`<Index each={[]} children={() => <aside />}>${body}</Index>`,
+		].map((output) => ({
+			name: `Solid body discards explicit children: ${output}`,
+			output,
+			rendersAside: false,
+		})),
+	),
 	{
 		name: `Solid comparison result overrides spread children`,
 		output: `<Show {...props} when={true} fallback={null}>{1 === 0}</Show>`,
@@ -76,7 +89,7 @@ export const solidPropPrecedenceCases = [
 	},
 ].map(({ output, ...testCase }) => ({
 	...testCase,
-	source: `import { Show, For } from "solid-js"
+	source: `import { Show, For, Index, Switch, Match } from "solid-js"
 import { Dynamic } from "solid-js/web"
 const css = { class: "class" }
 export function AppPanel(props) {
