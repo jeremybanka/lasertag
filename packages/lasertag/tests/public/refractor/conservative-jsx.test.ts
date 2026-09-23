@@ -14,6 +14,29 @@ afterAll(() => session.close())
 
 describe(`conservative JSX reachability`, () => {
 	it.each([
+		`"text"`,
+		`42`,
+		`true`,
+		`false`,
+		`null`,
+		`42n`,
+		"`text`",
+		"`value ${42}`",
+		`-1`,
+		`void 0`,
+		`typeof value`,
+	])(`literal sibling cannot supply an element root: %s`, (value) => {
+		const { diagnostics } = validateCssReachability(
+			{
+				tsxPath: `/project/AppPanel.tsx`,
+				tsxSource: `export function AppPanel() { return <><app-panel class={css.class}><span /></app-panel>{${value}}</> }`,
+				cssSource: conservativeJsxCss,
+			},
+			session,
+		)
+		expect(diagnostics.map(({ code }) => code)).toEqual([`dead-selector`])
+	})
+	it.each([
 		`const items = [1, 2]`,
 		`const items: readonly number[] = [1, 2]`,
 		`const items: [number, number] = [1, 2]`,

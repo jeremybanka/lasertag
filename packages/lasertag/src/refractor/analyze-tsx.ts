@@ -222,34 +222,79 @@ function isComponentFactoryModule(moduleName: string): boolean {
 	return moduleName === `react` || moduleName === `preact/compat`
 }
 
-function mayBeComponentInitializer(expression: ts.Expression): boolean {
+type ExpressionValueFacts = {
+	mayBeCallable: boolean
+	mayBeUndefined: boolean
+	mayRenderElements: boolean
+}
+
+function expressionValueFacts(expression: ts.Expression): ExpressionValueFacts {
 	expression = unwrapExpression(expression)
-	if (ts.isJsxElement(expression) || ts.isJsxSelfClosingElement(expression)) {
-		// Solid component JSX evaluates to the component's return value, which
-		// may itself be callable. Only intrinsic JSX is known to be non-callable.
-		const tagName = jsxTagName(expression)
-		return !ts.isIdentifier(tagName) || !isIntrinsicJsxTag(tagName.text)
-	}
 	if (ts.isConditionalExpression(expression)) {
-		return (
-			mayBeComponentInitializer(expression.whenTrue) ||
-			mayBeComponentInitializer(expression.whenFalse)
-		)
+		const left = expressionValueFacts(expression.whenTrue)
+		const right = expressionValueFacts(expression.whenFalse)
+		return {
+			mayBeCallable: left.mayBeCallable || right.mayBeCallable,
+			mayBeUndefined: left.mayBeUndefined || right.mayBeUndefined,
+			mayRenderElements: left.mayRenderElements || right.mayRenderElements,
+		}
 	}
-	// Keep calls, aliases, and other unknown bindings as possible components,
-	// but do not let statically non-callable exports compete with a component.
-	return !(
-		ts.isLiteralExpression(expression) ||
+	if (ts.isVoidExpression(expression)) {
+		return {
+			mayBeCallable: false,
+			mayBeUndefined: true,
+			mayRenderElements: false,
+		}
+	}
+	if (
+		ts.isStringLiteralLikeNode(expression) ||
+		ts.isNumericLiteral(expression) ||
+		ts.isBigIntLiteral(expression) ||
 		ts.isTemplateExpression(expression) ||
 		ts.isPrefixUnaryExpression(expression) ||
+		ts.isPostfixUnaryExpression(expression) ||
 		ts.isTypeOfExpression(expression) ||
-		ts.isVoidExpression(expression) ||
-		ts.isObjectLiteralExpression(expression) ||
-		ts.isArrayLiteralExpression(expression) ||
+		ts.isDeleteExpression(expression) ||
 		expression.kind === ts.SyntaxKind.NullKeyword ||
 		expression.kind === ts.SyntaxKind.TrueKeyword ||
 		expression.kind === ts.SyntaxKind.FalseKeyword
-	)
+	) {
+		return {
+			mayBeCallable: false,
+			mayBeUndefined: false,
+			mayRenderElements: false,
+		}
+	}
+	if (isFunctionExpression(expression) || ts.isClassExpression(expression)) {
+		return {
+			mayBeCallable: true,
+			mayBeUndefined: false,
+			mayRenderElements: true,
+		}
+	}
+	const intrinsicJsx =
+		(ts.isJsxElement(expression) || ts.isJsxSelfClosingElement(expression)) &&
+		ts.isIdentifier(jsxTagName(expression)) &&
+		isIntrinsicJsxTag(jsxTagName(expression).getText())
+	if (
+		ts.isArrayLiteralExpression(expression) ||
+		ts.isObjectLiteralExpression(expression) ||
+		ts.isRegularExpressionLiteral(expression) ||
+		intrinsicJsx
+	) {
+		return {
+			mayBeCallable: false,
+			mayBeUndefined: false,
+			mayRenderElements: true,
+		}
+	}
+	// Calls, aliases, and Solid component JSX can return arbitrary values,
+	// including functions or undefined. Share that uncertainty across consumers.
+	return { mayBeCallable: true, mayBeUndefined: true, mayRenderElements: true }
+}
+
+function mayBeComponentInitializer(expression: ts.Expression): boolean {
+	return expressionValueFacts(expression).mayBeCallable
 }
 
 function addVariableComponents(
@@ -1450,26 +1495,7 @@ const SOLID_RENDER_PROPS: RenderPropSemantics = {
 }
 
 function isDefinitelyDefined(expression: ts.Expression): boolean {
-	expression = unwrapExpression(expression)
-	if (ts.isJsxElement(expression) || ts.isJsxSelfClosingElement(expression)) {
-		const tagName = jsxTagName(expression)
-		return ts.isIdentifier(tagName) && isIntrinsicJsxTag(tagName.text)
-	}
-	if (ts.isConditionalExpression(expression)) {
-		return (
-			isDefinitelyDefined(expression.whenTrue) &&
-			isDefinitelyDefined(expression.whenFalse)
-		)
-	}
-	return (
-		ts.isArrayLiteralExpression(expression) ||
-		ts.isObjectLiteralExpression(expression) ||
-		isFunctionExpression(expression) ||
-		ts.isLiteralExpression(expression) ||
-		expression.kind === ts.SyntaxKind.NullKeyword ||
-		expression.kind === ts.SyntaxKind.TrueKeyword ||
-		expression.kind === ts.SyntaxKind.FalseKeyword
-	)
+	return !expressionValueFacts(expression).mayBeUndefined
 }
 
 function meaningfulJsxChildren(
@@ -2489,6 +2515,8 @@ function analyzeExpression(
 		}
 	}
 
+	if (!expressionValueFacts(expression).mayRenderElements) return []
+
 	if (ts.isArrayLiteralExpression(expression)) {
 		return expression.elements.flatMap((element) =>
 			ts.isSpreadElement(element)
@@ -2511,9 +2539,6 @@ function analyzeExpression(
 				: opaque(`unsupported render call`, context.sourceFile, expression),
 		]
 	}
-
-	if (expression.kind === ts.SyntaxKind.NullKeyword) return []
-	if (expression.kind === ts.SyntaxKind.FalseKeyword) return []
 
 	if (isChildrenExpression(expression)) {
 		return [
