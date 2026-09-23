@@ -45,6 +45,11 @@ paths. Foreign opaque paths carry ownership metadata so selectors that may
 match their DOM can be distinguished from selectors that are merely
 inconclusive. Unsupported selector shapes are unknown too.
 
+Array `map` callbacks are expanded when TypeScript resolves the method to the
+standard `Array` or `ReadonlyArray` declaration. Typed arrays and array literals
+retain precise analysis; custom methods and unresolved or untyped receivers stay
+unknown because their callbacks may not describe the call's complete output.
+
 An `@lasertag-adopt-subtree` opening-tag directive on an imported component
 instance requests validated adoption of that instance's render story. The
 directive is a block comment among the opening tag's attributes. Directly

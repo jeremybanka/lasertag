@@ -14,6 +14,22 @@ afterAll(() => session.close())
 
 describe(`conservative JSX reachability`, () => {
 	it.each([
+		`const items = [1, 2]`,
+		`const items: readonly number[] = [1, 2]`,
+		`const items: [number, number] = [1, 2]`,
+	])(`keeps standard array map analysis precise: %s`, (declaration) => {
+		const { diagnostics } = validateCssReachability(
+			{
+				tsxPath: `/project/AppPanel.tsx`,
+				tsxSource: `${declaration}
+export function AppPanel() { return <app-panel class={css.class}>{items.map(() => <span />)}</app-panel> }`,
+				cssSource: conservativeJsxCss,
+			},
+			session,
+		)
+		expect(diagnostics.map(({ code }) => code)).toEqual([`dead-selector`])
+	})
+	it.each([
 		[
 			`import { Fragment } from "react"`,
 			`<Fragment>{/* @lasertag-adopt-subtree */}</Fragment>`,

@@ -3,6 +3,12 @@ import { solidPropPrecedenceCases } from "./solid-prop-precedence.ts"
 
 export const conservativeJsxCases = [
 	...jsxCleanupSafetyCases,
+	{
+		name: `unresolved map receiver remains uncertain`,
+		source: `export function AppPanel({ renderer }) {
+	return <app-panel class={css.class}>{renderer.map(() => <span />)}</app-panel>
+}`,
+	},
 	...solidPropPrecedenceCases.filter(({ rendersAside }) => rendersAside),
 	...[
 		`const React = { Fragment: () => <aside /> }`,

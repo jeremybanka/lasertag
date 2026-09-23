@@ -13,6 +13,7 @@ import {
 /** A synchronous, single-owner TypeScript parser session for batched analysis. */
 export type TypescriptAstAnalysis = {
 	resolveAliasedDeclarations(node: Node): Node[]
+	isDefaultLibrary?(sourceFile: SourceFile): boolean
 }
 
 export type TypescriptAstSession = {
@@ -31,6 +32,12 @@ function createTypescriptAstAnalysis(
 	rootFilePath: string,
 ): TypescriptAstAnalysis {
 	return {
+		isDefaultLibrary(sourceFile) {
+			return (
+				project.program.getSourceFileMetadata(sourceFile.fileName)
+					?.isDefaultLibrary === true
+			)
+		},
 		resolveAliasedDeclarations(node) {
 			const symbol = project.checker.getSymbolAtLocation(node)
 

@@ -2390,10 +2390,30 @@ function analyzeMapCall(
 	node: ts.CallExpression,
 	stack: string[],
 ): StoryChild[] | undefined {
-	if (!ts.isPropertyAccessExpression(node.expression)) return
-	if (node.expression.name.text !== `map`) return
+	const callee = unwrapExpression(node.expression)
+	if (!ts.isPropertyAccessExpression(callee) || callee.name.text !== `map`)
+		return
+	const declarations = resolveDeclarations(context, callee.name)
+	if (
+		declarations.length === 0 ||
+		!declarations.every((declaration) => {
+			const parent = declaration.parent
+			return (
+				declaration.kind === ts.SyntaxKind.MethodSignature &&
+				ts.isInterfaceDeclaration(parent) &&
+				(parent.name.text === `Array` ||
+					parent.name.text === `ReadonlyArray`) &&
+				context.typescriptAnalysis.isDefaultLibrary?.(
+					declaration.getSourceFile(),
+				) === true
+			)
+		})
+	)
+		return
 
 	const callback = node.arguments[0]
+		? unwrapExpression(node.arguments[0])
+		: undefined
 
 	if (!callback)
 		return [opaque(`map call without callback`, context.sourceFile, node)]

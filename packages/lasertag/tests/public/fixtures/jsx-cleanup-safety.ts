@@ -1,5 +1,18 @@
 export const jsxCleanupSafetyCases = [
 	...[
+		`const renderer = { map(render) { return <aside>{render()}</aside> } }`,
+		`class Renderer { map(render) { return <aside>{render()}</aside> } }; const renderer = new Renderer()`,
+	].map((declaration) => ({
+		name: `custom map method adds DOM: ${declaration}`,
+		source: `const css = { class: "class" }
+${declaration}
+export function AppPanel() {
+	return <app-panel class={css.class}>{renderer.map(() => <span />)}</app-panel>
+}
+export const render = () => <AppPanel />`,
+		html: `<app-panel class="class"><aside><span></span></aside></app-panel>`,
+	})),
+	...[
 		`export default wrap(() => <app-panel class={css.class}><aside /></app-panel>)`,
 		`export default () => <app-panel class={css.class}><aside /></app-panel>`,
 		`export default function () { return <app-panel class={css.class}><aside /></app-panel> }`,
