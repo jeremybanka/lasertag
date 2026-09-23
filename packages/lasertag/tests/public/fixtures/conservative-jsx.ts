@@ -1,4 +1,7 @@
+import { solidPropPrecedenceCases } from "./solid-prop-precedence.ts"
+
 export const conservativeJsxCases = [
+	...solidPropPrecedenceCases.filter(({ rendersAside }) => rendersAside),
 	...[
 		`const React = { Fragment: () => <aside /> }`,
 		`import React from "./custom-runtime"`,

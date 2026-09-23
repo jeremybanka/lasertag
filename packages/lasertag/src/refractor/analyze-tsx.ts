@@ -1336,27 +1336,117 @@ function hasShadowedBinding(
 	})
 }
 
-function findJsxAttribute(
-	context: AnalyzeContext,
-	node: ComponentJsxNode,
-	name: string,
-): ts.JsxAttribute | undefined {
-	for (const attribute of [...jsxAttributes(node).properties].reverse()) {
-		if (ts.isJsxSpreadAttribute(attribute)) continue
-		if (attribute.name.getText(context.sourceFile) === name) return attribute
-	}
+type RenderPropSemantics = {
+	allowFunction?: boolean
+	undefinedFallsThrough?: boolean
 }
 
-function hasUnknownJsxProp(
+const SOLID_RENDER_PROPS: RenderPropSemantics = {
+	allowFunction: true,
+	undefinedFallsThrough: true,
+}
+
+function isDefinitelyDefined(expression: ts.Expression): boolean {
+	expression = unwrapExpression(expression)
+	if (ts.isJsxElement(expression) || ts.isJsxSelfClosingElement(expression)) {
+		const tagName = jsxTagName(expression)
+		return ts.isIdentifier(tagName) && isIntrinsicJsxTag(tagName.text)
+	}
+	if (ts.isConditionalExpression(expression)) {
+		return (
+			isDefinitelyDefined(expression.whenTrue) &&
+			isDefinitelyDefined(expression.whenFalse)
+		)
+	}
+	return (
+		ts.isArrayLiteralExpression(expression) ||
+		ts.isObjectLiteralExpression(expression) ||
+		isFunctionExpression(expression) ||
+		ts.isLiteralExpression(expression) ||
+		expression.kind === ts.SyntaxKind.NullKeyword ||
+		expression.kind === ts.SyntaxKind.TrueKeyword ||
+		expression.kind === ts.SyntaxKind.FalseKeyword
+	)
+}
+
+function meaningfulJsxChildren(
+	children: readonly ts.JsxChild[],
+): ts.JsxChild[] {
+	return children.filter((child) => {
+		if (ts.isJsxExpression(child) && !child.expression) return false
+		if (ts.isJsxText(child))
+			return child.text.trim().length > 0 || !/[\r\n]/.test(child.text)
+		return true
+	})
+}
+
+function resolveJsxProp(
 	context: AnalyzeContext,
 	node: ComponentJsxNode,
 	name: string,
-): boolean {
-	for (const attribute of [...jsxAttributes(node).properties].reverse()) {
-		if (ts.isJsxSpreadAttribute(attribute)) return true
-		if (attribute.name.getText(context.sourceFile) === name) return false
+	semantics: RenderPropSemantics = {},
+): {
+	attribute?: ts.JsxAttribute
+	body?: readonly ts.JsxChild[]
+	unknownSpread: boolean
+} {
+	const children =
+		name === `children` ? meaningfulJsxChildren(jsxChildren(node)) : []
+	const child = children[0]
+	const body = child ? jsxChildren(node) : undefined
+	// Solid's compiler can omit explicit children whenever a JSX body exists,
+	// including a comment-only body. Such an attribute cannot exclude a spread.
+	const solidChildrenBody =
+		semantics.undefinedFallsThrough &&
+		name === `children` &&
+		jsxChildren(node).length > 0
+	if (
+		child &&
+		(!semantics.undefinedFallsThrough ||
+			children.length > 1 ||
+			ts.isJsxText(child) ||
+			(ts.isJsxExpression(child)
+				? child.expression && isDefinitelyDefined(child.expression)
+				: isDefinitelyDefined(child)))
+	) {
+		return { body: jsxChildren(node), unknownSpread: false }
 	}
-	return false
+
+	let attribute: ts.JsxAttribute | undefined
+	let unknownSpread = false
+	const attributes = jsxAttributes(node).properties
+	for (let index = attributes.length - 1; index >= 0; index--) {
+		const candidate = attributes[index]!
+		if (ts.isJsxSpreadAttribute(candidate)) {
+			unknownSpread = true
+			continue
+		}
+		// The JSX body replaces explicit children attributes. Within one prop
+		// object, duplicate attributes also use ordinary last-write precedence.
+		if (
+			body ||
+			attribute ||
+			candidate.name.getText(context.sourceFile) !== name
+		)
+			continue
+		attribute = candidate
+		const initializer = attribute.initializer
+		if (solidChildrenBody) continue
+		if (
+			!semantics.undefinedFallsThrough ||
+			!initializer ||
+			!ts.isJsxExpression(initializer) ||
+			(initializer.expression && isDefinitelyDefined(initializer.expression))
+		)
+			break
+		// Solid mergeProps skips undefined between prop sources, so an earlier
+		// spread can remain live even after an explicit attribute or JSX body.
+	}
+	return {
+		...(attribute ? { attribute } : {}),
+		...(body ? { body } : {}),
+		unknownSpread,
+	}
 }
 
 function resolveImportBinding(
@@ -1471,12 +1561,7 @@ function analyzeJsxAttributeRenderValue(
 }
 
 function hasMeaningfulJsxChildren(children: readonly ts.JsxChild[]): boolean {
-	return children.some((child) => {
-		if (ts.isJsxExpression(child) && !child.expression) return false
-		if (ts.isJsxText(child))
-			return child.text.trim().length > 0 || !/[\r\n]/.test(child.text)
-		return true
-	})
+	return meaningfulJsxChildren(children).length > 0
 }
 
 function analyzeJsxRenderProp(
@@ -1484,13 +1569,36 @@ function analyzeJsxRenderProp(
 	node: ComponentJsxNode,
 	name: string,
 	stack: string[],
-	allowFunction = false,
+	semantics: RenderPropSemantics = {},
 ): StoryChild[] | undefined {
-	const attribute = findJsxAttribute(context, node, name)
-	const rendered = attribute
-		? analyzeJsxAttributeRenderValue(context, attribute, stack, allowFunction)
-		: undefined
-	if (hasUnknownJsxProp(context, node, name)) {
+	const { attribute, body, unknownSpread } = resolveJsxProp(
+		context,
+		node,
+		name,
+		semantics,
+	)
+	const rendered = body
+		? analyzeJsxChildrenWith(context, body, (child) => {
+				if (
+					semantics.allowFunction &&
+					ts.isJsxExpression(child) &&
+					child.expression
+				) {
+					const functionBody = functionBodyFromExpression(child.expression)
+					if (functionBody)
+						return analyzeFunctionBody(context, functionBody, stack)
+				}
+				return analyzeJsxChild(context, child, stack)
+			})
+		: attribute
+			? analyzeJsxAttributeRenderValue(
+					context,
+					attribute,
+					stack,
+					semantics.allowFunction,
+				)
+			: undefined
+	if (unknownSpread) {
 		return [
 			choice(
 				[
@@ -1515,24 +1623,14 @@ function analyzeTransparentChildren(
 	context: AnalyzeContext,
 	node: ComponentJsxNode,
 	stack: string[],
-	allowFunction = false,
+	semantics: RenderPropSemantics = {},
 ): StoryChild[] {
 	const children = jsxChildren(node)
 	if (!hasMeaningfulJsxChildren(children)) {
 		// Comments do not override the children prop, but still carry directives.
 		analyzeJsxChildren(context, children, stack)
-		return (
-			analyzeJsxRenderProp(context, node, `children`, stack, allowFunction) ??
-			[]
-		)
 	}
-	return analyzeJsxChildrenWith(context, children, (child) => {
-		if (allowFunction && ts.isJsxExpression(child) && child.expression) {
-			const body = functionBodyFromExpression(child.expression)
-			if (body) return analyzeFunctionBody(context, body, stack)
-		}
-		return analyzeJsxChild(context, child, stack)
-	})
+	return analyzeJsxRenderProp(context, node, `children`, stack, semantics) ?? []
 }
 
 function analyzeSolidTransparentChildren(
@@ -1540,7 +1638,7 @@ function analyzeSolidTransparentChildren(
 	node: ComponentJsxNode,
 	stack: string[],
 ): StoryChild[] {
-	return analyzeTransparentChildren(context, node, stack, true)
+	return analyzeTransparentChildren(context, node, stack, SOLID_RENDER_PROPS)
 }
 
 function analyzeSolidRepeatedChildren(
@@ -1549,9 +1647,14 @@ function analyzeSolidRepeatedChildren(
 	stack: string[],
 ): StoryChild[] {
 	const children = jsxChildren(node)
-	const childrenAttribute = findJsxAttribute(context, node, `children`)
+	const { attribute: childrenAttribute } = resolveJsxProp(
+		context,
+		node,
+		`children`,
+		SOLID_RENDER_PROPS,
+	)
 	if (!hasMeaningfulJsxChildren(children) && childrenAttribute) {
-		return analyzeTransparentChildren(context, node, stack, true)
+		return analyzeTransparentChildren(context, node, stack, SOLID_RENDER_PROPS)
 	}
 	const hasMeaningfulChild = children.some(
 		(child) =>
@@ -1595,7 +1698,13 @@ function analyzeSolidFallback(
 	node: ComponentJsxNode,
 	stack: string[],
 ): StoryChild[] | undefined {
-	return analyzeJsxRenderProp(context, node, `fallback`, stack, true)
+	return analyzeJsxRenderProp(
+		context,
+		node,
+		`fallback`,
+		stack,
+		SOLID_RENDER_PROPS,
+	)
 }
 
 function analyzeSolidSwitchAlternatives(
@@ -1715,10 +1824,15 @@ function lowerSolidComponent(
 				jsxChildren(node),
 				stack,
 			)
+			const childrenProp = resolveJsxProp(
+				context,
+				node,
+				`children`,
+				SOLID_RENDER_PROPS,
+			)
 			if (
 				!hasMeaningfulJsxChildren(jsxChildren(node)) &&
-				(findJsxAttribute(context, node, `children`) ||
-					hasUnknownJsxProp(context, node, `children`))
+				(childrenProp.attribute || childrenProp.unknownSpread)
 			) {
 				alternatives.push([
 					foreignOpaque(`Solid Switch render props`, context.sourceFile, node),
@@ -1757,9 +1871,14 @@ function lowerSolidComponent(
 		binding.moduleName === `solid-js/web` &&
 		binding.importedName === `Dynamic`
 	) {
-		const componentAttribute = findJsxAttribute(context, node, `component`)
+		const { attribute: componentAttribute, unknownSpread } = resolveJsxProp(
+			context,
+			node,
+			`component`,
+			SOLID_RENDER_PROPS,
+		)
 		const componentValue =
-			componentAttribute && !hasUnknownJsxProp(context, node, `component`)
+			componentAttribute && !unknownSpread
 				? dynamicComponentValue(context, componentAttribute)
 				: undefined
 
