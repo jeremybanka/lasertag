@@ -37,6 +37,37 @@ export const cleanedHonoCssSource = `project-card.class {
 
 export const honoCleanupCases = [
 	{
+		name: `unknown wrapped sibling supplies another CSS root`,
+		source: `const css = { class: "class" }
+function wrap(Render) { return Render }
+const LocalPanel = wrap(() => <app-panel class={css.class}><aside /></app-panel>)
+export function AppPanel() {
+	return <><app-panel class={css.class}><span /></app-panel><LocalPanel /></>
+}
+export const render = () => AppPanel()`,
+		html: `<app-panel class="class"><span></span></app-panel><app-panel class="class"><aside></aside></app-panel>`,
+	},
+	...([`Fragment`, `undefined`] as const).map((name) => ({
+		name: `render value named ${name} supplies an aside`,
+		source: `import { Fragment as Group } from "hono/jsx"
+const css = { class: "class" }
+export function AppPanel({ ${name} }) {
+	return <app-panel class={css.class}><Group children={${name}} /></app-panel>
+}
+export const render = () => AppPanel({ ${name}: <aside /> })`,
+		html: `<app-panel class="class"><aside></aside></app-panel>`,
+	})),
+	{
+		name: `local React.Fragment supplies its own DOM`,
+		source: `const css = { class: "class" }
+const React = { Fragment: () => <aside /> }
+export function AppPanel() {
+	return <app-panel class={css.class}><React.Fragment><span /></React.Fragment></app-panel>
+}
+export const render = () => AppPanel()`,
+		html: `<app-panel class="class"><aside></aside></app-panel>`,
+	},
+	{
 		name: `unknown wrapped main keeps its identity`,
 		source: `const css = { class: "class" }
 function decorate(Render) { return Render }

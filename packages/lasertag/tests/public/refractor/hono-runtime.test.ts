@@ -12,9 +12,25 @@ import { honoCleanupCases } from "../fixtures/hono.ts"
 const session = createTypescriptAstSession()
 afterAll(() => session.close())
 
-it.each(honoCleanupCases)(
-	`preserves CSS for actual Hono output: $name`,
-	async ({ source, html }) => {
+it.each([
+	...honoCleanupCases.map((testCase) => ({ ...testCase, dead: false })),
+	...[
+		`<Fragment {...props}>{undefined}</Fragment>`,
+		`<Fragment {...props} children={undefined} />`,
+	].map((output) => ({
+		name: `undefined replaces Hono spread children: ${output}`,
+		source: `import { Fragment } from "hono/jsx"
+const css = { class: "class" }
+export function AppPanel(props) {
+	return <app-panel class={css.class}>${output}</app-panel>
+}
+export const render = () => AppPanel({ children: <aside /> })`,
+		html: `<app-panel class="class"></app-panel>`,
+		dead: true,
+	})),
+])(
+	`matches CSS reachability to actual Hono output: $name`,
+	async ({ source, html, dead }) => {
 		const { code } = await transform(`AppPanel.tsx`, source, {
 			lang: `tsx`,
 			jsx: { runtime: `automatic`, importSource: `hono/jsx` },
@@ -41,8 +57,8 @@ it.each(honoCleanupCases)(
 			},
 			session,
 		)
-		expect(diagnostics.filter(({ code }) => code === `dead-selector`)).toEqual(
-			[],
-		)
+		expect(
+			diagnostics.filter(({ code }) => code === `dead-selector`),
+		).toHaveLength(dead ? 1 : 0)
 	},
 )

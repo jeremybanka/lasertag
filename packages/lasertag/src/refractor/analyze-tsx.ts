@@ -2211,7 +2211,7 @@ function lowerHonoComponent(
 			node,
 			`fallbackRender`,
 			stack,
-			true,
+			{ allowFunction: true },
 		)
 		if (fallbackRender) {
 			alternatives.push(fallbackRender)
