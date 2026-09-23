@@ -1174,7 +1174,16 @@ function isFragmentJsxTag(
 			].includes(binding.moduleName)
 		)
 	}
-	if (context.components.has(tagName)) return false
+	const root = expressionRoot(name)
+	if (
+		!ts.isIdentifier(root) ||
+		context.components.has(root.text) ||
+		context.imports.has(root.text) ||
+		context.namespaceImports.has(root.text) ||
+		resolveDeclarations(context, root).length > 0
+	)
+		return false
+	// Keep the legacy spelling fallback only for an unbound framework global.
 	return tagName === `Fragment` || tagName === `React.Fragment`
 }
 
@@ -1291,16 +1300,21 @@ function resolveDeclarations(
 	return declarations
 }
 
-function hasShadowedBinding(
-	context: AnalyzeContext,
-	expression: ts.Expression,
-): boolean {
+function expressionRoot(expression: ts.Expression): ts.Expression {
 	let root = unwrapExpression(expression)
 	while (
 		ts.isPropertyAccessExpression(root) ||
 		ts.isElementAccessExpression(root)
 	)
 		root = unwrapExpression(root.expression)
+	return root
+}
+
+function hasShadowedBinding(
+	context: AnalyzeContext,
+	expression: ts.Expression,
+): boolean {
+	const root = expressionRoot(expression)
 	if (!ts.isIdentifier(root)) return false
 	const definition = context.components.get(root.text)
 	return resolveDeclarations(context, root).some((declaration) => {
@@ -1417,15 +1431,7 @@ function isImportedCall(
 function expressionRootIdentifier(
 	expression: ts.Expression,
 ): string | undefined {
-	let current = expression
-
-	while (
-		ts.isPropertyAccessExpression(current) ||
-		ts.isElementAccessExpression(current)
-	) {
-		current = current.expression
-	}
-
+	const current = expressionRoot(expression)
 	return ts.isIdentifier(current) ? current.text : undefined
 }
 

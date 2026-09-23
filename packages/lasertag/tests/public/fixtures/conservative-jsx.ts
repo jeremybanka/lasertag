@@ -1,5 +1,16 @@
 export const conservativeJsxCases = [
 	...[
+		`const React = { Fragment: () => <aside /> }`,
+		`import React from "./custom-runtime"`,
+		`import { runtime as React } from "./custom-runtime"`,
+	].map((declaration) => ({
+		name: `bound React.Fragment is not a framework fragment: ${declaration}`,
+		source: `${declaration}
+export function AppPanel() {
+	return <app-panel class={css.class}><React.Fragment><span /></React.Fragment></app-panel>
+}`,
+	})),
+	...[
 		[`{ Fragment }`, `Fragment`],
 		[`{ Fragment }`, `(Fragment as unknown)!`],
 		[`{ undefined }`, `undefined`],
