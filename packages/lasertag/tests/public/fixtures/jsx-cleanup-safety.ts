@@ -1,5 +1,21 @@
 export const jsxCleanupSafetyCases = [
 	...[
+		`<app-panel class={css.class} children={<aside />} />`,
+		`<app-panel class={css.class} children={<aside />}></app-panel>`,
+		`<app-panel class={css.class} {...{ children: <aside /> }} />`,
+		`<app-panel class={css.class} {...{ children: <aside /> }}></app-panel>`,
+		`<app-panel class={css.class} children={<span />} {...{ children: <aside /> }} />`,
+		`<app-panel class={css.class} {...{ children: <aside /> }} children={undefined} />`,
+	].map((output) => ({
+		name: `intrinsic children props: ${output}`,
+		source: `const css = { class: "class" }
+export function AppPanel() { return ${output} }
+export const render = () => <AppPanel />`,
+		html: output.includes(`...`)
+			? `<app-panel class="class " ><aside></aside></app-panel>`
+			: `<app-panel class="class"><aside></aside></app-panel>`,
+	})),
+	...[
 		`const renderer = { map(render) { return <aside>{render()}</aside> } }`,
 		`class Renderer { map(render) { return <aside>{render()}</aside> } }; const renderer = new Renderer()`,
 	].map((declaration) => ({

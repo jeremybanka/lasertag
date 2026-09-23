@@ -1526,10 +1526,18 @@ function hasShadowedBinding(
 type RenderPropSemantics = {
 	allowFunction?: boolean
 	undefinedFallsThrough?: boolean
+	bodyDiscardsChildrenAttribute?: boolean
 }
 
 const SOLID_RENDER_PROPS: RenderPropSemantics = {
 	allowFunction: true,
+	undefinedFallsThrough: true,
+	bodyDiscardsChildrenAttribute: true,
+}
+
+// Intrinsic JSX does not identify its runtime. Preserve Solid's possible
+// undefined fallthrough as well as React-style explicit children in empty bodies.
+const INTRINSIC_RENDER_PROPS: RenderPropSemantics = {
 	undefinedFallsThrough: true,
 }
 
@@ -1565,7 +1573,7 @@ function resolveJsxProp(
 	// Solid's compiler can omit explicit children whenever a JSX body exists,
 	// including a comment-only body. Such an attribute cannot exclude a spread.
 	const solidChildrenBody =
-		semantics.undefinedFallsThrough &&
+		semantics.bodyDiscardsChildrenAttribute &&
 		name === `children` &&
 		jsxChildren(node).length > 0
 	if (
@@ -2148,7 +2156,7 @@ function analyzeJsxElement(
 		createStoryNode(
 			context,
 			tagName,
-			analyzeJsxChildren(context, node.children, stack),
+			analyzeTransparentChildren(context, node, stack, INTRINSIC_RENDER_PROPS),
 			rangeOf(context.sourceFile, node.openingElement.tagName),
 			node.openingElement.attributes,
 		),
@@ -2219,7 +2227,7 @@ function analyzeJsxSelfClosingElement(
 		createStoryNode(
 			context,
 			tagName,
-			[],
+			analyzeTransparentChildren(context, node, stack, INTRINSIC_RENDER_PROPS),
 			rangeOf(context.sourceFile, node.tagName),
 			node.attributes,
 		),

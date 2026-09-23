@@ -14,6 +14,22 @@ afterAll(() => session.close())
 
 describe(`conservative JSX reachability`, () => {
 	it.each([
+		`<app-panel class={css.class} {...props}><span /></app-panel>`,
+		`<app-panel class={css.class} children={<aside />}>{null}</app-panel>`,
+		`<app-panel class={css.class} {...props} children={<span />} />`,
+		`<app-panel class={css.class} {...props} children={null} />`,
+	])(`respects intrinsic children precedence: %s`, (output) => {
+		const { diagnostics } = validateCssReachability(
+			{
+				tsxPath: `/project/AppPanel.tsx`,
+				tsxSource: `export function AppPanel(props) { return ${output} }`,
+				cssSource: conservativeJsxCss,
+			},
+			session,
+		)
+		expect(diagnostics.map(({ code }) => code)).toEqual([`dead-selector`])
+	})
+	it.each([
 		`"text"`,
 		`42`,
 		`true`,
