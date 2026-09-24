@@ -13,6 +13,11 @@ import { stripVTControlCharacters, styleText } from "node:util"
 import { afterEach, describe, expect, it } from "vite-plus/test"
 
 import { runLasertagCli } from "../../../src/cli/main.ts"
+import {
+	cleanedHonoCssSource,
+	honoCssSource,
+	honoTsxSource,
+} from "../fixtures/hono.ts"
 import { createFixCourse } from "./fix-course.ts"
 
 const requireFromTest = createRequire(import.meta.url)
@@ -174,6 +179,34 @@ describe(`lasertag cli`, () => {
 		expect(result.diagnostics).toEqual([])
 		expect(result.exitCode).toBe(0)
 		expect(logs).toEqual([`✓ No dead CSS found in 1 file.`])
+	})
+
+	it(`checks and fixes Hono CSS Modules while retaining streamed and fallback branches`, async () => {
+		const fixture = createFixture({
+			"ProjectCard.tsx": honoTsxSource,
+			"ProjectCard.module.css": honoCssSource,
+		})
+		const { io } = createTestIO()
+		const options = { cwd: fixture.root }
+		const checked = await runLasertagCli(
+			[`node`, `lasertag`, `check`],
+			io,
+			options,
+		)
+		expect(checked.exitCode).toBe(1)
+		expect(checked.diagnostics).toHaveLength(1)
+
+		const fixed = await runLasertagCli([`node`, `lasertag`, `fix`], io, options)
+		expect(fixed.exitCode).toBe(0)
+		expect(readFileSync(fixture.path(`ProjectCard.module.css`), `utf8`)).toBe(
+			cleanedHonoCssSource,
+		)
+		const rechecked = await runLasertagCli(
+			[`node`, `lasertag`, `check`],
+			io,
+			options,
+		)
+		expect(rechecked.exitCode).toBe(0)
 	})
 
 	it(`reports ambiguous Astro and TSX neighbors as a CLI failure`, async () => {

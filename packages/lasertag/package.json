@@ -23,6 +23,9 @@
 		"./solid-jsx": {
 			"types": "./src/types/solid-jsx-intrinsic-elements.d.ts"
 		},
+		"./hono-jsx": {
+			"types": "./src/types/hono-jsx-intrinsic-elements.d.ts"
+		},
 		"./eslint-plugin": {
 			"import": "./dist/eslint-plugin.mjs",
 			"types": "./dist/eslint-plugin.d.mts"
@@ -84,6 +87,7 @@
 		"@typescript-eslint/utils": "8.70.1",
 		"babel-preset-solid": "1.9.15",
 		"eslint": "10.11.0",
+		"hono": "4.13.8",
 		"jiti": "2.7.0",
 		"preact": "10.29.8",
 		"solid-js": "1.9.15"
@@ -91,6 +95,7 @@
 	"peerDependencies": {
 		"@types/react": "^19.2",
 		"eslint": "^10.4",
+		"hono": "^4.13.8",
 		"preact": "^10.29",
 		"solid-js": "^1.9"
 	},
@@ -99,6 +104,9 @@
 			"optional": true
 		},
 		"eslint": {
+			"optional": true
+		},
+		"hono": {
 			"optional": true
 		},
 		"preact": {

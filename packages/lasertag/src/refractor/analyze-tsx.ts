@@ -220,7 +220,11 @@ function isKnownComponentFactory(
 }
 
 function isComponentFactoryModule(moduleName: string): boolean {
-	return moduleName === `react` || moduleName === `preact/compat`
+	return (
+		moduleName === `react` ||
+		moduleName === `preact/compat` ||
+		isHonoJsxModule(moduleName)
+	)
 }
 
 type ExpressionValueFacts = {
@@ -1399,6 +1403,10 @@ function assertedForeignComponentName(tagName: string): string {
 	return tagName.slice(tagName.indexOf(`.`) + 1)
 }
 
+function isHonoJsxModule(moduleName: string): boolean {
+	return moduleName === `hono/jsx` || moduleName === `hono/jsx/dom`
+}
+
 function isFragmentJsxTag(
 	context: AnalyzeContext,
 	name: ts.JsxTagNameExpression,
@@ -2169,6 +2177,50 @@ function lowerSolidComponent(
 	}
 }
 
+function lowerHonoComponent(
+	context: AnalyzeContext,
+	node: ComponentJsxNode,
+	stack: string[],
+): StoryChild[] | undefined {
+	const binding = resolveImportBinding(context, jsxTagName(node))
+	if (!binding) return
+
+	const isJsxModule = isHonoJsxModule(binding.moduleName)
+	const isFragment =
+		isJsxModule &&
+		(binding.importedName === `Fragment` ||
+			binding.importedName === `StrictMode`)
+	const isSuspense =
+		binding.importedName === `Suspense` &&
+		(isJsxModule || binding.moduleName === `hono/jsx/streaming`)
+	const isErrorBoundary =
+		isJsxModule && binding.importedName === `ErrorBoundary`
+	if (!isFragment && !isSuspense && !isErrorBoundary) return
+
+	const renderedChildren = analyzeTransparentChildren(context, node, stack)
+	if (isFragment) return renderedChildren
+
+	const alternatives = [renderedChildren]
+	alternatives.push(
+		analyzeJsxRenderProp(context, node, `fallback`, stack) ?? [],
+	)
+
+	if (isErrorBoundary) {
+		const fallbackRender = analyzeJsxRenderProp(
+			context,
+			node,
+			`fallbackRender`,
+			stack,
+			{ allowFunction: true },
+		)
+		if (fallbackRender) {
+			alternatives.push(fallbackRender)
+		}
+	}
+
+	return [choice(alternatives, context.sourceFile, node)]
+}
+
 function analyzeJsxElement(
 	context: AnalyzeContext,
 	node: ts.JsxElement,
@@ -2338,7 +2390,9 @@ function analyzeComponentTag(
 			),
 		]
 	}
-	const loweredChildren = lowerSolidComponent(context, node, stack)
+	const loweredChildren =
+		lowerHonoComponent(context, node, stack) ??
+		lowerSolidComponent(context, node, stack)
 
 	if (loweredChildren) {
 		if (adoption) {

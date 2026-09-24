@@ -8,6 +8,7 @@ zero-runtime structural css for jsx with css modules
 - Prefer semantic HTML and native form controls; otherwise use descriptive custom tags. Never use `<div>`.
 - Use `<header>`, `<main>`, and `<footer>` only as a sibling group: put at least two under one parent and do not mix in unrelated element siblings.
 - Keep `globals.css`, imported by the main entrypoint, small: resets, fonts, and semantic tokens. Keep component styling in CSS Modules.
+- For Hono JSX, import `lasertag/hono-jsx` and `lasertag/css-modules` in a declaration file, set `jsxImportSource` to `hono/jsx`, and use `class={css.class}`. Serve the compiled styles for both full-page and fragment responses; see the Hono section of the authoring guide.
 - Use the ESLint plugin at `lasertag/eslint-plugin`; scope component rules to JSX files. `render-tag-with-own-name` checks directly exported named declarations by default; set `checkAllComponentFunctions: true` to include every PascalCase component function.
 - Refractor (`lasertag/refractor`) compares a TSX or Astro render story with its sibling CSS Module. Use the API for custom analysis; unknown paths are not dead CSS. No guarantees apply to DOM injected through `innerHTML` or `dangerouslySetInnerHTML`.
 - After changing a component or its CSS Module, run `pnpm lasertag check`; use `pnpm lasertag fix` only when automatic removal of diagnosed selectors is intended, then review the diff and rerun `check`.

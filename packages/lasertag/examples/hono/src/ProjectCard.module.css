@@ -1,0 +1,23 @@
+project-card.class {
+	display: grid;
+	gap: 1rem;
+	padding: 1rem;
+
+	> h2 {
+		margin: 0;
+	}
+
+	> ul {
+		> li {
+			padding-block: 0.25rem;
+		}
+	}
+
+	> p {
+		font-style: italic;
+	}
+
+	> button {
+		justify-self: start;
+	}
+}
