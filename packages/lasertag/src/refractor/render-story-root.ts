@@ -1,4 +1,5 @@
 import type {
+	OpaqueStoryNode,
 	RenderStory,
 	StoryAttribute,
 	StoryChild,
@@ -9,6 +10,7 @@ export type CssClassRenderRootOptions = {
 	bindingName?: string
 	exportName?: string
 	missingAttachment?: `opaque` | `preserve`
+	preserveUnknownRoots?: boolean | ((node: OpaqueStoryNode) => boolean)
 }
 
 const DEFAULT_CSS_MODULE_BINDING = `css`
@@ -84,21 +86,63 @@ export function findCssClassRenderRoots(
 function scopedCssClassRenderRoots(
 	children: readonly StoryChild[],
 	options: CssClassRenderRootOptions,
+	preserveUnknown = false,
 ): StoryChild[] {
 	return children.flatMap((child): StoryChild[] => {
-		if (child.kind === `opaque`) return []
+		if (child.kind === `opaque`) {
+			if (child.mayContainCssClassRoot || preserveUnknown) return [child]
+			// Ownership describes selector boundaries, not which CSS roots the
+			// output may contain. Spread values and shadowed locals can supply one.
+			const preserve =
+				typeof options.preserveUnknownRoots === `function`
+					? options.preserveUnknownRoots(child)
+					: options.preserveUnknownRoots
+			if (preserve) {
+				return [{ ...child, mayContainCssClassRoot: true }]
+			}
+			return []
+		}
 		if (child.kind === `choice`) {
 			const alternatives = child.alternatives.map((alternative) =>
-				scopedCssClassRenderRoots(alternative, options),
+				scopedCssClassRenderRoots(alternative, options, preserveUnknown),
 			)
 
-			return alternatives.some((alternative) => alternative.length > 0)
-				? [{ ...child, alternatives }]
-				: []
+			if (!alternatives.some((alternative) => alternative.length > 0)) return []
+			// An unknown alternative may supply a different CSS root. Keep that
+			// possibility even when another branch has a statically known root.
+			return [
+				{
+					...child,
+					alternatives: alternatives.map((alternative, index) =>
+						alternative.length > 0
+							? alternative
+							: scopedCssClassRenderRoots(
+									child.alternatives[index] ?? [],
+									options,
+									true,
+								),
+					),
+				},
+			]
 		}
 		if (hasCssClassAttachment(child, options)) return [child]
+		if (child.mayHaveCssClass) {
+			// The spread can attach this node or leave descendant roots in scope.
+			// Persist uncertainty on the story so serialization and repeated scoping
+			// cannot drop it, while retaining any independently known descendants.
+			return [
+				{
+					kind: `opaque`,
+					reason: `spread may supply a CSS Module class attachment`,
+					mayContainCssClassRoot: true,
+					...(child.range ? { range: child.range } : {}),
+					...(child.sourcePath ? { sourcePath: child.sourcePath } : {}),
+				},
+				...scopedCssClassRenderRoots(child.children, options, preserveUnknown),
+			]
+		}
 
-		return scopedCssClassRenderRoots(child.children, options)
+		return scopedCssClassRenderRoots(child.children, options, preserveUnknown)
 	})
 }
 
@@ -106,6 +150,11 @@ export function scopeRenderStoryToCssClassRoots(
 	renderStory: RenderStory,
 	options: CssClassRenderRootOptions = {},
 ): RenderStory {
+	// Preserve the unscoped story when there are no known attachments. Only
+	// promote unknown output alongside a discovered CSS ownership root.
+	if (findCssClassRenderRoots(renderStory.roots, options).length === 0) {
+		if (options.missingAttachment !== `opaque`) return renderStory
+	}
 	const roots = scopedCssClassRenderRoots(renderStory.roots, options)
 
 	if (roots.length > 0) return { ...renderStory, roots }

@@ -19,6 +19,8 @@ export type StoryNode = {
 	children: StoryChild[]
 	addressable?: true
 	attributes?: StoryAttribute[]
+	/** A spread may attach this element to the consumer's CSS Module scope. */
+	mayHaveCssClass?: true
 	componentName?: string
 	ownership?: `foreign`
 	range?: SourceRange
@@ -28,6 +30,8 @@ export type StoryNode = {
 export type OpaqueStoryNode = {
 	kind: `opaque`
 	reason: string
+	/** Unknown output that may supply an additional CSS Module root, independently of DOM ownership. */
+	mayContainCssClassRoot?: true
 	componentName?: string
 	expectedRootTagName?: string
 	ownership?: `foreign`

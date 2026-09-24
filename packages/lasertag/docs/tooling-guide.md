@@ -45,6 +45,11 @@ paths. Foreign opaque paths carry ownership metadata so selectors that may
 match their DOM can be distinguished from selectors that are merely
 inconclusive. Unsupported selector shapes are unknown too.
 
+Array `map` callbacks are expanded when TypeScript resolves the method to the
+standard `Array` or `ReadonlyArray` declaration. Typed arrays and array literals
+retain precise analysis; custom methods and unresolved or untyped receivers stay
+unknown because their callbacks may not describe the call's complete output.
+
 An `@lasertag-adopt-subtree` opening-tag directive on an imported component
 instance requests validated adoption of that instance's render story. The
 directive is a block comment among the opening tag's attributes. Directly
@@ -68,9 +73,24 @@ similarly named user components are not given Solid semantics. Dynamic values
 remain opaque. Recognized portal-style, out-of-tree rendering is excluded from
 the component's descendant story.
 
+Intrinsic elements and supported framework components account for explicit
+`children` props and spreads as well as JSX bodies. Solid component bodies
+discard explicit children attributes even when the body contains only comments
+or formatting whitespace; spread children may still render. `For` and `Index`
+use the same effective-prop resolution before analyzing their render functions.
+`Switch` applies its `Match` analysis to directly authored JSX in either its body
+or its effective `children` attribute, preserving local ownership. Unresolved
+children values and relevant spreads retain uncertainty.
+
 Render-story ownership starts at the outermost rendered nodes whose `class` or
 `class:list` expression uses `css.class`. Wrappers and unrelated sibling roots
-are excluded before selector reachability runs. When Refractor cannot discover
+are excluded before selector reachability runs. Unknown local expressions,
+spread render props, and shadowed component bindings can supply additional CSS
+roots even when their DOM has foreign ownership, so those possibilities remain.
+An intrinsic element's spread can also supply the class attachment itself.
+When that attachment is uncertain, cleanup preserves its possible CSS scope;
+this can retain selectors that would otherwise look dead beside a known root.
+When Refractor cannot discover
 an attachment, validation uses an opaque ownership root and makes no
 dead-selector claims; ESLint is responsible for reporting a missing or misplaced
 attachment.
