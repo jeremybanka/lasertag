@@ -2057,20 +2057,35 @@ function lowerSolidComponent(
 		}
 
 		if (binding.importedName === `Switch`) {
-			const alternatives = analyzeSolidSwitchAlternatives(
-				context,
-				jsxChildren(node),
-				stack,
-			)
 			const childrenProp = resolveJsxProp(
 				context,
 				node,
 				`children`,
 				SOLID_RENDER_PROPS,
 			)
+			const initializer = childrenProp.attribute?.initializer
+			const expression =
+				initializer && ts.isJsxExpression(initializer) && initializer.expression
+					? unwrapExpression(initializer.expression)
+					: undefined
+			const explicitChildren =
+				expression &&
+				(ts.isJsxElement(expression) ||
+					ts.isJsxSelfClosingElement(expression) ||
+					ts.isJsxFragment(expression))
+					? [expression]
+					: undefined
+			// Authored Match JSX keeps its ownership regardless of whether it came
+			// from a body or an explicit children prop. Resolve precedence first.
+			const alternatives = analyzeSolidSwitchAlternatives(
+				context,
+				childrenProp.body ?? explicitChildren ?? [],
+				stack,
+			)
 			if (
-				!hasMeaningfulJsxChildren(jsxChildren(node)) &&
-				(childrenProp.attribute || childrenProp.unknownSpread)
+				!hasMeaningfulJsxChildren(childrenProp.body ?? []) &&
+				(childrenProp.unknownSpread ||
+					(childrenProp.attribute && !explicitChildren))
 			) {
 				alternatives.push([
 					foreignOpaque(`Solid Switch render props`, context.sourceFile, node),
