@@ -295,6 +295,8 @@ Put the diagnostic code in brackets. A disable also requires an explanation of a
 
 ### Conservative JSX cleanup
 
+Lasertag makes no guarantees for `innerHTML` or `dangerouslySetInnerHTML`. Injected HTML is outside static analysis; CLI fixes and editor cleanup may remove selectors used only by that HTML.
+
 Lasertag preserves CSS when a render branch is unknown. An arbitrary factory such as `wrap(() => <span />)` may insert elements around its callback, so Lasertag does not treat the callback as the factory's complete output. Imported React and Preact compatibility `memo` and `forwardRef` wrappers remain supported. Custom factories can therefore produce fewer dead-selector diagnostics and more ownership-boundary warnings; cleanup leaves those uncertain selectors intact.
 
 Framework component recognition respects local bindings: a parameter named `Fragment` or `Show` does not inherit the behavior of a shadowed framework import. Transparent framework wrappers also account for explicit `children` props, including when the JSX body contains only comments or formatting whitespace. Spread render props remain conservative because they can supply children or fallbacks that are not visible at the call site.

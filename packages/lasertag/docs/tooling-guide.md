@@ -45,6 +45,10 @@ paths. Foreign opaque paths carry ownership metadata so selectors that may
 match their DOM can be distinguished from selectors that are merely
 inconclusive. Unsupported selector shapes are unknown too.
 
+DOM injected through `innerHTML` or `dangerouslySetInnerHTML` is outside this
+contract. Lasertag does not parse HTML strings or guarantee diagnostics,
+completions, or CSS preservation for that DOM.
+
 Array `map` callbacks are expanded when TypeScript resolves the method to the
 standard `Array` or `ReadonlyArray` declaration. Typed arrays and array literals
 retain precise analysis; custom methods and unresolved or untyped receivers stay
