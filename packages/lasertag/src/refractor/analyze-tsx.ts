@@ -11,6 +11,11 @@ import type {
 	StoryChoiceNode,
 	StoryNode,
 } from "./diagnostics.ts"
+import {
+	type JsxFactory,
+	resolveJsxFactory,
+	resolveJsxRuntime,
+} from "./jsx-runtime.ts"
 import { scopeRenderStoryToCssClassRoots } from "./render-story-root.ts"
 import { mappedRenderSourcesFromDeclarations } from "./render-story-source-map.ts"
 import { isStandardIntrinsicTagName } from "./standard-intrinsic-tag-names.ts"
@@ -62,6 +67,7 @@ type ImportIndex = Pick<ComponentIndex, `imports` | `namespaceImports`>
 
 type AnalyzeContext = {
 	sourceFile: ts.SourceFile
+	jsxFactory: JsxFactory
 	components: Map<string, ComponentDefinition>
 	imports: Map<string, ImportBinding>
 	namespaceImports: Map<string, string>
@@ -1102,6 +1108,10 @@ function analyzeResolvedComponentStory(
 		]),
 		imports: index.imports,
 		maxComponentDepth: context.maxComponentDepth,
+		jsxFactory: resolveJsxFactory(
+			resolved.sourceFile,
+			context.typescriptAnalysis.compilerOptions,
+		),
 		resolvedDeclarations: context.resolvedDeclarations,
 		namespaceImports: index.namespaceImports,
 		sourceFile: resolved.sourceFile,
@@ -1612,10 +1622,26 @@ const SOLID_RENDER_PROPS: RenderPropSemantics = {
 	bodyDiscardsChildrenAttribute: true,
 }
 
-// Intrinsic JSX does not identify its runtime. Preserve Solid's possible
-// undefined fallthrough as well as React-style explicit children in empty bodies.
-const INTRINSIC_RENDER_PROPS: RenderPropSemantics = {
+// Without a known consumer, preserve Solid's possible undefined fallthrough
+// as well as React-style explicit children in empty bodies.
+const UNKNOWN_INTRINSIC_RENDER_PROPS: RenderPropSemantics = {
 	undefinedFallsThrough: true,
+}
+
+function intrinsicRenderProps(
+	context: AnalyzeContext,
+	node: ComponentJsxNode,
+): RenderPropSemantics {
+	// React settles prop precedence when creating the element. What a child
+	// component eventually renders cannot restore overwritten spread children;
+	// even an explicit undefined value replaces the spread's children.
+	return resolveJsxRuntime(
+		context.jsxFactory,
+		node,
+		context.typescriptAnalysis,
+	) === `react`
+		? {}
+		: UNKNOWN_INTRINSIC_RENDER_PROPS
 }
 
 function isDefinitelyDefined(expression: ts.Expression): boolean {
@@ -2285,7 +2311,12 @@ function analyzeJsxElement(
 		createStoryNode(
 			context,
 			tagName,
-			analyzeTransparentChildren(context, node, stack, INTRINSIC_RENDER_PROPS),
+			analyzeTransparentChildren(
+				context,
+				node,
+				stack,
+				intrinsicRenderProps(context, node),
+			),
 			rangeOf(context.sourceFile, node.openingElement.tagName),
 			node.openingElement.attributes,
 		),
@@ -2356,7 +2387,12 @@ function analyzeJsxSelfClosingElement(
 		createStoryNode(
 			context,
 			tagName,
-			analyzeTransparentChildren(context, node, stack, INTRINSIC_RENDER_PROPS),
+			analyzeTransparentChildren(
+				context,
+				node,
+				stack,
+				intrinsicRenderProps(context, node),
+			),
 			rangeOf(context.sourceFile, node.tagName),
 			node.attributes,
 		),
@@ -2777,6 +2813,10 @@ function createAnalyzeContext(
 ): AnalyzeContext {
 	return {
 		sourceFile,
+		jsxFactory: resolveJsxFactory(
+			sourceFile,
+			typescriptAnalysis.compilerOptions,
+		),
 		components: index.components,
 		foreignComponentStack: new Set(),
 		externalComponentOutput: new WeakSet(),

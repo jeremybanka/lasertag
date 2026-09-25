@@ -36,6 +36,46 @@ describe(`TypeScript AST session`, () => {
 		apiLifecycle.created = 0
 	})
 
+	it.each([`tsconfig.json`, `base.json`])(
+		`refreshes JSX settings after %s changes`,
+		(configName) => {
+			const projectRoot = mkdtempSync(
+				path.join(tmpdir(), `lasertag-session-config-`),
+			)
+			const filePath = path.join(projectRoot, `ProbePanel.tsx`)
+			const configPath = path.join(projectRoot, configName)
+			const sourceText = `export function ProbePanel(props) { return <probe-panel {...props}>{undefined}</probe-panel> }`
+			writeFileSync(filePath, sourceText)
+			if (configName === `base.json`) {
+				writeFileSync(
+					path.join(projectRoot, `tsconfig.json`),
+					JSON.stringify({ extends: `./base.json` }),
+				)
+			}
+			const session = createTypescriptAstSession()
+			try {
+				for (const jsxImportSource of [`react`, `solid-js`, `react`]) {
+					writeFileSync(
+						configPath,
+						JSON.stringify({
+							compilerOptions: { jsx: `react-jsx`, jsxImportSource },
+						}),
+					)
+					const story = analyzeTsxRenderStory(
+						{ filePath, sourceText, scopeToCssClassRoots: false },
+						session,
+					)
+					expect(
+						JSON.stringify(story).includes(`spread component render props`),
+					).toBe(jsxImportSource === `solid-js`)
+				}
+			} finally {
+				session.close()
+				rmSync(projectRoot, { recursive: true, force: true })
+			}
+		},
+	)
+
 	it(`reuses one native API while refreshing the source at one path`, () => {
 		const session = createTypescriptAstSession()
 		const filePath = `/virtual/TrainingPanel.tsx`

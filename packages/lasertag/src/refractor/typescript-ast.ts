@@ -3,7 +3,12 @@ import path from "node:path"
 
 import type { Node, SourceFile } from "typescript/unstable/ast"
 import type { FileSystem } from "typescript/unstable/fs"
-import { API, type Project, SymbolFlags } from "typescript/unstable/sync"
+import {
+	API,
+	type CompilerOptions,
+	type Project,
+	SymbolFlags,
+} from "typescript/unstable/sync"
 
 import {
 	resolveTypescriptSdkPath,
@@ -12,6 +17,10 @@ import {
 
 /** A synchronous, single-owner TypeScript parser session for batched analysis. */
 export type TypescriptAstAnalysis = {
+	/** Explicit project settings only; inferred projects do not establish a JSX runtime. */
+	compilerOptions?: CompilerOptions
+	/** Resolve a value's local binding without following import aliases. */
+	resolveValueDeclarations?(name: string, location: Node): Node[]
 	resolveAliasedDeclarations(node: Node): Node[]
 	isDefaultLibrary?(sourceFile: SourceFile): boolean
 }
@@ -31,7 +40,34 @@ function createTypescriptAstAnalysis(
 	dependencySources: Map<string, string>,
 	rootFilePath: string,
 ): TypescriptAstAnalysis {
+	let compilerOptions: CompilerOptions | undefined
+	try {
+		const configSource = readFileSync(project.configFileName, `utf8`)
+		dependencySources.set(
+			normalizeFilePath(project.configFileName),
+			configSource,
+		)
+		compilerOptions = project.compilerOptions
+	} catch {
+		// Inferred projects have a synthetic config path and default to React JSX.
+		// Those defaults are parser settings, not evidence about the application.
+	}
 	return {
+		...(compilerOptions ? { compilerOptions } : {}),
+		resolveValueDeclarations(name, location) {
+			const symbol = project.checker.resolveName(
+				name,
+				SymbolFlags.Value,
+				location,
+				true,
+			)
+			return (
+				symbol?.declarations.flatMap((declaration) => {
+					const resolvedDeclaration = declaration.resolve(project)
+					return resolvedDeclaration ? [resolvedDeclaration] : []
+				}) ?? []
+			)
+		},
 		isDefaultLibrary(sourceFile) {
 			return (
 				project.program.getSourceFileMetadata(sourceFile.fileName)
@@ -104,7 +140,10 @@ function normalizeFilePath(filePath: string): string {
 	return path.resolve(filePath)
 }
 
-function createSessionFileSystem(sources: Map<string, string>): FileSystem {
+function createSessionFileSystem(
+	sources: Map<string, string>,
+	configurationSources: Map<string, string>,
+): FileSystem {
 	return {
 		fileExists(candidate) {
 			return sources.has(normalizeFilePath(candidate)) ? true : undefined
@@ -112,9 +151,20 @@ function createSessionFileSystem(sources: Map<string, string>): FileSystem {
 		readFile(candidate) {
 			const normalizedCandidate = normalizeFilePath(candidate)
 
-			return sources.has(normalizedCandidate)
-				? sources.get(normalizedCandidate)
-				: undefined
+			if (sources.has(normalizedCandidate))
+				return sources.get(normalizedCandidate)
+			// An extended config can have any JSON filename or come from a package.
+			// Observe TypeScript's reads rather than duplicating its config resolver.
+			if (path.extname(normalizedCandidate) === `.json`) {
+				try {
+					const text = readFileSync(normalizedCandidate, `utf8`)
+					configurationSources.set(normalizedCandidate, text)
+					return text
+				} catch {
+					return undefined
+				}
+			}
+			return undefined
 		},
 		realpath(candidate) {
 			const normalizedCandidate = normalizeFilePath(candidate)
@@ -129,6 +179,7 @@ export function createTypescriptAstSession(
 ): TypescriptAstSession {
 	const sources = new Map<string, string>()
 	const dependencySources = new Map<string, string>()
+	const configurationSources = new Map<string, string>()
 	const typescriptSdkPath = resolveTypescriptSdkPath(options)
 	let api: API | undefined
 	let closed = false
@@ -137,7 +188,7 @@ export function createTypescriptAstSession(
 	function getApi(filePath: string): API {
 		api ??= new API({
 			cwd: path.dirname(filePath),
-			fs: createSessionFileSystem(sources),
+			fs: createSessionFileSystem(sources, configurationSources),
 			...(typescriptSdkPath ? { tsserverPath: typescriptSdkPath } : {}),
 		})
 
@@ -157,6 +208,7 @@ export function createTypescriptAstSession(
 			api?.close()
 			api = undefined
 			dependencySources.clear()
+			configurationSources.clear()
 		},
 		withSourceFile(sourceText, filePath, use) {
 			if (closed) {
@@ -184,8 +236,13 @@ export function createTypescriptAstSession(
 				dependencySources,
 				sources,
 			)
+			const configurationChanged = dependencySourceChanged(
+				configurationSources,
+				sources,
+			)
 
 			if (dependencyChanged) dependencySources.clear()
+			if (configurationChanged) configurationSources.clear()
 
 			const snapshot = activeApi.updateSnapshot({
 				...(previousFilePath && previousFilePath !== normalizedFilePath
@@ -194,16 +251,17 @@ export function createTypescriptAstSession(
 				// Imported component roots are ownership evidence. Rebuild the program
 				// when one of their declarations changes so a long-lived editor session
 				// never retains a verified root after its implementation changes.
-				fileChanges: dependencyChanged
-					? { invalidateAll: true }
-					: previousFilePath === normalizedFilePath
-						? { changed: [normalizedFilePath] }
-						: {
-								// Closing a root only removes its virtual overlay. Report the
-								// underlying file as changed so a new root can still import it.
-								...(previousFilePath ? { changed: [previousFilePath] } : {}),
-								created: [normalizedFilePath],
-							},
+				fileChanges:
+					dependencyChanged || configurationChanged
+						? { invalidateAll: true }
+						: previousFilePath === normalizedFilePath
+							? { changed: [normalizedFilePath] }
+							: {
+									// Closing a root only removes its virtual overlay. Report the
+									// underlying file as changed so a new root can still import it.
+									...(previousFilePath ? { changed: [previousFilePath] } : {}),
+									created: [normalizedFilePath],
+								},
 				openFiles: [normalizedFilePath],
 			})
 
