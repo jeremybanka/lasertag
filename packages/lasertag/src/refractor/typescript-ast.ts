@@ -19,6 +19,8 @@ import {
 export type TypescriptAstAnalysis = {
 	/** Explicit project settings only; inferred projects do not establish a JSX runtime. */
 	compilerOptions?: CompilerOptions
+	/** Resolve a value's local binding without following import aliases. */
+	resolveValueDeclarations?(name: string, location: Node): Node[]
 	resolveAliasedDeclarations(node: Node): Node[]
 	isDefaultLibrary?(sourceFile: SourceFile): boolean
 }
@@ -52,6 +54,20 @@ function createTypescriptAstAnalysis(
 	}
 	return {
 		...(compilerOptions ? { compilerOptions } : {}),
+		resolveValueDeclarations(name, location) {
+			const symbol = project.checker.resolveName(
+				name,
+				SymbolFlags.Value,
+				location,
+				true,
+			)
+			return (
+				symbol?.declarations.flatMap((declaration) => {
+					const resolvedDeclaration = declaration.resolve(project)
+					return resolvedDeclaration ? [resolvedDeclaration] : []
+				}) ?? []
+			)
+		},
 		isDefaultLibrary(sourceFile) {
 			return (
 				project.program.getSourceFileMetadata(sourceFile.fileName)

@@ -241,13 +241,34 @@ children; a child component's eventual output does not change prop precedence.
 An element with only a spread, such as `<button {...buttonProps} />`, can still
 render foreign children and remains conservative.
 
-Lasertag identifies React from explicit TypeScript project JSX settings
-(`react`, `react-jsx`, or `react-jsxdev` with the default React consumer) or
-leading JSX directives such as `/** @jsxImportSource react */`. It honors
-inherited settings and file overrides. Custom factories and other consumers
-remain conservative. JSX preserved without an identified consumer and React
-type imports alone do not establish React semantics; Solid's supported
-undefined fallthrough remains intact.
+Lasertag identifies the declared JSX consumer per file. Its primary support
+is modern automatic JSX, using the file's TypeScript project settings
+(including inherited settings) and leading block-comment directives:
+
+| Configuration                                                  | React detection                                                                                               |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `jsx: "react-jsx"` or `"react-jsxdev"`                         | Uses `jsxImportSource`, defaulting to `react` when omitted.                                                   |
+| `/** @jsxRuntime automatic */`                                 | Selects automatic JSX for that file and uses its effective import source.                                     |
+| `jsxImportSource: "react"` or `/** @jsxImportSource react */`  | Explicitly declares React, including with `jsx: "preserve"`; the file directive overrides the project source. |
+| Classic JSX (`jsx: "react"`, `@jsxRuntime classic`, or `@jsx`) | Requires the selected factory to resolve to a direct value import of React's `createElement`.                 |
+
+Classic factory support includes default and namespace imports, named
+`createElement` imports, and import aliases such as
+`import { createElement as h } from "react"` paired with `/** @jsx h */`.
+Bindings are checked at each JSX location: a parameter or local variable
+shadowing the factory prevents React detection. Unbound `React` globals,
+type-only imports, CommonJS factories, local factory wrappers or aliases, and
+barrel re-exports remain unknown. Contradictory file directives also remain
+unknown; `@jsx` does not silently switch an automatic transform to classic.
+
+This detection reads declared JSX settings. It does not inspect Babel, Vite,
+or SWC configuration, infer a consumer from installed dependencies, or resolve
+bundler aliases for runtime packages. For a preserved-JSX build, declare the
+matching `jsxImportSource` or leading file directive if those external tools
+provide the consumer. Bare `preserve`, inferred TypeScript project defaults,
+and React imports alone do not establish React semantics. Other import sources,
+including React-compatible providers, retain conservative intrinsic children
+analysis; Solid's supported undefined fallthrough remains intact.
 
 Broad descendant selectors are valid in dead-end components whose matching
 subtree is entirely defined in the same file. Ownership analysis is

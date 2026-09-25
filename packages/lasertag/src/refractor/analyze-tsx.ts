@@ -11,7 +11,11 @@ import type {
 	StoryChoiceNode,
 	StoryNode,
 } from "./diagnostics.ts"
-import { type JsxRuntime, resolveJsxRuntime } from "./jsx-runtime.ts"
+import {
+	type JsxFactory,
+	resolveJsxFactory,
+	resolveJsxRuntime,
+} from "./jsx-runtime.ts"
 import { scopeRenderStoryToCssClassRoots } from "./render-story-root.ts"
 import { mappedRenderSourcesFromDeclarations } from "./render-story-source-map.ts"
 import { isStandardIntrinsicTagName } from "./standard-intrinsic-tag-names.ts"
@@ -63,7 +67,7 @@ type ImportIndex = Pick<ComponentIndex, `imports` | `namespaceImports`>
 
 type AnalyzeContext = {
 	sourceFile: ts.SourceFile
-	jsxRuntime: JsxRuntime
+	jsxFactory: JsxFactory
 	components: Map<string, ComponentDefinition>
 	imports: Map<string, ImportBinding>
 	namespaceImports: Map<string, string>
@@ -1104,7 +1108,7 @@ function analyzeResolvedComponentStory(
 		]),
 		imports: index.imports,
 		maxComponentDepth: context.maxComponentDepth,
-		jsxRuntime: resolveJsxRuntime(
+		jsxFactory: resolveJsxFactory(
 			resolved.sourceFile,
 			context.typescriptAnalysis.compilerOptions,
 		),
@@ -1624,11 +1628,20 @@ const UNKNOWN_INTRINSIC_RENDER_PROPS: RenderPropSemantics = {
 	undefinedFallsThrough: true,
 }
 
-function intrinsicRenderProps(context: AnalyzeContext): RenderPropSemantics {
+function intrinsicRenderProps(
+	context: AnalyzeContext,
+	node: ComponentJsxNode,
+): RenderPropSemantics {
 	// React settles prop precedence when creating the element. What a child
 	// component eventually renders cannot restore overwritten spread children;
 	// even an explicit undefined value replaces the spread's children.
-	return context.jsxRuntime === `react` ? {} : UNKNOWN_INTRINSIC_RENDER_PROPS
+	return resolveJsxRuntime(
+		context.jsxFactory,
+		node,
+		context.typescriptAnalysis,
+	) === `react`
+		? {}
+		: UNKNOWN_INTRINSIC_RENDER_PROPS
 }
 
 function isDefinitelyDefined(expression: ts.Expression): boolean {
@@ -2302,7 +2315,7 @@ function analyzeJsxElement(
 				context,
 				node,
 				stack,
-				intrinsicRenderProps(context),
+				intrinsicRenderProps(context, node),
 			),
 			rangeOf(context.sourceFile, node.openingElement.tagName),
 			node.openingElement.attributes,
@@ -2378,7 +2391,7 @@ function analyzeJsxSelfClosingElement(
 				context,
 				node,
 				stack,
-				intrinsicRenderProps(context),
+				intrinsicRenderProps(context, node),
 			),
 			rangeOf(context.sourceFile, node.tagName),
 			node.attributes,
@@ -2800,7 +2813,7 @@ function createAnalyzeContext(
 ): AnalyzeContext {
 	return {
 		sourceFile,
-		jsxRuntime: resolveJsxRuntime(
+		jsxFactory: resolveJsxFactory(
 			sourceFile,
 			typescriptAnalysis.compilerOptions,
 		),

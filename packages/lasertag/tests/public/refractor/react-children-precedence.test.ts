@@ -56,10 +56,11 @@ export function ProbePanel({ buttonProps }: { buttonProps: ComponentProps<"butto
 const reactProjects = [`react`, `react-jsx`, `react-jsxdev`].map((jsx) => ({
 	name: jsx,
 	directory: project(jsx, { jsx }),
+	preamble: jsx === `react` ? `import React from "react"` : ``,
 }))
 
 it.each(
-	reactProjects.flatMap(({ name, directory }) =>
+	reactProjects.flatMap(({ name, directory, preamble }) =>
 		[
 			`<button {...buttonProps}><span /></button>`,
 			`<button {...buttonProps}><LocalChild /></button>`,
@@ -67,45 +68,48 @@ it.each(
 			`<button {...buttonProps} children={<LocalChild />} />`,
 			`<button {...buttonProps} children={<><span /></>} />`,
 			`<button children={undefined} {...buttonProps}><LocalChild /></button>`,
-		].map((output) => ({ name, directory, output })),
+		].map((output) => ({ name, directory, preamble, output })),
 	),
-)(`$name explicit children own their DOM: $output`, ({ directory, output }) => {
-	expect(analyze(directory, output).diagnostics).toEqual([])
-})
+)(
+	`$name explicit children own their DOM: $output`,
+	({ directory, output, preamble }) => {
+		expect(analyze(directory, output, preamble).diagnostics).toEqual([])
+	},
+)
 
 it.each(
-	reactProjects.flatMap(({ name, directory }) =>
+	reactProjects.flatMap(({ name, directory, preamble }) =>
 		[
 			`<button {...buttonProps}>{undefined}</button>`,
 			`<button {...buttonProps}>{void 0}</button>`,
 			`<button {...buttonProps}><EmptyChild /></button>`,
 			`<button {...buttonProps}><>{undefined}</></button>`,
 			`<button {...buttonProps} children={undefined} />`,
-		].map((output) => ({ name, directory, output })),
+		].map((output) => ({ name, directory, preamble, output })),
 	),
 )(
 	`$name empty output cannot restore spread children: $output`,
-	({ directory, output }) => {
+	({ directory, output, preamble }) => {
 		expect(
-			analyze(directory, output).diagnostics.map(({ code }) => code),
+			analyze(directory, output, preamble).diagnostics.map(({ code }) => code),
 		).toEqual([`dead-selector`])
 	},
 )
 
 it.each(
-	reactProjects.flatMap(({ name, directory }) =>
+	reactProjects.flatMap(({ name, directory, preamble }) =>
 		[
 			`<button {...buttonProps} />`,
 			`<button {...buttonProps}>{/* no explicit child */}</button>`,
 			`<button {...buttonProps}>\n\t</button>`,
 			`<button children={<LocalChild />} {...buttonProps} />`,
-		].map((output) => ({ name, directory, output })),
+		].map((output) => ({ name, directory, preamble, output })),
 	),
 )(
 	`$name retains possible spread children: $output`,
-	({ directory, output }) => {
+	({ directory, output, preamble }) => {
 		expect(
-			analyze(directory, output).diagnostics.map(({ code }) => code),
+			analyze(directory, output, preamble).diagnostics.map(({ code }) => code),
 		).toEqual([`selector-crosses-ownership-boundary`])
 	},
 )
@@ -174,7 +178,7 @@ it.each([
 it.each([
 	`/** @jsxImportSource react */`,
 	`/** @jsxRuntime automatic */`,
-	`/** @jsxRuntime classic */`,
+	`/** @jsxRuntime classic */\nimport React from "react"`,
 ])(`recognizes explicit React file configuration: %s`, (preamble) => {
 	const directory = project(`pragmas`)
 	expect(
