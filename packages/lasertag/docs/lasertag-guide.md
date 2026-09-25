@@ -233,6 +233,22 @@ app-panel.class {
 }
 ```
 
+For React JSX, explicitly authored children override a parent's prop spreads.
+For example, `<button {...buttonProps}><LocalChild /></button>` and
+`<button {...buttonProps}><><span /></></button>` do not acquire an ownership
+boundary from `buttonProps.children`. Even `{undefined}` replaces spread
+children; a child component's eventual output does not change prop precedence.
+An element with only a spread, such as `<button {...buttonProps} />`, can still
+render foreign children and remains conservative.
+
+Lasertag identifies React from explicit TypeScript project JSX settings
+(`react`, `react-jsx`, or `react-jsxdev` with the default React consumer) or
+leading JSX directives such as `/** @jsxImportSource react */`. It honors
+inherited settings and file overrides. Custom factories and other consumers
+remain conservative. JSX preserved without an identified consumer and React
+type imports alone do not establish React semantics; Solid's supported
+undefined fallthrough remains intact.
+
 Broad descendant selectors are valid in dead-end components whose matching
 subtree is entirely defined in the same file. Ownership analysis is
 path-sensitive, so an imported component in one branch does not prevent styling
