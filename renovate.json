@@ -40,12 +40,50 @@
 		},
 		{
 			"groupName": "vite-plus",
-			"matchDepNames": ["vite", "vitest", "vite-plus", "viteplus"],
 			"matchPackageNames": [
+				"vite",
+				"vitest",
 				"vite-plus",
-				"viteplus",
+				"@vitejs/*",
+				"@vitest/*",
 				"@voidzero-dev/vite-plus-core"
+			],
+			"separateMajorMinor": false,
+			"groupSingleUpdates": true,
+			"group": {
+				"commitMessageTopic": "{{{groupName}}}{{#each upgrades}}{{#if (equals depName 'vite-plus')}} to v{{{newVersion}}}{{/if}}{{/each}}",
+				"commitMessageExtra": ""
+			},
+			"skipArtifactsUpdate": true,
+			"postUpgradeTasks": {
+				"commands": [
+					"{{#if (includes (lookupArray upgrades 'depName') 'vite-plus')}}pnpm dlx --package=vite-plus@{{#each upgrades}}{{#if (equals depName 'vite-plus')}}{{{newVersion}}}{{/if}}{{/each}} vp migrate --no-interactive{{else}}pnpm install --no-frozen-lockfile --ignore-scripts{{/if}}",
+					"pnpm exec dprint fmt"
+				],
+				"executionMode": "branch",
+				"fileFilters": ["**/*"],
+				"installTools": { "node": {}, "pnpm": {} }
+			},
+			"prBodyNotes": [
+				"Vite Plus upgrades run the selected release's official `vp migrate --no-interactive` before installing new project dependencies. Review the generated source/configuration changes and any manual migration findings in the Renovate logs."
 			]
+		},
+		{
+			"description": "The official Vite Plus migrator owns bundled Vite/Vitest versions; independently released plugins remain eligible for updates",
+			"matchPackageNames": [
+				"vite",
+				"vitest",
+				"@vitest/*",
+				"!@vitest/eslint-plugin",
+				"!@vitest/browser-webdriverio",
+				"@voidzero-dev/vite-plus-core"
+			],
+			"enabled": false
+		},
+		{
+			"matchPackageNames": ["vite-plus"],
+			"ignoreUnstable": false,
+			"respectLatest": false
 		},
 		{
 			"groupName": "changesets",

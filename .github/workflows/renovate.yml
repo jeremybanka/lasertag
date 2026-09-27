@@ -42,6 +42,10 @@ jobs:
           LOG_LEVEL: debug
           RENOVATE_ALLOW_SCRIPTS: "true"
           RENOVATE_ALLOW_PLUGINS: true
+          RENOVATE_ALLOWED_COMMANDS: >-
+            ["^pnpm dlx --package=vite-plus@[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)? vp migrate --no-interactive$",
+            "^pnpm install --no-frozen-lockfile --ignore-scripts$",
+            "^pnpm exec dprint fmt$"]
           RENOVATE_REPOSITORIES: ${{ github.repository_owner }}/${{ github.event.repository.name }}
         with:
           configurationFile: renovate.json
