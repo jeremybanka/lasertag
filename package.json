@@ -34,7 +34,7 @@
 		"dprint-plugin-markup": "0.27.5",
 		"dprint-plugin-yaml": "0.6.0",
 		"typescript": "7.0.2",
-		"vite-plus": "0.3.3"
+		"vite-plus": "catalog:"
 	},
 	"packageManager": "pnpm@12.6.0",
 	"engines": {
