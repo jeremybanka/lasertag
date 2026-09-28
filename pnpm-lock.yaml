@@ -196,8 +196,8 @@ importers:
         specifier: 0.8.0
         version: 0.8.0
       break-check:
-        specifier: 0.7.3
-        version: 0.7.3(supports-color@7.2.0)(zod@4.5.4)
+        specifier: 0.8.0
+        version: 0.8.0(supports-color@7.2.0)(zod@4.5.4)
       cspell:
         specifier: 10.3.4
         version: 10.3.4
@@ -307,8 +307,14 @@ packages:
   '@ark/schema@0.56.2':
     resolution: {integrity: sha512-Qx4D2JFbBWpntiHZaTv7bGG4H/M2rigiknezKg/WVyDSaLdE4YCcWAOoFB7pjjDqHbbV2OqRfntm1nnXvwMexg==}
 
+  '@ark/schema@0.56.4':
+    resolution: {integrity: sha512-nd4OqaWdKZJeGF5zNmZysDQO7NyyJ1ycl4S7i16Hj1VxqL+x72Z66lOn7ErpsoMUZtCtslAMHMjqJhuQSxciyw==}
+
   '@ark/util@0.56.2':
     resolution: {integrity: sha512-9kU2sUE38FZEGG7l3hamYMBieLYEJh2L1mrYD2eXpT+78EnQSV1bhjxJhnxGBMSTbtwpBSDNSK+K60WvaI/DTQ==}
+
+  '@ark/util@0.56.4':
+    resolution: {integrity: sha512-KKqwGSia44cvuuDY70jGfbiUdG2E8F2cM4npdqvJ22S5a0LknlwG6nIrfQG1nF8fzxpzP30098wp0a8ASs0prQ==}
 
   '@astrojs/compiler@4.0.0':
     resolution: {integrity: sha512-eouss7G8ygdZqHuke033VMcVw5HTZUu+PXd/h06DGDUg/jt5btPYPqh66ENWw/mU78rBrf/oeC4oqoBwMtDMNA==}
@@ -1454,11 +1460,11 @@ packages:
     resolution: {integrity: sha512-Nqc90v4lWCXyakD6xNyNACBJNJ0tNCwj2WNk/7ivyacYHxiITVgmLUFXTBOeCdy79iz6HtN9Y31uw/jbLrdOAg==}
     engines: {node: '>=20.0.0'}
 
-  '@simple-git/args-pathspec@1.0.3':
-    resolution: {integrity: sha512-ngJMaHlsWDTfjyq9F3VIQ8b7NXbBLq5j9i5bJ6XLYtD6qlDXT7fdKY2KscWWUF8t18xx052Y/PUO1K1TRc9yKA==}
+  '@simple-git/args-pathspec@1.0.4':
+    resolution: {integrity: sha512-EtMX6XjRWSastG2SdkmSQByPtJ9dx/NIjnHbpQPCYt62j4RmSx5rgLTGpw0YCjF5h191gZOmBfheOT23cRSFdw==}
 
-  '@simple-git/argv-parser@1.1.1':
-    resolution: {integrity: sha512-Q9lBcfQ+VQCpQqGJFHe5yooOS5hGdLFFbJ5R+R5aDsnkPCahtn1hSkMcORX65J2Z5lxSkD0lQorMsncuBQxYUw==}
+  '@simple-git/argv-parser@2.0.1':
+    resolution: {integrity: sha512-M++IaVWrN+vYalilOHfwvT2IL3wYZtVEBQpmX6DLSOJLtxbZ+SUeIDE3IiPogzhPACLajwtxfa5rp+ZX1FczzQ==}
 
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
@@ -2045,11 +2051,17 @@ packages:
   aria-query@5.3.0:
     resolution: {integrity: sha512-b0P0sZPKtyu8HkeRAfCq0IfURZK+SuwMjY1UXGBU27wpAiTwQAIlq56IbIO+ytk/JjS1fMR14ee5WBBfKi5J6A==}
 
+  arkregex@0.0.10:
+    resolution: {integrity: sha512-+iDWBYBjH8w7wqEv8VY4loBwRldFxX84KNwKbobH3FJPay/18XI9sTesmXYpKyIrgbC5z/s16+vSJYHCC9FEvQ==}
+
   arkregex@0.0.8:
     resolution: {integrity: sha512-PJcx6G1kQTgLKPUbeYlYecDRaKq15AMSGVajlKFYWlPeJRQL+j3dKE6tyMs40HZ99djS1l9Vhl3ezAHy9JBIqQ==}
 
   arktype@2.2.3:
     resolution: {integrity: sha512-7W+0RLTUNJiBFIIZXwOQxSR8Z273IAd6IvqBeG9+gHnQKFsIx2C0iOtGTmMrPnlX4qLXyc5+ll7A0BIj9WrbTg==}
+
+  arktype@2.2.5:
+    resolution: {integrity: sha512-c9oqY1eBab2LceqvpWX50xae2HB8P/nJPxRhuhPVf5lEDi3WQpf7WQflJFMsyCiA3NGh6zENOlse30gWBzlwDg==}
 
   array-timsort@1.0.3:
     resolution: {integrity: sha512-/+3GRL7dDAGEfM6TseQk/U+mi18TU2Ms9I3UlLdUMhz2hbvGNTKdj9xniwXfUqgYhHxRx0+8UnKkvlNwVU+cWQ==}
@@ -2136,8 +2148,8 @@ packages:
     resolution: {integrity: sha512-ScQ4IuvIEF1TMlP7Zt+vjJ//9zlPb2SDcxWxM3bk8s6t6GGdJ7KO1dCcTidOPJKePW30LE/2cT7wCyPho9/Wxg==}
     engines: {node: 20 || >=22}
 
-  break-check@0.7.3:
-    resolution: {integrity: sha512-nNl1Yxy4hKH1/bRVRjxzCiNWsohwhzf3v9g9qltcd0VIosw7hJOgy8XyXxiPm8v6UmugXNdMuVFyZ6tFSqXU4g==}
+  break-check@0.8.0:
+    resolution: {integrity: sha512-PS2yOp6KktXP/hm1UwhRA2G63R0WzxRIdywF8FcHgV3ENrqyv6M2IuNgLlzfiqXoDcgvlo9j9ApeCRyseu4eEA==}
     hasBin: true
 
   browserslist@4.29.0:
@@ -2192,17 +2204,6 @@ packages:
   cockatiel@3.2.1:
     resolution: {integrity: sha512-gfrHV6ZPkquExvMh9IOkKsBzNDk6sDuZ6DdBGUBkvFnTCqCxzpuq48RySgP0AnaqQkw2zynOFj9yly6T1Q2G5Q==}
     engines: {node: '>=16'}
-
-  comline@0.8.1:
-    resolution: {integrity: sha512-FSg4FZRIC4WOlN4Kg8KPLBufj+2crxZ/ZC+Q97rP1q+kEWOBnSaVJuc1rCM/JHx2KVtHd3Jaap9lpTlYAZwdDg==}
-    peerDependencies:
-      arktype: ^2.1.28
-      zod: ^4.2.0
-    peerDependenciesMeta:
-      arktype:
-        optional: true
-      zod:
-        optional: true
 
   comline@0.9.0:
     resolution: {integrity: sha512-PB6CjpeJqSzKL4XZ6kjlGE3G5bcBDZjRQcDoPwKsQT1VloTOQ9Q4EhkJFi0Ng39bFDB7I928qfOZ9LrDYaDc5A==}
@@ -3033,8 +3034,8 @@ packages:
   signal-exit@3.0.7:
     resolution: {integrity: sha512-wnD2ZE+l+SPC/uoS0vXeE9L1+0wuaMqKlfz9AMUo38JsyLSBWSFcHR1Rri62LZc12vLr1gb3jl7iwQhgwpAbGQ==}
 
-  simple-git@3.36.0:
-    resolution: {integrity: sha512-cGQjLjK8bxJw4QuYT7gxHw3/IouVESbhahSsHrX97MzCL1gu2u7oy38W6L2ZIGECEfIBG4BabsWDPjBxJENv9Q==}
+  simple-git@4.0.2:
+    resolution: {integrity: sha512-l0sIsv9VrPwovKELFDBOj/lhmIcbMvxBk2B+hRhsMM4/VL3gKtuZvYnBNixVo+N/0HnqQx2cBdLvxnAbygHpqA==}
 
   sirv@3.0.2:
     resolution: {integrity: sha512-2wcC/oGxHis/BoHkkPwldgiPSYcpZK3JU28WoMVv55yHJgcZ8rlXvuG9iZggz+sU1d4bRgIGASwyWqjxu3FM0g==}
@@ -3326,8 +3327,16 @@ snapshots:
   '@ark/schema@0.56.2':
     dependencies:
       '@ark/util': 0.56.2
+    optional: true
 
-  '@ark/util@0.56.2': {}
+  '@ark/schema@0.56.4':
+    dependencies:
+      '@ark/util': 0.56.4
+
+  '@ark/util@0.56.2':
+    optional: true
+
+  '@ark/util@0.56.4': {}
 
   '@astrojs/compiler@4.0.0': {}
 
@@ -4291,11 +4300,11 @@ snapshots:
 
   '@secretlint/types@10.2.2': {}
 
-  '@simple-git/args-pathspec@1.0.3': {}
+  '@simple-git/args-pathspec@1.0.4': {}
 
-  '@simple-git/argv-parser@1.1.1':
+  '@simple-git/argv-parser@2.0.1':
     dependencies:
-      '@simple-git/args-pathspec': 1.0.3
+      '@simple-git/args-pathspec': 1.0.4
 
   '@standard-schema/spec@1.1.0': {}
 
@@ -4782,15 +4791,27 @@ snapshots:
     dependencies:
       dequal: 2.0.3
 
+  arkregex@0.0.10:
+    dependencies:
+      '@ark/util': 0.56.4
+
   arkregex@0.0.8:
     dependencies:
       '@ark/util': 0.56.2
+    optional: true
 
   arktype@2.2.3:
     dependencies:
       '@ark/schema': 0.56.2
       '@ark/util': 0.56.2
       arkregex: 0.0.8
+    optional: true
+
+  arktype@2.2.5:
+    dependencies:
+      '@ark/schema': 0.56.4
+      '@ark/util': 0.56.4
+      arkregex: 0.0.10
 
   array-timsort@1.0.3: {}
 
@@ -4838,12 +4859,12 @@ snapshots:
     dependencies:
       balanced-match: 4.0.4
 
-  break-check@0.7.3(supports-color@7.2.0)(zod@4.5.4):
+  break-check@0.8.0(supports-color@7.2.0)(zod@4.5.4):
     dependencies:
-      arktype: 2.2.3
-      comline: 0.8.1(arktype@2.2.3)(zod@4.5.4)
+      arktype: 2.2.5
+      comline: 0.9.0(arktype@2.2.5)(zod@4.5.4)
       minimatch: 10.2.6
-      simple-git: 3.36.0(supports-color@7.2.0)
+      simple-git: 4.0.2(supports-color@7.2.0)
       takua: 0.2.3
     transitivePeerDependencies:
       - supports-color
@@ -4899,14 +4920,6 @@ snapshots:
 
   cockatiel@3.2.1: {}
 
-  comline@0.8.1(arktype@2.2.3)(zod@4.5.4):
-    dependencies:
-      '@standard-schema/spec': 1.1.0
-      treetrunks: 0.1.12
-    optionalDependencies:
-      arktype: 2.2.3
-      zod: 4.5.4
-
   comline@0.9.0(arktype@2.2.3)(zod@4.6.5):
     dependencies:
       '@standard-schema/spec': 1.1.0
@@ -4914,6 +4927,14 @@ snapshots:
     optionalDependencies:
       arktype: 2.2.3
       zod: 4.6.5
+
+  comline@0.9.0(arktype@2.2.5)(zod@4.5.4):
+    dependencies:
+      '@standard-schema/spec': 1.1.0
+      treetrunks: 0.1.12
+    optionalDependencies:
+      arktype: 2.2.5
+      zod: 4.5.4
 
   commander@12.1.0: {}
 
@@ -5730,12 +5751,12 @@ snapshots:
 
   signal-exit@3.0.7: {}
 
-  simple-git@3.36.0(supports-color@7.2.0):
+  simple-git@4.0.2(supports-color@7.2.0):
     dependencies:
       '@kwsites/file-exists': 1.1.1(supports-color@7.2.0)
       '@kwsites/promise-deferred': 1.1.1
-      '@simple-git/args-pathspec': 1.0.3
-      '@simple-git/argv-parser': 1.1.1
+      '@simple-git/args-pathspec': 1.0.4
+      '@simple-git/argv-parser': 2.0.1
       debug: 4.4.3(supports-color@7.2.0)
     transitivePeerDependencies:
       - supports-color
