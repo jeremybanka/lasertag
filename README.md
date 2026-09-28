@@ -32,3 +32,7 @@ available under MPL 2.0 and preserve the license notices. Mozilla's
 [official MPL 2.0 FAQ](https://www.mozilla.org/en-US/MPL/2.0/FAQ/) explains
 the intent and common use cases. This summary is not a substitute for the
 license itself.
+
+## Repository commands
+
+See [the command guide](docs/commands.md) for formatting, static checks, tests, coverage where available, and release commands.

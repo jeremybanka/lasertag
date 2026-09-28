@@ -47,5 +47,5 @@ Covered by `tests/public/refractor/css-reachability.test.ts` and verified with:
 - `pnpm --filter lasertag test -- tests/public/refractor/css-reachability.test.ts`
 - `pnpm --filter lasertag test`
 - `pnpm check`
-- `pnpm fmt:check`
+- `pnpm check:fmt`
 - `pnpm --filter lasertag build`
