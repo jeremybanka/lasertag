@@ -23,9 +23,8 @@ Following the [mise Node.js cookbook](https://mise.jdx.dev/mise-cookbook/nodejs.
 - `check:fmt`: `dprint check`.
 - `check:vp`: `vp check --no-fmt`.
 - `check:spelling`: `cspell .`.
-- `check:tsc`: `tsc --noEmit`.
 
-`check:vp` invokes the configured Vite Plus validation pipeline; `check:fmt` handles formatting separately.
+`check:vp` runs linting and TypeScript typechecking through Vite Plus with `lint.options.typeAware` and `lint.options.typeCheck` enabled. `check:fmt` handles formatting separately.
 
 ## Command notes
 

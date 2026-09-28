@@ -11,7 +11,6 @@
 		"check:fmt": "dprint check",
 		"check:vp": "vp check --no-fmt",
 		"check:spelling": "cspell .",
-		"check:tsc": "tsc --noEmit",
 		"fmt": "dprint fmt",
 		"refractor:corpus": "./scripts/fetch-refractor-corpus.node.ts",
 		"refractor:corpus:test": "./scripts/test-refractor-corpus.node.ts",
