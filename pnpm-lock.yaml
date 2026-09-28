@@ -232,8 +232,8 @@ importers:
         specifier: 0.53.2
         version: 0.53.2(@types/react@19.3.0)(@typescript-eslint/parser@8.70.1(eslint@10.11.0(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0))(eslint@10.11.0(jiti@2.7.0)(supports-color@7.2.0))(solid-js@1.9.15)
       comline:
-        specifier: 0.8.1
-        version: 0.8.1(arktype@2.2.3)(zod@4.6.5)
+        specifier: 0.9.0
+        version: 0.9.0(arktype@2.2.3)(zod@4.6.5)
       rolldown:
         specifier: 1.2.11
         version: 1.2.11
@@ -2195,6 +2195,17 @@ packages:
 
   comline@0.8.1:
     resolution: {integrity: sha512-FSg4FZRIC4WOlN4Kg8KPLBufj+2crxZ/ZC+Q97rP1q+kEWOBnSaVJuc1rCM/JHx2KVtHd3Jaap9lpTlYAZwdDg==}
+    peerDependencies:
+      arktype: ^2.1.28
+      zod: ^4.2.0
+    peerDependenciesMeta:
+      arktype:
+        optional: true
+      zod:
+        optional: true
+
+  comline@0.9.0:
+    resolution: {integrity: sha512-PB6CjpeJqSzKL4XZ6kjlGE3G5bcBDZjRQcDoPwKsQT1VloTOQ9Q4EhkJFi0Ng39bFDB7I928qfOZ9LrDYaDc5A==}
     peerDependencies:
       arktype: ^2.1.28
       zod: ^4.2.0
@@ -4896,7 +4907,7 @@ snapshots:
       arktype: 2.2.3
       zod: 4.5.4
 
-  comline@0.8.1(arktype@2.2.3)(zod@4.6.5):
+  comline@0.9.0(arktype@2.2.3)(zod@4.6.5):
     dependencies:
       '@standard-schema/spec': 1.1.0
       treetrunks: 0.1.12
