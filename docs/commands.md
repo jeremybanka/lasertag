@@ -34,4 +34,4 @@ Release compatibility checks need access to the Git remote and release tags.
 
 ## Migration
 
-Use `check:fmt` for formatting validation and `check:<tool>` for static checks. Existing non-conflicting aliases remain available, but CI and maintainer documentation use the canonical commands.
+Use `check:fmt` for formatting validation and `check:<tool>` for static checks. Use the canonical commands directly; superseded names have been removed.
