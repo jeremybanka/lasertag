@@ -60,7 +60,8 @@
 		"check:eslint": "eslint",
 		"test": "vp test",
 		"test:private": "vp test tests/private",
-		"test:public": "vp test tests/public"
+		"test:public": "vp test tests/public",
+		"test:watch": "vp test watch"
 	},
 	"dependencies": {
 		"@astrojs/compiler": "4.0.0",
