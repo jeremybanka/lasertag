@@ -90,14 +90,14 @@
 		"eslint": "10.11.0",
 		"hono": "4.13.9",
 		"jiti": "2.7.0",
-		"preact": "10.29.8",
+		"preact": "11.0.0",
 		"solid-js": "1.9.15"
 	},
 	"peerDependencies": {
 		"@types/react": "^19.2",
 		"eslint": "^10.4",
 		"hono": "^4.13.8",
-		"preact": "^10.29",
+		"preact": "^10.29 || ^11.0.0",
 		"solid-js": "^1.9"
 	},
 	"peerDependenciesMeta": {
