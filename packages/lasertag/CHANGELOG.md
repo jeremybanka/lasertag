@@ -1,5 +1,11 @@
 # lasertag
 
+## 0.8.7
+
+### Patch Changes
+
+- 0a5f1f8: Support Preact 11 alongside Preact 10.
+
 ## 0.8.6
 
 ### Patch Changes
