@@ -22,6 +22,11 @@ export async function ProjectCard({ children }: PropsWithChildren) {
 const attributes: JSX.IntrinsicElements[`project-card`] = { class: css.class }
 void attributes
 
+const deferredAttributes: JSX.IntrinsicElements[`project-card`] = {
+	class: Promise.resolve(css.class),
+}
+void deferredAttributes
+
 // @ts-expect-error Hono HTML class attributes must be strings or promises.
 const invalidClass = <project-card class={123} />
 void invalidClass
