@@ -1,0 +1,12 @@
+{
+	"compilerOptions": {
+		"jsx": "react-jsx",
+		"lib": ["DOM", "ES2024"],
+		"module": "NodeNext",
+		"moduleResolution": "NodeNext",
+		"noEmit": true,
+		"strict": true,
+		"types": []
+	},
+	"include": ["./ProjectCard.tsx"]
+}

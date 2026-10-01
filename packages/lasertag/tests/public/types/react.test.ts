@@ -5,13 +5,9 @@ import { fileURLToPath } from "node:url"
 
 import { expect, it } from "vite-plus/test"
 
-it.each(
-	([`hono/jsx`, `hono/jsx/dom`] as const).flatMap((runtime) =>
-		([`react-jsx`, `react-jsxdev`] as const).map((jsx) => ({ runtime, jsx })),
-	),
-)(
-	`types $runtime custom roots and CSS Modules with $jsx without React globals`,
-	({ runtime, jsx }) => {
+it.each([`react`, `react-jsx`, `react-jsxdev`])(
+	`types React custom roots and CSS Modules with %s`,
+	(jsx) => {
 		const require = createRequire(import.meta.url)
 		const compiler = path.join(
 			path.dirname(require.resolve(`typescript/package.json`)),
@@ -22,11 +18,9 @@ it.each(
 			[
 				compiler,
 				`--project`,
-				fileURLToPath(new URL(`fixtures/hono/tsconfig.json`, import.meta.url)),
+				fileURLToPath(new URL(`fixtures/react/tsconfig.json`, import.meta.url)),
 				`--jsx`,
 				jsx,
-				`--jsxImportSource`,
-				runtime,
 			],
 			{ encoding: `utf8` },
 		)
