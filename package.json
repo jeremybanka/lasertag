@@ -18,7 +18,7 @@
 		"release:version": "changeset version",
 		"staged": "vp staged",
 		"test": "vp run -r test",
-		"test:semver": "break-check",
+		"test:breaks": "vp run -r --no-cache test:breaks",
 		"test:watch": "vp run -r --parallel --no-cache test:watch",
 		"workflows:update": "./scripts/update-workflows.node.ts"
 	},
@@ -29,7 +29,6 @@
 		"@dprint/markdown": "0.26.0",
 		"@dprint/oxc": "0.43.0",
 		"@dprint/toml": "0.9.0",
-		"break-check": "0.8.1",
 		"cspell": "10.3.6",
 		"dprint": "0.60.1",
 		"dprint-plugin-malva": "0.16.0",

@@ -195,9 +195,6 @@ importers:
       '@dprint/toml':
         specifier: 0.9.0
         version: 0.9.0
-      break-check:
-        specifier: 0.8.1
-        version: 0.8.1(supports-color@7.2.0)(zod@4.6.5)
       cspell:
         specifier: 10.3.6
         version: 10.3.6
@@ -286,6 +283,9 @@ importers:
       babel-preset-solid:
         specifier: 1.9.15
         version: 1.9.15(@babel/core@8.0.6)(solid-js@1.9.15)
+      break-check:
+        specifier: 0.8.1
+        version: 0.8.1(supports-color@7.2.0)(zod@4.6.5)
       eslint:
         specifier: 10.12.0
         version: 10.12.0(jiti@2.7.0)(supports-color@7.2.0)
