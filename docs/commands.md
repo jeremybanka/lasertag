@@ -11,7 +11,6 @@ Following the [mise Node.js cookbook](https://mise.jdx.dev/mise-cookbook/nodejs.
 | `check`            | Run every static check listed below. Generated prerequisites and caches may be written; source fixes are explicit. |
 | `test`             | Run the normal test suite once and return a failing status when tests fail.                                        |
 | `test:watch`       | Watch the available interactive test suites.                                                                       |
-| `test:breaks`      | Check the latest release's public tests against the proposed implementation.                                       |
 | `build`            | Build distributable artifacts.                                                                                     |
 | `change`           | Author pending release notes.                                                                                      |
 | `release:version`  | Prepare versions and release metadata without publishing.                                                          |
@@ -26,10 +25,6 @@ Following the [mise Node.js cookbook](https://mise.jdx.dev/mise-cookbook/nodejs.
 - `check:spelling`: `cspell .`.
 
 `check:vp` runs linting and TypeScript typechecking through Vite Plus with `lint.options.typeAware` and `lint.options.typeCheck` enabled. `check:fmt` handles formatting separately.
-
-## Command notes
-
-`test:breaks` runs each package's Break Check configuration with verbose output and task caching disabled. It requires a clean Git working tree and access to the Git remote and release tags. Lasertag runs the released public tests directly against the proposed source implementation; a pending `lasertag` minor changeset certifies an intentional breaking change before 1.0.0.
 
 ## Migration
 
