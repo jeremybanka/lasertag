@@ -29,7 +29,7 @@ Following the [mise Node.js cookbook](https://mise.jdx.dev/mise-cookbook/nodejs.
 
 ## Command notes
 
-`test:breaks` runs each package's Break Check configuration with verbose output and task caching disabled. It requires a clean Git working tree and access to the Git remote and release tags. Lasertag builds the proposed implementation before running the released public tests; a pending `lasertag` minor changeset certifies an intentional breaking change before 1.0.0.
+`test:breaks` runs each package's Break Check configuration with verbose output and task caching disabled. It requires a clean Git working tree and access to the Git remote and release tags. Lasertag runs the released public tests directly against the proposed source implementation; a pending `lasertag` minor changeset certifies an intentional breaking change before 1.0.0.
 
 ## Migration
 
