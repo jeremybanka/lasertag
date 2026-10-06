@@ -3,9 +3,9 @@ import Exhibit from "c/Exhibit.astro";
 # diagnostics
 
 <doc-lead>
-  A Lasertag diagnostic is either a proven structural mismatch, an ownership
-  risk, or a stale exception. This reference explains what each result means and
-  what to change first.
+	A Lasertag diagnostic is either a proven structural mismatch, an ownership
+	risk, or a stale exception. This reference explains what each result means and
+	what to change first.
 </doc-lead>
 
 ## reachability and ownership
@@ -56,6 +56,20 @@ uncertain root are grouped into one diagnostic to avoid cascades.
 If a third-party component guarantees an intrinsic root, an explicit
 `<svg.Icon />`-style assertion can make the root addressable. The assertion does
 not transfer ownership of descendants.
+
+## adoption diagnostics
+
+| Code                          | Meaning                                                          |
+| ----------------------------- | ---------------------------------------------------------------- |
+| `adoption-source-unavailable` | The imported instance has no single analyzable implementation.   |
+| `invalid-adoption-target`     | The directive is not attached to an imported component instance. |
+| `invalid-adoption-directive`  | Its syntax, placement, or multiplicity is invalid.               |
+
+These diagnostics point to the render-source comment rather than a CSS
+selector. Adoption never grants ownership without implementation evidence. The
+retired `{/* @lasertag-own-subtree */}` sibling comment is reported with
+migration guidance; use an `@lasertag-adopt-subtree` block comment inside the
+opening tag instead. See [composition and ownership](/docs/composition#adopt-a-headless-component-deliberately).
 
 ## exception-directive diagnostics
 

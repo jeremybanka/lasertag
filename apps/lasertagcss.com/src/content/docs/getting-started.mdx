@@ -4,15 +4,15 @@ import Exhibit from "c/Exhibit.astro";
 # getting started
 
 <doc-lead>
-  Add Lasertag to one component first. You should finish with two familiar files
-  and a command that can prove their structures agree.
+	Add Lasertag to one component first. You should finish with two familiar files
+	and a command that can prove their structures agree.
 </doc-lead>
 
 ## prerequisites
 
 You need a project that already compiles `.module.css` files and renders JSX
-with React, Preact, or Solid, or an Astro project using CSS Modules. Lasertag
-does not replace your framework or CSS pipeline.
+with React, Preact, Solid, or Hono, or an Astro project using CSS Modules.
+Lasertag does not replace your framework or CSS pipeline.
 
 > **Existing project?** Choose a small leaf component with no `children` prop and
 > few imported components. Its ownership boundary will be obvious while you
@@ -34,8 +34,8 @@ Module type and the JSX type for your framework:
 <Exhibit src="getting-started/lasertag.d.ts.txt" />
 
 For Preact, replace `lasertag/react-jsx` with `lasertag/preact-jsx`. For Solid,
-use `lasertag/solid-jsx`. Astro templates do not need a JSX custom-element type,
-but TSX islands still do.
+use `lasertag/solid-jsx`; for Hono, use `lasertag/hono-jsx`. Astro templates do
+not need a JSX custom-element type, but TSX islands still do.
 
 The CSS Module type exposes exactly one member:
 

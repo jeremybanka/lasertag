@@ -1,0 +1,22 @@
+import css from "./HonoProjectCard.module.css"
+
+export async function HonoProjectCard({
+	loadName,
+}: {
+	loadName: () => Promise<string>
+}) {
+	const name = await loadName()
+	return (
+		<hono-project-card class={css.class}>
+			<h2>{name}</h2>
+			<button
+				type="button"
+				hx-get="/project"
+				hx-target="closest hono-project-card"
+				hx-swap="outerHTML"
+			>
+				Refresh
+			</button>
+		</hono-project-card>
+	)
+}

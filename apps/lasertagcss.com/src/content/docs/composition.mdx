@@ -3,9 +3,9 @@ import Exhibit from "c/Exhibit.astro";
 # composition & ownership
 
 <doc-lead>
-  A component may arrange another component, but it does not own that
-  component's private DOM. Lasertag turns this maintenance boundary into a
-  selector rule.
+	A component may arrange another component, but it does not own that
+	component's private DOM. Lasertag turns this maintenance boundary into a
+	selector rule.
 </doc-lead>
 
 ## what a component owns
@@ -113,6 +113,30 @@ The assertion is unchecked: Refractor trusts the namespace and does not inspect
 its value. Use standard HTML or SVG tag names only when the external component's
 contract is genuinely stable.
 
+## adopt a headless component deliberately
+
+Sometimes a headless component intentionally ships semantic structure for a
+consumer to style. Put `@lasertag-adopt-subtree` inside that imported component
+instance's opening tag:
+
+<Exhibit src="composition/AdoptedMenu.tsx.txt" />
+
+Lasertag resolves that implementation and makes its provable render story part
+of this one consumer's ownership contract:
+
+<Exhibit src="composition/AdoptedMenu.module.css.txt" />
+
+Adoption is validated evidence, not suppression. A missing implementation
+reports `adoption-source-unavailable`; an inapplicable target or malformed
+comment reports an adoption diagnostic. Dead selectors inside a successfully
+adopted story still report normally, and nested imports, children, render props,
+slots, and portals keep their ownership boundaries.
+
+The directive is instance-local and has no runtime output. Put it directly
+among the opening tag's attributes, with no other comment text. The retired
+sibling form, `{/* @lasertag-own-subtree */}`, is invalid and receives migration
+guidance.
+
 ## branches are path-sensitive
 
 An imported component in one branch does not taint a separate, fully owned
@@ -143,6 +167,12 @@ exception next to the selector:
 
 The explanation is required. When the selector becomes reachable or disappears,
 the directive becomes `unused-expect-error`, so exceptions cannot silently rot.
+
+Injected strings are a stricter boundary: Lasertag makes no guarantees for DOM
+created through `innerHTML` or `dangerouslySetInnerHTML`. It does not parse the
+HTML, and cleanup may remove selectors used only by that content. Prefer a
+component-owned render story; if injection is unavoidable, treat its selectors
+and cleanup review as an explicit application responsibility.
 
 For several runtime-owned selectors, use a diagnostic-scoped disable region.
 See the [diagnostics reference](/docs/diagnostics) for exact syntax.

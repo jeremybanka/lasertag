@@ -1,0 +1,5 @@
+lasertag completion install bash
+lasertag completion install zsh
+lasertag completion install fish
+lasertag completion install nushell
+lasertag completion install carapace

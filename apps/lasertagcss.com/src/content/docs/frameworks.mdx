@@ -3,9 +3,9 @@ import Exhibit from "c/Exhibit.astro";
 # frameworks
 
 <doc-lead>
-  Lasertag depends on CSS Modules and analyzable component source, not a runtime
-  integration. React, Preact, Solid, and Astro use the same structural contract
-  with small syntax differences.
+	Lasertag depends on CSS Modules and analyzable component source, not a runtime
+	integration. React, Preact, Solid, Hono, and Astro use the same structural
+	contract with small syntax differences.
 </doc-lead>
 
 ## shared setup
@@ -43,7 +43,7 @@ runtime accepts `class` too; using `className` keeps TSX examples consistent.
 
 Keep `jsxImportSource: "preact"` in the TypeScript project as usual. Lasertag's
 types augment Preact's JSX namespace with arbitrary standards-compliant
-hyphenated custom elements.
+hyphenated custom elements. Preact 10 and 11 are supported.
 
 ## Solid
 
@@ -61,6 +61,25 @@ component as control flow. Supported primitives include:
 
 Static alternatives become render possibilities. Dynamic values remain opaque,
 and recognized portal-style output is excluded from descendant ownership.
+
+## Hono
+
+Import `lasertag/hono-jsx`, use `class={css.class}`, and configure TypeScript's
+automatic JSX transform with `jsxImportSource: "hono/jsx"`:
+
+<Exhibit src="frameworks/HonoProjectCard.tsx.txt" />
+
+Lasertag supplies Hono-native custom-element types without adding React types or
+a global JSX namespace. Refractor understands async components, fragments,
+`StrictMode`, `Suspense`, and `ErrorBoundary`, including imports from
+`hono/jsx/dom` and `hono/jsx/streaming`. Imported Hono `memo` and `forwardRef`
+wrappers preserve the wrapped render structure.
+
+Lasertag does not add a CSS compiler to Wrangler or infer future DOM from
+`hx-get`, `hx-target`, or `hx-swap`. The build must emit and serve the CSS Module
+stylesheet, including styles for fragments that HTMX may request later. Give
+each exported fragment a named root; replacing that complete root preserves its
+class and ownership contract.
 
 ## Astro
 
@@ -85,9 +104,9 @@ server for structural reachability.
 ## mixed repositories
 
 Each component pair is analyzed from its source extension, so a monorepo can
-contain React, Preact, Solid, and Astro packages. Keep the appropriate JSX type
-import in each TypeScript project rather than loading all framework declarations
-globally.
+contain React, Preact, Solid, Hono, and Astro packages. Keep the appropriate JSX
+type import in each TypeScript project rather than loading all framework
+declarations globally.
 
 The CLI scans every `**/*.module.css` by default. Narrow a CI job when a package
 needs an independent boundary:
@@ -102,7 +121,7 @@ comma-separated value.
 The emitted stylesheet needs no Lasertag runtime support. A framework or bundler
 that supports CSS Modules can carry Lasertag-authored CSS. Full static analysis
 currently requires a supported `.tsx` or `.astro` render source, and JSX typing
-is provided for React, Preact, and Solid.
+is provided for React, Preact, Solid, and Hono.
 
 That distinction matters: **CSS compatibility is broad; analyzer adapters are
 explicit.** Unsupported render languages still receive valid CSS Modules, but

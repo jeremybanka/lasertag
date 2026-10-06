@@ -4,9 +4,9 @@ import Exhibit from "c/Exhibit.astro";
 # CLI & editor
 
 <doc-lead>
-  The CLI, language server, VS Code extension, and Refractor API are different
-  surfaces over one conservative analysis engine. Choose the surface that fits
-  the moment; the structural answer stays the same.
+	The CLI, language server, VS Code extension, and Refractor API are different
+	surfaces over one conservative analysis engine. Choose the surface that fits
+	the moment; the structural answer stays the same.
 </doc-lead>
 
 ## choose a surface
@@ -44,6 +44,24 @@ display cap; JSON output always includes every diagnostic.
 `--show-story` adds up to three closest render possibilities to each displayed
 dead selector. The real matching prefix is followed by a marked impossible
 continuation—useful when a deeply nested selector differs from JSX in one place.
+
+### shell completion
+
+Install native completion for the shell you use:
+
+<Exhibit src="tooling/completion.sh.txt" label="choose one shell" />
+
+The installer discovers the shell's completion directory and reports the file
+it writes; it does not edit shell profiles. Open a new shell afterward. Run the
+same command to update an existing integration, or use
+`lasertag completion <shell>` to print a file for manual installation.
+
+Completion covers commands, options, formats, paths, `--max-files=all`, and
+editor targets without running checks or fixes. Bash requires Bash 4+ and
+bash-completion 2.18+; Fish requires Fish 4+; Zsh requires `compinit`; Nushell
+requires version 0.116.0+ with external completions enabled. Existing Nushell
+users should reinstall completion after upgrading Lasertag. If Carapace already
+drives completion in Nushell, install only the Carapace integration.
 
 ## fix
 

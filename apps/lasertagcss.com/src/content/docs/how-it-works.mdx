@@ -3,9 +3,9 @@ import Exhibit from "c/Exhibit.astro";
 # how it works
 
 <doc-lead>
-  Refractor converts render source into a finite structural story, scopes that
-  story to the `css.class` attachment, and asks whether each CSS selector path
-  can exist without crossing ownership.
+	Refractor converts render source into a finite structural story, scopes that
+	story to the `css.class` attachment, and asks whether each CSS selector path
+	can exist without crossing ownership.
 </doc-lead>
 
 ## the pipeline
@@ -75,6 +75,24 @@ Each selector path is classified as:
 Only unreachable paths become `dead-selector`. If results from several selector
 branches are combined, reachable wins over unknown, and unknown wins over
 unreachable. This is the conservative bias that keeps deletion safe.
+
+## children and spreads
+
+JSX bodies, explicit `children` props, and relevant prop spreads all contribute
+possible structure. For React, authored JSX children take precedence over
+`children` supplied by a spread—even `{undefined}` is an explicit replacement.
+A self-closing element with only a spread remains uncertain because that spread
+may supply children or a CSS attachment.
+
+Unknown render branches preserve possibly live CSS. Supported framework
+wrappers and array maps retain precise stories; arbitrary factories, untyped
+maps, custom wrappers, and unresolved spread values remain opaque. This can
+mean fewer dead-selector reports, but cleanup will not delete CSS merely because
+Lasertag cannot prove the branch.
+
+That protection does not extend to HTML strings. `innerHTML` and
+`dangerouslySetInnerHTML` are outside the static render story, so selectors used
+only by injected markup are not guaranteed to survive cleanup.
 
 ## ownership is evaluated separately
 

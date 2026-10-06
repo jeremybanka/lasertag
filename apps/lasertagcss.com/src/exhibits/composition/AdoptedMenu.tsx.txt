@@ -1,0 +1,14 @@
+import { HeadlessMenu } from "@acme/headless-menu"
+
+import css from "./AccountMenu.module.css"
+
+export function AccountMenu() {
+	return (
+		<account-menu className={css.class}>
+			<HeadlessMenu
+				/* @lasertag-adopt-subtree */
+				items={["Profile", "Sign out"]}
+			/>
+		</account-menu>
+	)
+}

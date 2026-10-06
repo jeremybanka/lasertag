@@ -1,0 +1,6 @@
+account-menu.class {
+	> headless-menu {
+		> button {}
+		> menu > li {}
+	}
+}

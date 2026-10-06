@@ -1,11 +1,8 @@
 {
 	"name": "lasertagcss.com",
-	"type": "module",
 	"version": "0.0.0",
 	"private": true,
-	"engines": {
-		"node": "26.5.1"
-	},
+	"type": "module",
 	"scripts": {
 		"dev": "./scripts/rm-dev-lock.node.ts && astro dev",
 		"build": "astro build",
@@ -22,7 +19,7 @@
 		"astro": "7.1.5",
 		"corners": "0.2.0",
 		"lasertag": "workspace:*",
-		"preact": "10.29.8",
+		"preact": "11.0.0",
 		"react": "npm:@preact/compat@18.3.2",
 		"react-dom": "npm:@preact/compat@18.3.2",
 		"react-syntax-highlighter": "16.1.1"
@@ -31,6 +28,9 @@
 		"@types/react": "19.2.17",
 		"@types/react-syntax-highlighter": "15.5.13",
 		"typescript": "7.0.2",
-		"wrangler": "4.119.0"
+		"wrangler": "4.147.0"
+	},
+	"engines": {
+		"node": "26.5.1"
 	}
 }
