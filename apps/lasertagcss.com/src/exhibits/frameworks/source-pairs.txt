@@ -1,0 +1,2 @@
+ComponentName.tsx + ComponentName.module.css
+ComponentName.astro + ComponentName.module.css

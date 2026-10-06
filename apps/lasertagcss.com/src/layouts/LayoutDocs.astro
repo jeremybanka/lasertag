@@ -1,0 +1,19 @@
+---
+import { DocsNavigation } from "../components/DocsNavigation.tsx"
+import Layout from "./Layout.astro"
+import css from "./LayoutDocs.module.css"
+
+type Props = {
+	description?: string
+	title?: string
+}
+
+const { description, title = `lasertag docs` } = Astro.props
+---
+
+<Layout description={description} title={title}>
+	<docs-layout class={css.class}>
+		<DocsNavigation client:load transition:persist />
+		<article><slot /></article>
+	</docs-layout>
+</Layout>

@@ -1,0 +1,15 @@
+name: CSS structure
+
+on:
+	pull_request:
+	push:
+		branches: [main]
+
+jobs:
+	lasertag:
+		runs-on: ubuntu-latest
+		steps:
+			- uses: actions/checkout@v4
+			- uses: pnpm/action-setup@v4
+			- run: pnpm install --frozen-lockfile
+			- run: pnpm lasertag check

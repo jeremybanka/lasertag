@@ -1,0 +1,11 @@
+import { validateCssReachability } from "lasertag/refractor"
+
+const result = validateCssReachability({
+	cssPath: "src/StatusCard.module.css",
+	cssSource,
+	tsxPath: "src/StatusCard.tsx",
+	tsxSource
+})
+
+for (const warning of result.renderStory.warnings) console.warn(warning)
+for (const diagnostic of result.diagnostics) console.error(diagnostic)

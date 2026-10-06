@@ -1,0 +1,9 @@
+import css from "./SolidNotice.module.css"
+
+export function SolidNotice() {
+	return (
+		<solid-notice class={css.class}>
+			<strong>Solid</strong>
+		</solid-notice>
+	)
+}

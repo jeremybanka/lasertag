@@ -1,0 +1,52 @@
+toggle-button.class {
+	--height: 1em;
+	--width: 1em;
+	align-items: center;
+	display: flex;
+	height: var(--height);
+	justify-items: center;
+	position: relative;
+	width: var(--width);
+
+	> button {
+		appearance: none;
+		align-items: center;
+		background: none;
+		border: 0;
+		color: inherit;
+		cursor: pointer;
+		display: grid;
+		height: 100%;
+		justify-items: center;
+		padding: 0;
+		position: relative;
+		width: 100%;
+
+		> back-fill {
+			background: var(--bg-soft-glass-1);
+			backdrop-filter: blur(20px);
+			border: 1px solid var(--bg-soft-glass-3);
+			box-shadow: 0 1px 20px 1px var(--bg-shadow-2);
+			height: var(--height);
+			position: absolute;
+			width: var(--width);
+		}
+		> span {
+			align-items: center;
+			display: inline-flex;
+			font-size: calc(var(--height) * 0.5);
+			height: var(--height);
+			justify-content: center;
+			position: absolute;
+			user-select: none;
+			width: var(--width);
+		}
+		&:hover > back-fill {
+			background: var(--bg-soft-glass-3);
+		}
+		&:focus-visible {
+			outline: 2px solid var(--fg-color);
+			outline-offset: 3px;
+		}
+	}
+}

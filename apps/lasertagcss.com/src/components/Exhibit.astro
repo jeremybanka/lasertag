@@ -1,0 +1,27 @@
+---
+import { exhibits } from "virtual:lasertag-exhibits"
+
+import { extractExhibitCode, parseExhibitReference } from "../lib/exhibits.ts"
+import { CodeBlock } from "./CodeBlock"
+
+type Props = {
+	label?: string
+	soft?: boolean
+	src: string
+}
+
+function getDisplayFilename(src: string): string {
+	const filename = src.split(`/`).pop() ?? `code`
+	return filename.endsWith(`.txt`) ? filename.slice(0, -4) : filename
+}
+
+const { label, soft = false, src } = Astro.props
+const reference = parseExhibitReference(src)
+const sourceCode = exhibits[reference.source]
+if (sourceCode === undefined) throw new Error(`Unknown exhibit source: ${src}`)
+
+const code = extractExhibitCode(sourceCode, reference)
+const filepath = getDisplayFilename(reference.source)
+---
+
+<CodeBlock code={code} filepath={filepath} label={label} soft={soft} />

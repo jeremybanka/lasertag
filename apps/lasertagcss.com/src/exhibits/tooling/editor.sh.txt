@@ -1,0 +1,3 @@
+pnpm lasertag vsix
+pnpm lasertag vsix --target code-insiders
+pnpm lasertag vsix --build-only

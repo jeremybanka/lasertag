@@ -1,10 +1,14 @@
 packages:
+  - apps/*
   - packages/*
 
 allowBuilds:
   "@vscode/vsce-sign": false
   dprint: true
+  esbuild: true
   keytar: false
+  sharp: true
+  workerd: true
 
 blockExoticSubdeps: true
 minimumReleaseAge: 1440

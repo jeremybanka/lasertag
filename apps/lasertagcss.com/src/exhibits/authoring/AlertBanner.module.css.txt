@@ -1,0 +1,7 @@
+alert-banner.class {
+	&[data-severity="warning"] {}
+	&[data-severity="error"] {}
+
+	> button:hover {}
+	> button:focus-visible {}
+}

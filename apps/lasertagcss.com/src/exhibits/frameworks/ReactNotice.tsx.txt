@@ -1,0 +1,9 @@
+import css from "./ReactNotice.module.css"
+
+export function ReactNotice() {
+	return (
+		<react-notice className={css.class}>
+			<strong>React</strong>
+		</react-notice>
+	)
+}

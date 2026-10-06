@@ -1,0 +1,8 @@
+src/components/ProjectCard.module.css  1 warning
+└─ 18:2  dead-selector
+   17 │   > header {}
+   18 │   > footer {}
+      │   ^^^^^^^^^^^
+      ╰─ Selector "project-card.class > footer" does not match any supported render story path.
+
+▲ Check found 1 warning in 1 file

@@ -1,0 +1,16 @@
+account-panel.class {
+	> header > h2 {
+		font-size: 1.5rem;
+	}
+
+	/* Stops at the owned slot boundary. */
+	> main {
+		min-height: 12rem;
+	}
+
+	/* Stops at the imported component boundary. */
+	> footer {
+		display: flex;
+		justify-content: flex-end;
+	}
+}

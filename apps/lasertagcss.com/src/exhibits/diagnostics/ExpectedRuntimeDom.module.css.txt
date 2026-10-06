@@ -1,0 +1,6 @@
+chart-canvas.class {
+	/* @lasertag-expect-error: chart runtime appends this canvas */
+	> canvas {
+		display: block;
+	}
+}
