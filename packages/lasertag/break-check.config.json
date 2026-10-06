@@ -1,0 +1,6 @@
+{
+	"tagPattern": "refs/tags/lasertag@",
+	"testPattern": "tests/public/**",
+	"testCommand": "pnpm run test:public",
+	"certifyCommand": "grep -q -F '\"lasertag\": minor' ../../.changeset/*.md"
+}
