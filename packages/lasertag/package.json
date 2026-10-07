@@ -87,7 +87,7 @@
 		"@types/react": "19.3.0",
 		"@typescript-eslint/parser": "8.71.1",
 		"@typescript-eslint/utils": "8.71.1",
-		"babel-preset-solid": "1.9.15",
+		"babel-preset-solid": "1.9.16",
 		"break-check": "0.8.2",
 		"eslint": "10.12.0",
 		"hono": "4.13.13",
