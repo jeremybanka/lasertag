@@ -93,7 +93,7 @@
 		"hono": "4.13.13",
 		"jiti": "2.7.0",
 		"preact": "11.0.0",
-		"solid-js": "1.9.15"
+		"solid-js": "1.9.16"
 	},
 	"peerDependencies": {
 		"@types/react": "^19.2",
