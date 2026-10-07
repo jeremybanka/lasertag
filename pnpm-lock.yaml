@@ -284,8 +284,8 @@ importers:
         specifier: 1.9.15
         version: 1.9.15(@babel/core@8.0.6)(solid-js@1.9.15)
       break-check:
-        specifier: 0.8.1
-        version: 0.8.1(supports-color@7.2.0)(zod@4.6.5)
+        specifier: 0.8.2
+        version: 0.8.2(supports-color@7.2.0)(zod@4.6.5)
       eslint:
         specifier: 10.12.0
         version: 10.12.0(jiti@2.7.0)(supports-color@7.2.0)
@@ -2160,8 +2160,8 @@ packages:
     resolution: {integrity: sha512-ScQ4IuvIEF1TMlP7Zt+vjJ//9zlPb2SDcxWxM3bk8s6t6GGdJ7KO1dCcTidOPJKePW30LE/2cT7wCyPho9/Wxg==}
     engines: {node: 20 || >=22}
 
-  break-check@0.8.1:
-    resolution: {integrity: sha512-YEHOJLMsyvoDp/AI2fLdmCoFBJOEx7ibCaXNOpD8QLXLUQ7az6C6rhP24LXcGOY/ywiwlBrEvpjI8FF4vcp2Sg==}
+  break-check@0.8.2:
+    resolution: {integrity: sha512-Ff4qfyry4IX4ZwRdk9M+IbF+ZFDbb5D3RCWHC5FlMM5fRiyZnLnzoGCAmHStLrsSKJGmHt9zu0MGdqzg0OFLPQ==}
     hasBin: true
 
   browserslist@4.29.0:
@@ -4839,7 +4839,7 @@ snapshots:
     dependencies:
       balanced-match: 4.0.4
 
-  break-check@0.8.1(supports-color@7.2.0)(zod@4.6.5):
+  break-check@0.8.2(supports-color@7.2.0)(zod@4.6.5):
     dependencies:
       arktype: 2.2.7
       comline: 0.9.0(arktype@2.2.7)(zod@4.6.5)
