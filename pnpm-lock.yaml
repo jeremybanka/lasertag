@@ -227,7 +227,7 @@ importers:
         version: 4.0.0(supports-color@7.2.0)
       atom.io:
         specifier: 0.53.3
-        version: 0.53.3(@types/react@19.3.0)(@typescript-eslint/parser@8.71.1(eslint@10.12.0(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0))(eslint@10.12.0(jiti@2.7.0)(supports-color@7.2.0))(solid-js@1.9.16)
+        version: 0.53.3(@types/react@19.3.0)(@typescript-eslint/parser@8.71.1(eslint@10.12.0(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0))(eslint@10.12.0(jiti@2.7.0)(supports-color@7.2.0))(solid-js@1.9.17)
       comline:
         specifier: 0.9.0
         version: 0.9.0(arktype@2.2.7)(zod@4.6.5)
@@ -282,7 +282,7 @@ importers:
         version: 8.71.1(eslint@10.12.0(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0)
       babel-preset-solid:
         specifier: 1.9.16
-        version: 1.9.16(@babel/core@8.0.7)(solid-js@1.9.16)
+        version: 1.9.16(@babel/core@8.0.7)(solid-js@1.9.17)
       break-check:
         specifier: 0.8.2
         version: 0.8.2(supports-color@7.2.0)(zod@4.6.5)
@@ -299,8 +299,8 @@ importers:
         specifier: 11.0.0
         version: 11.0.0
       solid-js:
-        specifier: 1.9.16
-        version: 1.9.16
+        specifier: 1.9.17
+        version: 1.9.17
 
 packages:
 
@@ -3068,8 +3068,8 @@ packages:
     resolution: {integrity: sha512-kCZr2V3ch9i00x8zXRhjUNVcjG9ijES5dDudkXvUVCT5QlJNQWElSJdZqyPemffHoLNUYwOcou0Fy+ojN0uHSQ==}
     engines: {node: '>= 18'}
 
-  solid-js@1.9.16:
-    resolution: {integrity: sha512-vESESWrNRebA0sQv+Vr9/2wOFOL6NK2QQow7F5/WCBH4c+OVoDyQNEbiVKVL7YqE1M7MPd7z7p27KElLkaD0bw==}
+  solid-js@1.9.17:
+    resolution: {integrity: sha512-4GAmLOWPfNV8H9Jfn2LSFTpNEG6jiOKPiwd5lnLGQtehHaX6l3TOLzJqQ7mqwB/3k1Yy3zyumFVopmc/tm34ow==}
 
   source-map-js@1.2.1:
     resolution: {integrity: sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==}
@@ -4868,12 +4868,12 @@ snapshots:
 
   assertion-error@2.0.1: {}
 
-  atom.io@0.53.3(@types/react@19.3.0)(@typescript-eslint/parser@8.71.1(eslint@10.12.0(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0))(eslint@10.12.0(jiti@2.7.0)(supports-color@7.2.0))(solid-js@1.9.16):
+  atom.io@0.53.3(@types/react@19.3.0)(@typescript-eslint/parser@8.71.1(eslint@10.12.0(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0))(eslint@10.12.0(jiti@2.7.0)(supports-color@7.2.0))(solid-js@1.9.17):
     optionalDependencies:
       '@types/react': 19.3.0
       '@typescript-eslint/parser': 8.71.1(eslint@10.12.0(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0)
       eslint: 10.12.0(jiti@2.7.0)(supports-color@7.2.0)
-      solid-js: 1.9.16
+      solid-js: 1.9.17
 
   azure-devops-node-api@12.5.0:
     dependencies:
@@ -4889,12 +4889,12 @@ snapshots:
       html-entities: 2.3.3
       parse5: 7.3.0
 
-  babel-preset-solid@1.9.16(@babel/core@8.0.7)(solid-js@1.9.16):
+  babel-preset-solid@1.9.16(@babel/core@8.0.7)(solid-js@1.9.17):
     dependencies:
       '@babel/core': 8.0.7
       babel-plugin-jsx-dom-expressions: 0.40.11(@babel/core@8.0.7)
     optionalDependencies:
-      solid-js: 1.9.16
+      solid-js: 1.9.17
 
   balanced-match@4.0.4: {}
 
@@ -5812,7 +5812,7 @@ snapshots:
 
   smol-toml@1.8.0: {}
 
-  solid-js@1.9.16:
+  solid-js@1.9.17:
     dependencies:
       csstype: 3.2.3
       seroval: 1.6.8
