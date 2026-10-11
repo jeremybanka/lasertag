@@ -119,9 +119,9 @@
 			"optional": true
 		}
 	},
-	"packageManager": "pnpm@12.10.1",
+	"packageManager": "pnpm@12.11.2",
 	"engines": {
 		"node": "26.11.1",
-		"pnpm": "12.10.1"
+		"pnpm": "12.11.2"
 	}
 }
