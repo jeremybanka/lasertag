@@ -59,7 +59,7 @@
 		"build": "vp pack",
 		"check:eslint": "eslint",
 		"test": "vp test",
-		"test:breaks": "break-check break-check.config.json --verbose",
+		"test:breaks": "breakage breakage.config.json --verbose",
 		"test:private": "vp test tests/private",
 		"test:public": "vp test tests/public",
 		"test:watch": "vp test watch"
@@ -88,7 +88,7 @@
 		"@typescript-eslint/parser": "8.71.2",
 		"@typescript-eslint/utils": "8.71.2",
 		"babel-preset-solid": "1.9.16",
-		"break-check": "0.8.2",
+		"breakage": "0.8.1",
 		"eslint": "10.12.0",
 		"hono": "4.13.13",
 		"jiti": "2.7.0",
