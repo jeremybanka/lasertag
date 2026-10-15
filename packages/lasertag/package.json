@@ -59,7 +59,7 @@
 		"build": "vp pack",
 		"check:eslint": "eslint",
 		"test": "vp test",
-		"test:breaks": "breakage breakage.config.json --verbose",
+		"test:breakage": "breakage breakage.config.json --verbose",
 		"test:private": "vp test tests/private",
 		"test:public": "vp test tests/public",
 		"test:watch": "vp test watch"

@@ -18,7 +18,7 @@
 		"release:version": "changeset version",
 		"staged": "vp staged",
 		"test": "vp run -r test",
-		"test:breaks": "vp run -r --no-cache test:breaks",
+		"test:breakage": "vp run -r --no-cache test:breakage",
 		"test:watch": "vp run -r --parallel --no-cache test:watch",
 		"workflows:update": "./scripts/update-workflows.node.ts"
 	},
