@@ -10,6 +10,7 @@ Following the [mise Node.js cookbook](https://mise.jdx.dev/mise-cookbook/nodejs.
 | `check:fmt`        | Validate formatting without rewriting maintained files; language-specific validators are listed below.             |
 | `check`            | Run every static check listed below. Generated prerequisites and caches may be written; source fixes are explicit. |
 | `test`             | Run the normal test suite once and return a failing status when tests fail.                                        |
+| `test:breakage`    | Replay the latest released public consumer contracts against current source.                                       |
 | `test:watch`       | Watch the available interactive test suites.                                                                       |
 | `build`            | Build distributable artifacts.                                                                                     |
 | `change`           | Author pending release notes.                                                                                      |
