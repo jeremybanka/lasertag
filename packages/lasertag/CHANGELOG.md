@@ -1,5 +1,14 @@
 # lasertag
 
+## 0.8.8
+
+### Patch Changes
+
+- 34e7ec5: Upgrade Lasertag's TypeScript runtime to 7.1.0-beta and reuse analysis sessions across files and edits. Refresh unresolved imports when dependencies are created or restored. Existing render-story APIs, CSS diagnostics, completions, and cleanup rules remain compatible.
+- 34e7ec5: Log the VS Code extension version, selected server and TypeScript executable paths, actual native compiler version, and content mapper trust status at startup.
+- 34e7ec5: Add Astro component navigation in trusted editor workspaces using @astrojs/ts-content-mapper registered for .astro in tsconfig.json. Go to Definition opens source targets, including aliased and namespace imports; Go to Declaration opens ambient declarations. Navigation starts on demand and reuses its session, including unsaved dependency edits. Astro render-story structure continues to come from the template parser, preserving CSS diagnostics, completions, and cleanup behavior.
+- 34e7ec5: Resolve css.class to its authored stylesheet in CLI check and fix and the editor's CSS ownership view. Install css-modules-content-mapper and register it for .module.css in the top-level tsconfig.json contentMappers array; Astro files also need @astrojs/ts-content-mapper registered for .astro. Lasertag uses these registrations automatically in trusted projects, with no additional feature settings. Shared TypeScript analysis reuses project state across files and edits, and mapper failures fall back to ordinary analysis. Existing CSS diagnostics, completions, cleanup rules, and the .class-only contract are preserved. See docs/tooling-guide.md for setup and verification.
+
 ## 0.8.7
 
 ### Patch Changes
