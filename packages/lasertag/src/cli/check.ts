@@ -1,10 +1,16 @@
+import {
+	createCliCssAnalysis,
+	currentCssAnalysis,
+	type PreparedCssAnalysis,
+} from "./css-analysis.ts"
+import { validateCssAnalysis } from "../refractor/css-analysis.ts"
+import type { CssOwnershipResult } from "../refractor/css-ownership-evidence.ts"
 import { existsSync, readFileSync } from "node:fs"
 
 import {
 	ambiguousRenderSourceMessage,
 	createTypescriptAstSession,
 	resolveSiblingRenderSource,
-	validateRenderSourceCssReachability,
 	type CssReachabilityDiagnostic,
 	type TypescriptAstSession,
 } from "../refractor/index.ts"
@@ -17,6 +23,7 @@ import {
 export type LasertagCheckFileStatus = `checked` | `failed` | `skipped`
 
 export type LasertagCheckFileResult = LasertagWorkResult & {
+	ownership?: CssOwnershipResult[`ownership`]
 	diagnostics: CssReachabilityDiagnostic[]
 	status: LasertagCheckFileStatus
 	error?: string
@@ -41,6 +48,7 @@ export type LasertagCheckFileSystem = {
 }
 
 export type RunLasertagCheckOptions = {
+	cssOwnership?: boolean
 	fileSystem?: Partial<LasertagCheckFileSystem>
 	includeStoryEvidence?: boolean
 	typescriptSdkPath?: string
@@ -62,6 +70,7 @@ function checkFile(
 	workerId: number,
 	fileSystem: LasertagCheckFileSystem,
 	typescriptSession: TypescriptAstSession,
+	prepared?: PreparedCssAnalysis,
 ): LasertagCheckFileResult {
 	const { cssPath, index, stolenFrom } = task
 	const assignment = stolenFrom === undefined ? {} : { stolenFrom }
@@ -90,15 +99,23 @@ function checkFile(
 		sourcePath = resolution.source.path
 
 		const cssSource = fileSystem.readFile(cssPath)
-		const diagnostics = validateRenderSourceCssReachability(
+		const sourceText = fileSystem.readFile(sourcePath)
+		const mapped = currentCssAnalysis(
+			prepared,
+			sourcePath,
+			sourceText,
+			cssSource,
+		)
+		const diagnostics = validateCssAnalysis(
 			{
 				cssPath,
 				cssSource,
 				...(task.includeStoryEvidence ? { includeStoryEvidence: true } : {}),
 				sourcePath,
-				sourceText: fileSystem.readFile(sourcePath),
+				sourceText,
 			},
 			typescriptSession,
+			mapped,
 		).diagnostics
 
 		return {
@@ -106,6 +123,7 @@ function checkFile(
 			diagnostics,
 			index,
 			status: `checked`,
+			...(mapped ? { ownership: mapped.ownership } : {}),
 			...assignment,
 			tsxPath: sourcePath,
 			workerId,
@@ -187,14 +205,35 @@ export async function runLasertagCheck(
 		options.fileSystem !== undefined &&
 		Object.keys(options.fileSystem).length > 0
 
+	const mapper = options.cssOwnership
+		? createCliCssAnalysis(
+				options.workerModuleUrl ?? new URL(`./main.ts`, import.meta.url),
+				typescriptSession,
+				options.typescriptSdkPath,
+			)
+		: undefined
 	try {
 		const work = await runWorkStealing<LasertagCheckFileResult>({
 			files,
-			forceSerial: hasCustomFileSystem,
+			forceSerial: hasCustomFileSystem || !!mapper,
 			...(options.includeStoryEvidence ? { includeStoryEvidence: true } : {}),
 			operation: `check`,
-			processSerial: (task, workerId) =>
-				checkFile(task, workerId, fileSystem, typescriptSession),
+			processSerial: async (task, workerId) => {
+				let prepared: PreparedCssAnalysis | undefined
+				try {
+					prepared = await mapper?.prepare(task.cssPath, fileSystem)
+				} catch {
+					/* File failures are reported by the ordinary path. */
+				}
+				const result = checkFile(
+					task,
+					workerId,
+					fileSystem,
+					typescriptSession,
+					prepared,
+				)
+				return result
+			},
 			...(options.typescriptSdkPath
 				? { typescriptSdkPath: options.typescriptSdkPath }
 				: {}),
@@ -206,6 +245,7 @@ export async function runLasertagCheck(
 
 		return summarizeCheck(work.fileResults, work.workerCount, work.stealCount)
 	} finally {
+		await mapper?.close()
 		typescriptSession.close()
 	}
 }

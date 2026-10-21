@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+import {
+	CSS_ANALYSIS_WORKER,
+	runCssAnalysisWorker,
+} from "../refractor/css-analysis.ts"
+import type { CssOwnershipResult } from "../refractor/css-ownership-evidence.ts"
+
 import { existsSync, readFileSync } from "node:fs"
 import path from "node:path"
 import { styleText } from "node:util"
@@ -10,7 +16,6 @@ import {
 	completionResponse,
 	formatWarnings,
 	help,
-	noOptions,
 	options,
 	optional,
 	parseBooleanOption,
@@ -115,7 +120,16 @@ const rootOptionsSchema = z.object({
 	version: z.boolean().default(false),
 })
 
+const cssOwnershipOption = {
+	completion: { repeatable: false },
+	description: `execute project content mappers and report CSS ownership evidence`,
+	example: `--css-ownership`,
+	parse: parseBooleanOption,
+	required: false,
+}
+
 const checkOptionsSchema = z.object({
+	"css-ownership": z.boolean().optional(),
 	format: z.enum(FORMAT_OPTIONS).default(`stylish`),
 	"max-files": z
 		.string()
@@ -135,7 +149,8 @@ const vsixOptionsSchema = z.object({
 
 type RootOptions = z.infer<typeof rootOptionsSchema>
 type CheckOptions = z.infer<typeof checkOptionsSchema>
-type FixOptions = Record<never, never>
+const fixOptionsSchema = z.object({ "css-ownership": z.boolean().optional() })
+type FixOptions = z.infer<typeof fixOptionsSchema>
 type VsixOptions = z.infer<typeof vsixOptionsSchema>
 
 export type LasertagCliMode =
@@ -212,6 +227,7 @@ const checkRouteOptions = options(
 	`Validate component-owned CSS modules.`,
 	checkOptionsSchema,
 	{
+		"css-ownership": cssOwnershipOption,
 		format: {
 			completion: { repeatable: false },
 			description: `output format`,
@@ -236,8 +252,10 @@ const checkRouteOptions = options(
 	},
 )
 
-const fixRouteOptions = noOptions(
+const fixRouteOptions = options(
 	`Clean up fixable diagnostics in component-owned CSS modules.`,
+	fixOptionsSchema,
+	{ "css-ownership": cssOwnershipOption },
 )
 
 const lasertagCli = cli({
@@ -968,9 +986,14 @@ function formatDiagnostics(
 	cwd: string,
 	readCssSource: (cssPath: string) => string,
 	styler: CheckOutputStyler,
+	ownership?: ReturnType<typeof ownershipReports>,
 ): string {
 	if (options.format === `json`) {
-		return JSON.stringify({ diagnostics, files }, null, 2)
+		return JSON.stringify(
+			{ diagnostics, files, ...(ownership ? { ownership } : {}) },
+			null,
+			2,
+		)
 	}
 
 	if (diagnostics.length === 0) {
@@ -1036,6 +1059,36 @@ function createDiagnostic(
 	}
 }
 
+function ownershipReports(
+	files: Array<{
+		cssPath: string
+		tsxPath?: string
+		ownership?: CssOwnershipResult[`ownership`]
+	}>,
+) {
+	return files.flatMap(({ cssPath, tsxPath, ownership }) =>
+		ownership ? [{ cssPath, sourcePath: tsxPath, ...ownership }] : [],
+	)
+}
+function formatOwnership(
+	reports: ReturnType<typeof ownershipReports>,
+	cwd: string,
+): string {
+	return reports
+		.flatMap((report) =>
+			report.status === `unavailable`
+				? [`${displayPath(cwd, report.cssPath)}: ${report.reason}`]
+				: [
+						`${displayPath(cwd, report.cssPath)}: ${report.attachments.length} CSS ownership references`,
+						...report.attachments.map(
+							(reference) =>
+								`  ${reference.expression}: ${reference.status}${reference.targets.length ? ` (${reference.targets.map((target) => displayPath(cwd, target.sourcePath)).join(`, `)})` : ``}`,
+						),
+					],
+		)
+		.join(`\n`)
+}
+
 async function runCheck(
 	targets: string[],
 	options: CheckOptions,
@@ -1047,6 +1100,7 @@ async function runCheck(
 	const files = discoverCssModuleFiles(targets, environment)
 	const fileSystem = checkFileSystemFromEnvironment(environment)
 	const checkResult = await runLasertagCheck(files, {
+		...(options[`css-ownership`] ? { cssOwnership: true } : {}),
 		...(options[`show-story`] && options.format === `stylish`
 			? { includeStoryEvidence: true }
 			: {}),
@@ -1085,8 +1139,21 @@ async function runCheck(
 	}
 
 	io.log(
-		formatDiagnostics(diagnostics, options, files, cwd, readCssSource, styler),
+		formatDiagnostics(
+			diagnostics,
+			options,
+			files,
+			cwd,
+			readCssSource,
+			styler,
+			options[`css-ownership`]
+				? ownershipReports(checkResult.fileResults)
+				: undefined,
+		),
 	)
+
+	if (options[`css-ownership`] && options.format !== `json`)
+		io.log(formatOwnership(ownershipReports(checkResult.fileResults), cwd))
 
 	return {
 		diagnostics,
@@ -1195,6 +1262,7 @@ function fixFileSystemFromEnvironment(
 
 async function runFix(
 	targets: string[],
+	options: FixOptions,
 	io: LasertagCliIO,
 	environment: LasertagCliEnvironment,
 ): Promise<LasertagCliResult> {
@@ -1213,6 +1281,7 @@ async function runFix(
 
 	try {
 		fixResult = await runLasertagFix(files, {
+			...(options[`css-ownership`] ? { cssOwnership: true } : {}),
 			...(environment.fixWorkerCount
 				? { workerCount: environment.fixWorkerCount }
 				: {}),
@@ -1283,6 +1352,8 @@ async function runFix(
 		)
 	}
 
+	if (options[`css-ownership`])
+		io.log(formatOwnership(ownershipReports(fixResult.fileResults), cwd))
 	return {
 		changedFiles: fixResult.changedFiles,
 		diagnostics,
@@ -1290,7 +1361,7 @@ async function runFix(
 		files,
 		fixedCount: fixResult.fixedCount,
 		mode: `fix`,
-		options: {},
+		options,
 		stealCount: fixResult.stealCount,
 		targets,
 		workerCount: fixResult.workerCount,
@@ -1448,9 +1519,19 @@ export async function runLasertagCli(
 			}
 		}
 		case `fix`:
-			return runFix(DEFAULT_TARGET_PATTERNS, io, environment)
+			return runFix(
+				DEFAULT_TARGET_PATTERNS,
+				parsed.inputs.opts,
+				io,
+				environment,
+			)
 		case `fix/$glob`:
-			return runFix(targetsFromGlob(parsed.inputs.path[1]), io, environment)
+			return runFix(
+				targetsFromGlob(parsed.inputs.path[1]),
+				parsed.inputs.opts,
+				io,
+				environment,
+			)
 		case `check`:
 			return runCheck(
 				DEFAULT_TARGET_PATTERNS,
@@ -1470,7 +1551,13 @@ export async function runLasertagCli(
 	}
 }
 
-if (!isMainThread && isLasertagWorkerData(workerData)) {
+if (
+	isMainThread &&
+	import.meta.main &&
+	process.argv.includes(`--${CSS_ANALYSIS_WORKER}`)
+) {
+	runCssAnalysisWorker()
+} else if (!isMainThread && isLasertagWorkerData(workerData)) {
 	const typescriptSession = createTypescriptAstSession(
 		workerData.typescriptSdkPath
 			? { typescriptSdkPath: workerData.typescriptSdkPath }

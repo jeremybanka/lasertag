@@ -13,6 +13,7 @@ import {
 } from "../lsp/render-story-view.ts"
 import {
 	astroNavigationInitializationOptions,
+	cssOwnershipInitializationOptions,
 	resolveBundledTypescriptSdkPath,
 	resolveTypescriptSdkPath,
 	resolveWorkspacePath,
@@ -432,13 +433,20 @@ function createServerOptions(context: ExtensionContext) {
 
 function createClientOptions() {
 	return {
-		initializationOptions: () =>
-			astroNavigationInitializationOptions(
+		initializationOptions: () => ({
+			...cssOwnershipInitializationOptions(
+				vscode.workspace
+					.getConfiguration("lasertag")
+					.get("css.ownership.enabled", false),
+				vscode.workspace.isTrusted,
+			),
+			...astroNavigationInitializationOptions(
 				vscode.workspace
 					.getConfiguration("lasertag")
 					.get("astro.navigation.enabled", false),
 				vscode.workspace.isTrusted,
 			),
+		}),
 		documentSelector: [
 			{
 				language: "css",
@@ -511,7 +519,10 @@ export async function activate(context: ExtensionContext) {
 	await client.start()
 	context.subscriptions.push(
 		vscode.workspace.onDidChangeConfiguration((event) => {
-			if (event.affectsConfiguration("lasertag.astro.navigation.enabled"))
+			if (
+				event.affectsConfiguration("lasertag.astro.navigation.enabled") ||
+				event.affectsConfiguration("lasertag.css.ownership.enabled")
+			)
 				void client?.restart()
 		}),
 	)

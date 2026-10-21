@@ -1,15 +1,22 @@
 # Render Story CSS Validation Plan
 
-Status: planning
+Status: implemented with opt-in CSS ownership analysis; historical design notes follow.
 
-## CSS mapper ownership prototype
+## CSS mapper ownership analysis
 
-The private source module `src/refractor/css-ownership-evidence.ts` evaluates
-TypeScript content mappers as evidence for CSS Module references. It reuses
-`createTypescriptAstSession`, including dependency tracking, current unsaved
-overlays, and explicit invalidation. It is outside the `lasertag/refractor`
-exports and does not change public story extraction, CSS ownership, completions,
-cleanup, CLI behavior, or the LSP's Astro navigation setting.
+The source module `src/refractor/css-ownership-evidence.ts` supplies CSS Module
+ownership evidence to CLI `check --css-ownership` and `fix --css-ownership`, and
+to the LSP with `cssOwnership.enabled` and `runExternalCode` enabled. VS Code
+exposes the trusted-workspace setting `lasertag.css.ownership.enabled`.
+See the [consumer setup and output contract](tooling-guide.md#css-mapper-ownership-analysis).
+
+The consumers reuse a bounded analysis process and TypeScript session, including
+current unsaved overlays and explicit invalidation. TSX stories and evidence
+share parsed source; the template parser remains authoritative for Astro
+structure. Mapper results are consumed by CLI reporting and the editor's
+render-story view. Existing structural rules still determine CSS diagnostics,
+completions, and cleanup. Worker failures fall back to ordinary extraction.
+The implementation remains outside the `lasertag/refractor` exports.
 
 Development validation pins `css-modules-content-mapper` `0.1.1` and runs its
 unmodified executable. Astro inputs also use `@astrojs/ts-content-mapper` `0.2.0`.
@@ -50,7 +57,7 @@ recognizes; differences are evidence for future review, not behavior changes.
 An overall `available` status means the input could be analyzed, not that every
 reference has verified CSS evidence.
 
-The prototype verifies the authored token as well as the mapper's symbol. The
+The analysis verifies the authored token as well as the mapper's symbol. The
 generic mapper exports IDs and names inside global selectors; those are not
 sibling ownership proof. Comments, attribute strings, partial names, escaped
 tokens, missing or feature-disabled mappings, and stale CSS source are rejected
@@ -69,7 +76,7 @@ path mappings, optional and bracket accesses, shadowing, different modules,
 unsaved CSS and import edits, closing overlays, disk changes, ambiguous types,
 mapper failures, and deliberately defective projections. The `.class`-only rule
 still diagnoses other local classes even though the generic development mapper
-can expose them to TypeScript. This prototype does not adopt imported DOM, infer
+can expose them to TypeScript. This analysis does not adopt imported DOM, infer
 selector reachability from a class symbol, or replace the CSS parser.
 
 Run the repeatable website validation from the repository root:

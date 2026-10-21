@@ -83,6 +83,7 @@ settings; restarting the existing Lasertag client does not reload those settings
 | `lasertag.typescript.sdk.path`      | `""`     | Path to the TypeScript 7 native executable used for TSX analysis. Relative paths resolve from the first workspace root. Leave empty to use the bundled executable. |
 | `lasertag.log.level`                | `"info"` | Operational logging: `off`, `error`, `warn`, `info`, or `debug`.                                                                                                   |
 | `lasertag.trace.server`             | `"off"`  | Client/server protocol tracing: `off`, `messages`, or `verbose`. This is separate from operational logging.                                                        |
+| `lasertag.css.ownership.enabled`    | `false`  | Enable CSS ownership analysis and authored stylesheet targets in trusted workspaces.                                                                               |
 | `lasertag.astro.navigation.enabled` | `false`  | Enable on-demand Astro navigation and permit execution of project content mappers in trusted workspaces.                                                           |
 
 Operational logs and protocol traces appear in **View: Toggle Output** under
@@ -112,6 +113,22 @@ of its source file. **Go to Declaration** follows ambient declarations; an MDX
 `Content` type declaration does not establish the MDX implementation. Unresolved
 or conflicting mappings return no target. Render stories, CSS diagnostics,
 completions, and cleanup continue to use the template parser.
+
+## CSS ownership analysis
+
+Install and register `css-modules-content-mapper` for `.module.css` in the
+project's `contentMappers` configuration. Astro files also need the Astro mapper
+shown above. Enable `lasertag.css.ownership.enabled` in a trusted workspace.
+This separately permits project mapper execution during CSS analysis and
+restarts the server.
+
+Diagnostics, completions, cleanup, and the sidebar share the mapped story while
+retaining existing structural rules. The **CSS ownership** section shows each
+class reference's status and lets you open verified authored stylesheet targets.
+Unsaved stylesheets and imported bindings participate in analysis. Missing or
+failed evidence stays unverified or unavailable; worker failures fall back to
+ordinary analysis. The feature does not permit extra local classes or change
+cleanup decisions.
 
 ## Troubleshooting
 

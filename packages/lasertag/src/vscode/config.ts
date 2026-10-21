@@ -16,6 +16,18 @@ export function astroNavigationInitializationOptions(
 	}
 }
 
+export function cssOwnershipInitializationOptions(
+	enabled: boolean,
+	trusted: boolean,
+) {
+	return {
+		cssOwnership: {
+			enabled: enabled && trusted,
+			runExternalCode: enabled && trusted,
+		},
+	}
+}
+
 export function resolveWorkspacePath(
 	configuredPath: string,
 	workspaceRoot: string | undefined,

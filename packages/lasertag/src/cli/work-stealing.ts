@@ -56,7 +56,10 @@ export type RunWorkStealingOptions<TResult extends LasertagWorkResult> = {
 	onProgress?: (progress: WorkStealingProgress<TResult>) => void
 	onStart?: (start: WorkStealingStart) => void
 	operation: LasertagWorkerOperation
-	processSerial: (task: LasertagWorkTask, workerId: number) => TResult
+	processSerial: (
+		task: LasertagWorkTask,
+		workerId: number,
+	) => TResult | Promise<TResult>
 	typescriptSdkPath?: string
 	workerCount?: number
 	workerModuleUrl?: string | URL
@@ -172,13 +175,13 @@ function orderedResults<TResult extends LasertagWorkResult>(
 	return [...fileResults].sort((left, right) => left.index - right.index)
 }
 
-function runSerial<TResult extends LasertagWorkResult>(
+async function runSerial<TResult extends LasertagWorkResult>(
 	options: RunWorkStealingOptions<TResult>,
-): WorkStealingRunResult<TResult> {
+): Promise<WorkStealingRunResult<TResult>> {
 	const fileResults: TResult[] = []
 
 	for (const [index, cssPath] of options.files.entries()) {
-		const result = options.processSerial(
+		const result = await options.processSerial(
 			{
 				cssPath,
 				...(options.includeStoryEvidence ? { includeStoryEvidence: true } : {}),

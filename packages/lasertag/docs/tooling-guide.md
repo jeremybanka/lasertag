@@ -450,6 +450,74 @@ Enabling navigation does not run mappers for diagnostics, completions, cleanup,
 or the Render Story sidebar. Those retain their existing template structure and
 CSS ownership rules.
 
+### CSS mapper ownership analysis
+
+Enable CSS ownership analysis to resolve class references to their authored
+stylesheet declarations while using the same render-story and CSS policies.
+Install `css-modules-content-mapper@0.1.1` in the project and register it in
+`tsconfig.json`. Astro sources also require `@astrojs/ts-content-mapper@0.2.0`:
+
+```json
+{
+	"contentMappers": [
+		{ "package": "css-modules-content-mapper", "extensions": [".module.css"] },
+		{ "package": "@astrojs/ts-content-mapper", "extensions": [".astro"] }
+	]
+}
+```
+
+In a trusted project, run:
+
+```sh
+pnpm lasertag check --css-ownership
+pnpm lasertag check --css-ownership --format=json
+pnpm lasertag fix --css-ownership
+```
+
+The flag explicitly permits executing the project's configured content mappers.
+Check and fix use one reusable analysis process for the batch. TSX story
+extraction and ownership queries share the native source analysis; Astro
+structure comes from the template parser. Fix uses the existing cleanup rules
+and refreshes ownership evidence after writing the stylesheet.
+
+Stylish output lists each reference's ownership status and target file. JSON
+check output adds an `ownership` array beside the existing `diagnostics` and
+`files`. Each entry identifies the CSS and render source paths and reports
+either available attachment evidence or an unavailable reason. Attachment and
+target ranges are UTF-16 offsets in the authored source and stylesheet.
+
+In VS Code, enable `lasertag.css.ownership.enabled` in a trusted workspace. The
+setting restarts the server and is independent of Astro navigation. Other LSP
+clients send both flags in `initialize.initializationOptions`:
+
+```json
+{
+	"cssOwnership": { "enabled": true, "runExternalCode": true }
+}
+```
+
+The LSP shares each mapped story across diagnostics, completions, cleanup, and
+the render-story view. Its `lasertag/renderStory` response includes optional
+`ownership` evidence when enabled. The sidebar shows a **CSS ownership** section
+with source references and verified stylesheet targets that open at the authored
+declaration. Unsaved source, imported bindings, stylesheets, and configuration
+changes invalidate prior evidence; stale replies are discarded. Clients must
+synchronize these documents and forward watched-file changes as described for
+Astro navigation above.
+
+A `sibling` result verifies the expected stylesheet; `foreign` identifies a
+different stylesheet. Ambient, unresolved, conflicting, or unverified evidence
+does not establish stylesheet ownership. These results explain references;
+existing structural analysis continues to determine diagnostics and cleanup.
+The `.class`-only contract and component ownership boundaries still apply.
+
+Missing or broken mappings leave ownership unverified or unavailable. A worker
+failure or ten-second timeout falls back to ordinary analysis and terminates
+the owned worker/compiler/mapper processes. Subsequent edits can start a fresh
+analysis session. Closing the last relevant editor document, removing workspace
+folders, or shutting down the server releases the session. Mapper analysis is
+disabled by default and does not add a new `lasertag/refractor` export.
+
 ## VS Code Extension
 
 Install the extension shipped in the npm package with `pnpm lasertag vsix`. It

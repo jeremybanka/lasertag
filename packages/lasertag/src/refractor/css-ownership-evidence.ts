@@ -55,6 +55,7 @@ export type CssOwnershipOptions = TypescriptRuntimeOptions & {
 	sourcePath: string
 	sourceText: string
 	componentName?: string
+	scopeToCssClassRoots?: boolean
 	expectedCssPath?: string
 	typescriptSource?: TypescriptAstSourceOptions
 }
@@ -460,6 +461,7 @@ function storyFromParsedSource(
 	file: ts.SourceFile,
 	analysis: TypescriptAstAnalysis,
 ): RenderStory {
+	if (file.contentMapper) return analyzeRenderStory(options)
 	function check(declarations: ts.Node[]): ts.Node[] {
 		if (declarations.some((node) => node.getSourceFile().contentMapper))
 			throw new MappedStoryDeclaration()
@@ -490,9 +492,9 @@ function storyFromParsedSource(
 }
 
 /**
- * Private prototype: public story policies remain unchanged.
+ * Semantic evidence used by opted-in CLI and LSP analysis.
  * Evidence describes stylesheet references, never permission to expand a subtree
- * or remove CSS. It is deliberately absent from lasertag/refractor's exports.
+ * or remove CSS. Structural policies remain authoritative.
  */
 export function analyzeCssOwnershipEvidence(
 	options: CssOwnershipOptions,

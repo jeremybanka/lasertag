@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs"
-import { fileURLToPath, pathToFileURL } from "node:url"
-import { fork, spawn, type ChildProcess } from "node:child_process"
+import { pathToFileURL } from "node:url"
+import { createMapperProcess } from "../refractor/mapper-process.ts"
 
 import type {
 	CancellationToken,
@@ -152,7 +152,7 @@ export function createAstroNavigationAnalyzer() {
 }
 
 type WorkerRequest = { id: number; task: AstroNavigationTask } | { close: true }
-type WorkerResponse = { id: number; targets: AstroNavigationTarget[] }
+type WorkerResponse = { id: number; result: AstroNavigationTarget[] }
 
 export function runAstroNavigationWorker(): void {
 	const analyzer = createAstroNavigationAnalyzer()
@@ -168,133 +168,22 @@ export function runAstroNavigationWorker(): void {
 		} catch {
 			/* Fail closed; CSS analysis uses another path. */
 		}
-		process.send?.({ id: request.id, targets } satisfies WorkerResponse)
+		process.send?.({ id: request.id, result: targets } satisfies WorkerResponse)
 	})
 }
 
-function stopNavigationProcess(child: ChildProcess): void {
-	if (!child.pid) return
-	if (process.platform === `win32`) {
-		// Windows does not have POSIX process groups; terminate the owned tree.
-		// cspell:ignore taskkill
-		const killer = spawn(`taskkill`, [`/pid`, String(child.pid), `/T`, `/F`], {
-			stdio: `ignore`,
-			windowsHide: true,
-		})
-		killer.on(`error`, () => child.kill())
-	} else {
-		try {
-			process.kill(-child.pid, `SIGKILL`)
-		} catch {
-			/* Already exited. */
-		}
-	}
-}
-
-/** Lazy, serialized worker keeps native synchronous calls off the LSP event loop. */
 export function createAstroNavigationService(
 	workerModule: string | URL,
 	timeoutMs = 10_000,
 ) {
-	let worker: ChildProcess | undefined
-	let nextId = 0
-	const pending = new Map<
-		number,
-		{
-			finish: (targets: AstroNavigationTarget[]) => void
-			timer: ReturnType<typeof setTimeout>
-			cancel: { dispose(): void }
-		}
-	>()
-	function reset(): Promise<void> {
-		for (const request of pending.values()) {
-			clearTimeout(request.timer)
-			request.cancel.dispose()
-			request.finish([])
-		}
-		pending.clear()
-		const previous = worker
-		worker = undefined
-		if (!previous) return Promise.resolve()
-		return new Promise((resolve) => {
-			const timer = setTimeout(() => {
-				stopNavigationProcess(previous)
-			}, 1_000)
-			timer.unref()
-			// `close` also fires after a spawn error, which has no `exit` event.
-			previous.once(`close`, () => {
-				clearTimeout(timer)
-				resolve()
-			})
-			if (previous.connected)
-				previous.send({ close: true } satisfies WorkerRequest, () => {})
-			else stopNavigationProcess(previous)
-		})
-	}
-	function getWorker(): ChildProcess {
-		if (worker) return worker
-		const created = fork(
-			workerModule instanceof URL ? fileURLToPath(workerModule) : workerModule,
-			[`--${ASTRO_NAVIGATION_WORKER}`],
-			{
-				execArgv: [],
-				detached: process.platform !== `win32`,
-				stdio: [`ignore`, `ignore`, `pipe`, `ipc`],
-				windowsHide: true,
-			},
-		)
-		worker = created
-		// The native API blocks in readSync; a process group is needed to stop
-		// both it and its mapper even when the JS worker cannot handle messages.
-		const stop = () => stopNavigationProcess(created)
-		process.once(`exit`, stop)
-		// Descendants can inherit stderr and keep `close` pending after an exit.
-		created.once(`exit`, stop)
-		created.stderr?.resume()
-		created.on(`message`, ({ id, targets }: WorkerResponse) => {
-			if (worker !== created) return
-			const request = pending.get(id)
-			if (!request) return
-			pending.delete(id)
-			clearTimeout(request.timer)
-			request.cancel.dispose()
-			request.finish(targets)
-		})
-		created.on(`error`, () => {
-			if (worker === created) void reset()
-		})
-		created.on(`close`, () => {
-			process.off(`exit`, stop)
-			if (worker !== created) return
-			worker = undefined
-			void reset()
-		})
-		return created
-	}
+	const service = createMapperProcess<
+		AstroNavigationTask,
+		AstroNavigationTarget[]
+	>(workerModule, ASTRO_NAVIGATION_WORKER, timeoutMs)
 	return {
-		reset,
-		request(
-			task: AstroNavigationTask,
-			token: CancellationToken,
-		): Promise<AstroNavigationTarget[]> {
-			if (token.isCancellationRequested || pending.size >= 16)
-				return Promise.resolve([])
-			return new Promise((resolve) => {
-				const id = ++nextId
-				const timer = setTimeout(() => {
-					void reset()
-				}, timeoutMs)
-				const cancel = token.onCancellationRequested(() => resolve([]))
-				pending.set(id, { finish: resolve, timer, cancel })
-				try {
-					const active = getWorker()
-					active.send({ id, task } satisfies WorkerRequest, (error) => {
-						if (error && worker === active) void reset()
-					})
-				} catch {
-					void reset()
-				}
-			})
+		reset: service.reset,
+		async request(task: AstroNavigationTask, token: CancellationToken) {
+			return (await service.request(task, token)) ?? []
 		},
 	}
 }

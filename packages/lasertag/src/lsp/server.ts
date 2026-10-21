@@ -1,5 +1,12 @@
 #!/usr/bin/env node
 
+import {
+	CSS_ANALYSIS_WORKER,
+	cssOwnershipEnabled,
+	createCssAnalysisService,
+	fallbackCssAnalysis,
+	runCssAnalysisWorker,
+} from "../refractor/css-analysis.ts"
 import { existsSync, readFileSync } from "node:fs"
 import path from "node:path"
 
@@ -455,6 +462,90 @@ export function createLasertagLspServer(
 	let workspaceFolderPaths: string[] = []
 	const navigation = createAstroNavigationService(new URL(import.meta.url))
 	let navigationEnabled = false
+	let cssEnabled = false
+	let cssRevision = 0
+	let cssDiskRevision = 0
+	const cssAnalysis = createCssAnalysisService(new URL(import.meta.url))
+	const cssRequests = new Map<string, Promise<boolean>>()
+	function invalidateCssAnalysis(disk = false) {
+		if (!cssEnabled) return
+		cssRevision++
+		if (disk) cssDiskRevision++
+		cssRequests.clear()
+		state.setMappedCssAnalysis(null)
+	}
+	function inWorkspace(filePath: string) {
+		return workspaceFolderPaths.some((folder) => {
+			const relative = path.relative(folder, filePath)
+			return (
+				relative !== `..` &&
+				!relative.startsWith(`..${path.sep}`) &&
+				!path.isAbsolute(relative)
+			)
+		})
+	}
+	async function ensureCssAnalysis(
+		filePath: string,
+		token?: CancellationToken,
+	): Promise<boolean> {
+		if (!cssEnabled || !inWorkspace(filePath)) return true
+		if (token?.isCancellationRequested) return false
+		const input = state.getCssAnalysisInput(filePath)
+		if (!input || !inWorkspace(input.sourcePath)) return true
+		const revision = cssRevision
+		let pending = cssRequests.get(input.cssPath)
+		if (!pending) {
+			const task = {
+				...input,
+				diskRevision: cssDiskRevision,
+				openFiles: documents.all().flatMap((doc) => {
+					const name = filePathFromDocument(doc)
+					return name ? [[name, doc.getText()] as [string, string]] : []
+				}),
+			}
+			pending = (async () => {
+				let result = await cssAnalysis.request(task)
+				if (revision !== cssRevision || !cssEnabled) return false
+				try {
+					result ??= fallbackCssAnalysis(task)
+				} catch {
+					return true
+				}
+				state.setMappedCssAnalysis({ task, result })
+				return true
+			})()
+			cssRequests.set(input.cssPath, pending)
+		}
+		let cancel: { dispose(): void } | undefined
+		try {
+			const ready = token
+				? await Promise.race([
+						pending,
+						new Promise<boolean>((resolve) => {
+							cancel = token.onCancellationRequested(() => resolve(false))
+						}),
+					])
+				: await pending
+			return (
+				ready && !token?.isCancellationRequested && revision === cssRevision
+			)
+		} finally {
+			cancel?.dispose()
+		}
+	}
+	function scheduleOpenCss() {
+		if (cssEnabled)
+			for (const name of state.getOpenDocumentPaths())
+				if (isCssModulePath(name) || isRenderSourcePath(name))
+					scheduleDiagnostics(name)
+	}
+	function hasOpenCssContext() {
+		return documents.all().some((doc) => {
+			const name = filePathFromDocument(doc)
+			return name && (isCssModulePath(name) || isRenderSourcePath(name))
+		})
+	}
+
 	let definitionLinkSupport = false
 	let declarationLinkSupport = false
 	let navigationRevision = 0
@@ -462,12 +553,18 @@ export function createLasertagLspServer(
 
 	connection.onShutdown(async () => {
 		navigationEnabled = false
+		invalidateCssAnalysis()
+		cssEnabled = false
+		await cssAnalysis.reset()
 		for (const timer of diagnosticTimers.values()) clearTimeout(timer)
 		diagnosticTimers.clear()
 		await navigation.reset()
 		logger.info(`server`, `shutdown requested`)
 	})
 	connection.onExit(() => {
+		invalidateCssAnalysis()
+		cssEnabled = false
+		void cssAnalysis.reset()
 		void navigation.reset()
 		logger.warn(`server`, `exit notification received`)
 		writeServerEventToStderr(`exit notification received`)
@@ -493,11 +590,19 @@ export function createLasertagLspServer(
 		}
 	}
 
-	function publishDiagnostics(filePath: string): void {
+	async function publishDiagnostics(filePath: string): Promise<void> {
 		const isCssModule = isCssModulePath(filePath)
 
 		if (!isCssModule && !isRenderSourcePath(filePath)) return
 
+		// Closing the last document may still refresh ordinary diagnostics. Those
+		// background updates must not restart the mapper process just released.
+		if (
+			cssEnabled &&
+			hasOpenCssContext() &&
+			!(await ensureCssAnalysis(filePath))
+		)
+			return
 		const startedAt = performance.now()
 		const logLevel = logger.getLevel()
 		const chronicle = logLevel === `debug` ? logger.makeChronicle() : undefined
@@ -536,7 +641,7 @@ export function createLasertagLspServer(
 		if (isCssModule) {
 			const sourcePath = state.getRenderSourcePath(filePath)
 
-			if (sourcePath) publishDiagnostics(sourcePath)
+			if (sourcePath) void publishDiagnostics(sourcePath)
 		}
 	}
 
@@ -547,7 +652,7 @@ export function createLasertagLspServer(
 
 		if (debounceMs <= 0) {
 			logger.debug(`diagnostics`, `publishing immediately`, { filePath })
-			publishDiagnostics(filePath)
+			void publishDiagnostics(filePath)
 			return
 		}
 
@@ -556,7 +661,7 @@ export function createLasertagLspServer(
 			filePath,
 			setTimeout(() => {
 				diagnosticTimers.delete(filePath)
-				publishDiagnostics(filePath)
+				void publishDiagnostics(filePath)
 			}, debounceMs),
 		)
 	}
@@ -671,6 +776,7 @@ export function createLasertagLspServer(
 
 		if (!filePath) return
 		if (!isCssModulePath(filePath)) navigationRevision++
+		invalidateCssAnalysis()
 
 		logger.debug(`document`, eventName, {
 			filePath,
@@ -678,6 +784,7 @@ export function createLasertagLspServer(
 			version: document.version,
 		})
 		state.openDocument(createDocumentInput(document, filePath))
+		scheduleOpenCss()
 
 		if (isCssModulePath(filePath)) {
 			scheduleDiagnostics(filePath)
@@ -695,6 +802,8 @@ export function createLasertagLspServer(
 	): void {
 		navigationRevision++
 		navigationDiskRevision++
+		invalidateCssAnalysis(true)
+		void cssAnalysis.reset()
 		void navigation.reset()
 		const removedPaths = new Set(
 			event.removed.flatMap((workspaceFolder) => {
@@ -723,6 +832,7 @@ export function createLasertagLspServer(
 	connection.onInitialize((params) => {
 		const startedAt = performance.now()
 		navigationEnabled = astroNavigationEnabled(params.initializationOptions)
+		cssEnabled = cssOwnershipEnabled(params.initializationOptions)
 		definitionLinkSupport =
 			params.capabilities.textDocument?.definition?.linkSupport === true
 		declarationLinkSupport =
@@ -748,7 +858,10 @@ export function createLasertagLspServer(
 		return createInitializeResult(params)
 	})
 	connection.onInitialized(() => {
-		if (navigationEnabled && clientSupportsDynamicWatchedFiles) {
+		if (
+			(navigationEnabled || cssEnabled) &&
+			clientSupportsDynamicWatchedFiles
+		) {
 			void connection.client
 				.register(DidChangeWatchedFilesNotification.type, {
 					watchers: [
@@ -815,8 +928,18 @@ export function createLasertagLspServer(
 			})
 		}
 	})
-	connection.onCodeAction(createCodeActions)
-	connection.onCompletion(createCompletions)
+	connection.onCodeAction(async (params, token) => {
+		const filePath = filePathFromUri(params.textDocument.uri)
+		if (filePath && cssEnabled && !(await ensureCssAnalysis(filePath, token)))
+			return []
+		return createCodeActions(params)
+	})
+	connection.onCompletion(async (params, token) => {
+		const filePath = filePathFromUri(params.textDocument.uri)
+		if (filePath && cssEnabled && !(await ensureCssAnalysis(filePath, token)))
+			return []
+		return createCompletions(params)
+	})
 	async function navigate(
 		params: TextDocumentPositionParams,
 		token: CancellationToken,
@@ -877,15 +1000,21 @@ export function createLasertagLspServer(
 	)
 	connection.onRequest<LasertagRenderStoryView, never>(
 		LASERTAG_RENDER_STORY_REQUEST,
-		(params: LasertagRenderStoryRequest): LasertagRenderStoryView => {
+		async (
+			params: LasertagRenderStoryRequest,
+			token,
+		): Promise<LasertagRenderStoryView> => {
 			const filePath = filePathFromUri(params.uri)
 
+			if (filePath && cssEnabled && !(await ensureCssAnalysis(filePath, token)))
+				return { kind: `outside-context` }
 			return filePath
 				? state.getRenderStoryView(filePath)
 				: { kind: `outside-context` as const }
 		},
 	)
 	connection.onDidChangeWatchedFiles((event) => {
+		invalidateCssAnalysis(true)
 		if (event.changes.some((change) => !change.uri.endsWith(`.css`))) {
 			navigationRevision++
 			navigationDiskRevision++
@@ -947,6 +1076,7 @@ export function createLasertagLspServer(
 				}
 			}
 		}
+		scheduleOpenCss()
 	})
 	documents.onDidOpen((event) =>
 		handleChangedDocument(event.document, `opened`),
@@ -959,6 +1089,7 @@ export function createLasertagLspServer(
 
 		if (!filePath) return
 		if (!isCssModulePath(filePath)) navigationRevision++
+		invalidateCssAnalysis()
 		if (
 			!documents
 				.all()
@@ -972,6 +1103,11 @@ export function createLasertagLspServer(
 			version: event.document.version,
 		})
 		state.closeDocument(filePath)
+		scheduleOpenCss()
+		if (!hasOpenCssContext()) {
+			cssRequests.clear()
+			void cssAnalysis.reset()
+		}
 
 		if (isCssModulePath(filePath)) {
 			clearDiagnostics(filePath, event.document.uri)
@@ -993,7 +1129,12 @@ export function createLasertagLspServer(
 	}
 }
 
-if (import.meta.main && process.argv.includes(`--${ASTRO_NAVIGATION_WORKER}`)) {
+if (import.meta.main && process.argv.includes(`--${CSS_ANALYSIS_WORKER}`)) {
+	runCssAnalysisWorker()
+} else if (
+	import.meta.main &&
+	process.argv.includes(`--${ASTRO_NAVIGATION_WORKER}`)
+) {
 	runAstroNavigationWorker()
 } else if (import.meta.main) {
 	const server = createLasertagLspServer()
