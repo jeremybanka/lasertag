@@ -1,12 +1,11 @@
 # Astro Support Plan
 
-## TypeScript 7.1 semantic prototype
+## TypeScript 7.1 semantic integration
 
-The workspace uses TypeScript `7.1.0-beta`. The experimental source module
+The workspace uses TypeScript `7.1.0-beta`. The internal source module
 `src/refractor/astro-semantic-evidence.ts` combines the existing Astro template
 story with separate component-reference evidence from a configured content mapper.
-It is intentionally outside the `lasertag/refractor` exports while its contract
-is being evaluated. Public render stories and CSS decisions continue to use the
+It remains outside the `lasertag/refractor` exports. Public render stories and CSS decisions continue to use the
 template analyzer. The LSP now consumes the semantic evidence for on-demand component navigation using
 the project’s TypeScript mapper configuration; see the
 [editor setup](tooling-guide.md#astro-component-navigation).
@@ -18,9 +17,10 @@ installed mapper registered for `.astro` in `tsconfig.json`:
 node scripts/inspect-astro-semantics.node.ts --runExternalCode path/to/AppPanel.astro
 ```
 
-The flag permits TypeScript to execute the project's configured mapper. Ordinary
-Lasertag analysis keeps external code execution disabled. The prototype does not
-configure consumer projects. Validation pins `@astrojs/ts-content-mapper`
+The inspector flag permits TypeScript to execute the project's configured mapper.
+The shipped CLI and trusted LSP automatically permit configured mappers; restricted
+editor workspaces retain structural analysis without executing them. Lasertag does
+not configure consumer projects. Validation pins `@astrojs/ts-content-mapper`
 `0.2.0` as a development dependency and runs its unmodified process. The smaller
 protocol fixture remains useful for testing conflicting mappings and failures.
 
@@ -39,7 +39,7 @@ empty transforms, missing configuration, and disabled execution produce unavaila
 semantic evidence while retaining the template story. No semantic failure becomes
 an empty render story or authorizes CSS removal.
 
-The prototype coverage lives under `tests/private/refractor/`. Public navigation
+Implementation coverage lives under `tests/private/refractor/`. Public navigation
 protocol tests live under `tests/public/lsp/`; process and session lifecycle tests
 live under `tests/private/lsp/`. A resolved symbol
 identifies a TypeScript declaration, which can be an ambient type declaration or a

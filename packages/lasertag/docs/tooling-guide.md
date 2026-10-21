@@ -397,11 +397,11 @@ want to expose it.
 ### TypeScript content mapper setup
 
 Lasertag uses the project's TypeScript content mapper configuration automatically.
-The integration is tested with TypeScript `7.1.0-beta`. Install the mappers needed
-by your project:
+Lasertag supplies its TypeScript `7.1.0-beta` runtime. Install the mappers needed
+by your project (the versions below are tested with this release):
 
 ```sh
-pnpm add -D typescript@7.1.0-beta @astrojs/ts-content-mapper@0.2.0 css-modules-content-mapper@0.1.1
+pnpm add -D @astrojs/ts-content-mapper@0.2.0 css-modules-content-mapper@0.1.1
 ```
 
 Register them at the top level of `tsconfig.json`, alongside `compilerOptions`:
@@ -417,7 +417,9 @@ Register them at the top level of `tsconfig.json`, alongside `compilerOptions`:
 
 TSX-only projects need only the CSS mapper. TypeScript resolves the mapper
 packages from the project and uses their generated declarations and source maps.
-For a separate TypeScript compiler invocation, permit mapper execution with
+You do not need to replace your project's TypeScript version to use Lasertag's
+bundled runtime. To use the same configuration in a separate compiler invocation,
+install a compatible compiler (tested with `typescript@7.1.0-beta`) and permit mapper execution with
 `pnpm exec tsc --noEmit --runExternalCode`. Lasertag grants the equivalent native
 API permission internally; no Lasertag feature flags or editor preferences are
 needed. Its bundled TypeScript runtime supplies API support, while the project
@@ -433,6 +435,34 @@ Provide the workspace root and synchronize open documents, including imported
 TypeScript, JavaScript, Astro, CSS Module, and JSON configuration files. Forward
 watched-file changes when dynamic registration is unavailable. TypeScript handles
 project configuration and mapper resolution; Lasertag does not modify tsconfig.
+
+### Verify the editor integration
+
+After installing the VSIX at the path printed by `pnpm lasertag vsix --build-only`,
+run **Developer: Reload Window** in a trusted workspace. Open a component and its
+same-named CSS Module, then open the Lasertag Activity Bar view.
+
+- **Output → Lasertag** reports the extension version, selected server and native
+  compiler paths, and `TypeScript native runtime: 7.1.0-beta` with the bundled
+  runtime. It identifies configured overrides and whether workspace trust permits
+  mappers. Permission alone does not establish successful mapper resolution.
+- Expand **CSS ownership**, then expand `css.class`. A `sibling` entry should
+  point to the component's CSS Module; click the stylesheet target to open its
+  authored declaration. `foreign` means the binding points to a different stylesheet.
+- In an Astro file, use **Go to Definition** on an imported component tag to open
+  its source. **Go to Declaration** follows ambient declarations. A declaration
+  alone does not establish an implementation target.
+- Insert a blank line before the stylesheet's root selector without saving, then
+  reopen its ownership target. The location should follow the edit. Ordinary
+  diagnostics and cleanup still use the same structural rules.
+
+If ownership is missing, verify that the mapper packages resolve from the
+component's TypeScript project and that its nearest `tsconfig.json` registers
+the required extensions (directly or through `extends`). For Astro navigation,
+also check the file's language mode is **Astro** and imports resolve under that
+project's module resolution settings. Restart Lasertag after changing mapper
+installation or configuration. Clear server and SDK path overrides and reload
+the window when testing the bundled runtime.
 
 ### Astro component navigation
 
@@ -484,7 +514,7 @@ new `lasertag/refractor` exports.
 Install the extension shipped in the npm package with `pnpm lasertag vsix`. It
 bundles `lasertag-lsp` and its TypeScript runtime, so the default installation
 needs no path configuration. In addition to diagnostics and completions, the
-Command Palette provides **Lasertag: Clean up Dead Selectors** and **Lasertag:
+Command Palette provides **Lasertag: Clean up Diagnostics** and **Lasertag:
 Restart Lasertag Server**.
 
 | Setting                        | Purpose                                                                                          |

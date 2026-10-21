@@ -29,6 +29,9 @@ file changes. If both source siblings exist, Lasertag reports an ambiguity error
   selector lists or whole rules.
 - Offers automatic Astro component navigation: **Go to Definition** opens source
   targets; **Go to Declaration** opens ambient type declarations.
+- Shows **CSS ownership** in the sidebar when project-configured mappers resolve
+  `css.class` to authored stylesheets. Expand a reference and click its stylesheet
+  target to open the declaration, including unsaved edits.
 
 Diagnostics are conservative. Dynamic or unsupported render paths are treated
 as uncertain rather than reported as dead CSS.
@@ -50,13 +53,51 @@ pnpm lasertag vsix --target code-insiders
 ```
 
 Use `pnpm lasertag vsix --build-only` to create the VSIX without installing it;
-the command reports the generated path.
+install the exact generated path printed by the command, then run
+**Developer: Reload Window**.
+
+## Enable CSS ownership and Astro navigation
+
+The extension bundles TypeScript `7.1.0-beta`. Install these tested mapper versions
+in your project:
+
+```sh
+pnpm add -D css-modules-content-mapper@0.1.1 @astrojs/ts-content-mapper@0.2.0
+```
+
+Register them at the top level of the component's `tsconfig.json`, alongside
+`compilerOptions`:
+
+```json
+{
+	"contentMappers": [
+		{ "package": "css-modules-content-mapper", "extensions": [".module.css"] },
+		{ "package": "@astrojs/ts-content-mapper", "extensions": [".astro"] }
+	]
+}
+```
+
+TSX-only projects need only the CSS mapper. The mapper packages must resolve from
+the configured project. You can keep your project's existing TypeScript version;
+Lasertag uses its bundled runtime. Running a separate `tsc` with these mappers
+requires a compatible compiler and `--runExternalCode`.
+
+In a trusted workspace these registrations enable the features automatically;
+there are no additional Lasertag feature settings. Restricted workspaces retain
+ordinary structural analysis. Granting trust restarts the server automatically.
+
+Open a component and its same-named CSS Module, then open the Lasertag Activity
+Bar view. Under **CSS ownership**, expand `css.class` and click its stylesheet
+target. `sibling` means the expected CSS Module; `foreign` means another stylesheet.
+In an Astro file, use **Go to Definition** on an imported component tag to open
+its source. **Output → Lasertag** confirms the runtime version; ownership targets
+confirm that the project mapper produced stylesheet evidence.
 
 ## Commands
 
 Open the Command Palette to run:
 
-- **Lasertag: Clean up Dead Selectors** — applies the cleanup action to the
+- **Lasertag: Clean up Diagnostics** — applies the cleanup action to the
   active CSS Module.
 - **Lasertag: Open Styles** — opens the active component's CSS Module. This is
   also available from the Render Story view title.
@@ -66,7 +107,7 @@ Open the Command Palette to run:
 - **Lasertag: Restart Lasertag Server** — restarts the language server used by
   the extension.
 
-Both warning types also expose **Lasertag: Clean up Dead Selectors** as a Quick
+Both warning types also expose **Lasertag: Clean up Diagnostics** as a Quick
 Fix.
 
 ## Settings
@@ -86,18 +127,13 @@ settings; restarting the existing Lasertag client does not reload those settings
 Operational logs and protocol traces appear in **View: Toggle Output** under
 **Lasertag**.
 
+At the default `info` log level, startup reports the extension version, server
+and TypeScript executable paths (bundled or overridden), the selected native
+compiler's version, and whether workspace trust permits content mappers.
+Mapper permission alone does not confirm that a project's mappers resolved;
+inspect **CSS ownership** in the sidebar to verify stylesheet evidence.
+
 ## Astro navigation
-
-Install `@astrojs/ts-content-mapper` in your project and register it in
-`tsconfig.json`:
-
-```json
-{
-	"contentMappers": [
-		{ "package": "@astrojs/ts-content-mapper", "extensions": [".astro"] }
-	]
-}
-```
 
 In a trusted workspace, Lasertag automatically permits
 TypeScript to execute the project's configured content mappers when you navigate
@@ -127,6 +163,13 @@ cleanup decisions.
 
 ## Troubleshooting
 
+- If **CSS ownership** is missing, verify the mapper installation and the nearest
+  `tsconfig.json` for the component, including any inherited configuration. Astro
+  ownership needs both mappers. Restart Lasertag after changing mapper installation
+  or configuration. Ordinary CSS diagnostics alone do not prove mapper activation.
+- If Astro navigation returns no target, check that the editor's language mode is
+  **Astro** and that the import resolves under the project's module resolution
+  settings. Ambient declarations support **Go to Declaration**, not source navigation.
 - If diagnostics or completions do not appear, check that the files use the
   exact sibling names `Component.tsx` or `Component.astro` and
   `Component.module.css`, then run
@@ -151,6 +194,3 @@ changes to MPL-covered files, make those files' source available under MPL 2.0;
 separate files remain under terms of your choice. See Mozilla's
 [official MPL 2.0 FAQ](https://www.mozilla.org/en-US/MPL/2.0/FAQ/) for the
 plain-language explanation and the included `LICENSE` file for the full terms.
-
-Mapper execution is disabled in restricted workspaces. Granting workspace trust
-restarts the server automatically. No additional Lasertag feature settings are needed.

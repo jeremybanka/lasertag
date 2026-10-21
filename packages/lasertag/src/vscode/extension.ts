@@ -18,6 +18,7 @@ import {
 	resolveWorkspacePath,
 	withTypescriptSdkPathEnvironment,
 } from "./config.ts"
+import { typescriptRuntimeVersion } from "./runtime-info.ts"
 import {
 	createRenderStoryTree,
 	LASERTAG_IN_CONTEXT_KEY,
@@ -70,6 +71,7 @@ type TreeItem = {
 
 type ExtensionContext = {
 	asAbsolutePath(relativePath: string): string
+	extension: { packageJSON: { version: string } }
 	subscriptions: {
 		push(...disposables: Disposable[]): void
 	}
@@ -149,7 +151,7 @@ type VscodeModule = {
 
 const path = require("node:path") as typeof import("node:path")
 const vscode = require("vscode") as VscodeModule
-const { LanguageClient, TransportKind } =
+const { LanguageClient, State, TransportKind } =
 	require("vscode-languageclient/node") as typeof import("vscode-languageclient/node")
 
 type InitializeParams = import("vscode-languageclient/node").InitializeParams
@@ -487,6 +489,41 @@ export async function activate(context: ExtensionContext) {
 		"lasertag",
 		createServerOptions(context),
 		createClientOptions(),
+	)
+	const activeClient = client
+	const serverOverride =
+		getConfiguredLspPath() ||
+		vscode.workspace.getConfiguration("lasertag").get("server.path", "").trim()
+	const serverPath = getConfiguredLspPath() || getServerModulePath(context)
+	const sdkPath = getTypescriptSdkPath(context)
+	const sdkOverride = vscode.workspace
+		.getConfiguration("lasertag")
+		.get("typescript.sdk.path", "")
+		.trim()
+	context.subscriptions.push(
+		activeClient.onDidChangeState(({ newState }) => {
+			if (newState !== State.Running) return
+			const level = getConfiguredLogLevel()
+			if (level !== "info" && level !== "debug") return
+			activeClient.info(
+				`Lasertag ${context.extension.packageJSON.version}; server: ${serverOverride ? "configured override" : "bundled"} (${serverPath})`,
+			)
+			activeClient.info(
+				`TypeScript native executable: ${sdkOverride ? "configured override" : "bundled"} (${sdkPath})`,
+			)
+			activeClient.info(
+				vscode.workspace.isTrusted
+					? "Content mappers: permitted; CSS ownership and Astro navigation use the project's tsconfig registrations on demand."
+					: "Content mappers: disabled because the workspace is untrusted.",
+			)
+			void typescriptRuntimeVersion(sdkPath).then(
+				(version) => activeClient.info(`TypeScript native runtime: ${version}`),
+				(error: unknown) =>
+					activeClient.warn(
+						`Could not identify TypeScript native runtime: ${error instanceof Error ? error.message : String(error)}`,
+					),
+			)
+		}),
 	)
 
 	context.subscriptions.push({

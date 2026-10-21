@@ -2,4 +2,4 @@
 "lasertag": patch
 ---
 
-Add automatic, on-demand Astro navigation using project-configured TypeScript mappers to the language server: Go to Definition opens source targets and Go to Declaration opens ambient declarations. Reuse a separate TypeScript session with unsaved dependency overlays, discard stale replies, and clean up mapper processes on timeout or shutdown while preserving render stories, CSS diagnostics, completions, and cleanup edits.
+Add Astro component navigation in trusted editor workspaces using @astrojs/ts-content-mapper registered for .astro in tsconfig.json. Go to Definition opens source targets, including aliased and namespace imports; Go to Declaration opens ambient declarations. Navigation starts on demand and reuses its session, including unsaved dependency edits. Astro render-story structure continues to come from the template parser, preserving CSS diagnostics, completions, and cleanup behavior.
