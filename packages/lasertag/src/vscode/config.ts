@@ -4,6 +4,18 @@ import { LASERTAG_TYPESCRIPT_SDK_PATH } from "../refractor/typescript-runtime.ts
 
 export { LASERTAG_TYPESCRIPT_SDK_PATH }
 
+export function astroNavigationInitializationOptions(
+	enabled: boolean,
+	trusted: boolean,
+) {
+	return {
+		astroNavigation: {
+			enabled: enabled && trusted,
+			runExternalCode: enabled && trusted,
+		},
+	}
+}
+
 export function resolveWorkspacePath(
 	configuredPath: string,
 	workspaceRoot: string | undefined,

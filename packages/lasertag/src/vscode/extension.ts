@@ -12,6 +12,7 @@ import {
 	type RenderStoryViewLocation,
 } from "../lsp/render-story-view.ts"
 import {
+	astroNavigationInitializationOptions,
 	resolveBundledTypescriptSdkPath,
 	resolveTypescriptSdkPath,
 	resolveWorkspacePath,
@@ -130,6 +131,12 @@ type VscodeModule = {
 		): PromiseLike<TextEditor>
 	}
 	workspace: {
+		isTrusted: boolean
+		onDidChangeConfiguration(
+			listener: (event: {
+				affectsConfiguration(section: string): boolean
+			}) => unknown,
+		): Disposable
 		createFileSystemWatcher(globPattern: string): unknown
 		getConfiguration(section: string): {
 			get<T>(key: string, defaultValue: T): T
@@ -425,6 +432,13 @@ function createServerOptions(context: ExtensionContext) {
 
 function createClientOptions() {
 	return {
+		initializationOptions: () =>
+			astroNavigationInitializationOptions(
+				vscode.workspace
+					.getConfiguration("lasertag")
+					.get("astro.navigation.enabled", false),
+				vscode.workspace.isTrusted,
+			),
 		documentSelector: [
 			{
 				language: "css",
@@ -439,6 +453,9 @@ function createClientOptions() {
 				language: "astro",
 				scheme: "file",
 			},
+			...["typescript", "javascript", "javascriptreact", "json", "jsonc"].map(
+				(language) => ({ language, scheme: "file" }),
+			),
 		],
 		outputChannelName: "Lasertag",
 		synchronize: {
@@ -446,6 +463,9 @@ function createClientOptions() {
 				vscode.workspace.createFileSystemWatcher("**/*.module.css"),
 				vscode.workspace.createFileSystemWatcher("**/*.tsx"),
 				vscode.workspace.createFileSystemWatcher("**/*.astro"),
+				vscode.workspace.createFileSystemWatcher(
+					"**/*.{ts,js,jsx,mts,cts,json,jsonc}",
+				),
 			],
 		},
 	}
@@ -489,6 +509,12 @@ export async function activate(context: ExtensionContext) {
 
 	await client.setTrace(traceFromSetting(trace))
 	await client.start()
+	context.subscriptions.push(
+		vscode.workspace.onDidChangeConfiguration((event) => {
+			if (event.affectsConfiguration("lasertag.astro.navigation.enabled"))
+				void client?.restart()
+		}),
+	)
 
 	const storyTreeProvider = new RenderStoryTreeProvider()
 

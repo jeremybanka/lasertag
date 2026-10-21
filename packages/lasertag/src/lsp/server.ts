@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { existsSync, readFileSync } from "node:fs"
+import path from "node:path"
 
 import {
 	CodeActionKind,
@@ -16,6 +17,8 @@ import {
 	type InitializeParams,
 	type InitializeResult,
 	type TextEdit,
+	type TextDocumentPositionParams,
+	type CancellationToken,
 	TextDocumentSyncKind,
 	TextDocuments,
 	WatchKind,
@@ -55,6 +58,14 @@ import {
 	type LasertagRenderStoryRequest,
 	type LasertagRenderStoryView,
 } from "./render-story-view.ts"
+import {
+	ASTRO_NAVIGATION_WORKER,
+	astroNavigationEnabled,
+	createAstroNavigationService,
+	navigationLocations,
+	runAstroNavigationWorker,
+	type AstroNavigationTarget,
+} from "./astro-navigation.ts"
 
 export type LasertagLspReadOptions = {
 	cssPath?: string
@@ -141,6 +152,9 @@ export function createInitializeResult(
 ): InitializeResult {
 	return {
 		capabilities: {
+			...(astroNavigationEnabled(params?.initializationOptions)
+				? { definitionProvider: true, declarationProvider: true }
+				: {}),
 			codeActionProvider: {
 				codeActionKinds: [
 					CodeActionKind.QuickFix,
@@ -439,11 +453,22 @@ export function createLasertagLspServer(
 	let clientSupportsDynamicWatchedFiles = false
 	let clientSupportsWorkspaceFolderChanges = false
 	let workspaceFolderPaths: string[] = []
+	const navigation = createAstroNavigationService(new URL(import.meta.url))
+	let navigationEnabled = false
+	let definitionLinkSupport = false
+	let declarationLinkSupport = false
+	let navigationRevision = 0
+	let navigationDiskRevision = 0
 
-	connection.onShutdown(() => {
+	connection.onShutdown(async () => {
+		navigationEnabled = false
+		for (const timer of diagnosticTimers.values()) clearTimeout(timer)
+		diagnosticTimers.clear()
+		await navigation.reset()
 		logger.info(`server`, `shutdown requested`)
 	})
 	connection.onExit(() => {
+		void navigation.reset()
 		logger.warn(`server`, `exit notification received`)
 		writeServerEventToStderr(`exit notification received`)
 	})
@@ -645,6 +670,7 @@ export function createLasertagLspServer(
 		const filePath = filePathFromDocument(document)
 
 		if (!filePath) return
+		if (!isCssModulePath(filePath)) navigationRevision++
 
 		logger.debug(`document`, eventName, {
 			filePath,
@@ -667,6 +693,9 @@ export function createLasertagLspServer(
 	function handleWorkspaceFoldersChanged(
 		event: WorkspaceFolderChangeEvent,
 	): void {
+		navigationRevision++
+		navigationDiskRevision++
+		void navigation.reset()
 		const removedPaths = new Set(
 			event.removed.flatMap((workspaceFolder) => {
 				const filePath = filePathFromUri(workspaceFolder.uri)
@@ -693,6 +722,11 @@ export function createLasertagLspServer(
 
 	connection.onInitialize((params) => {
 		const startedAt = performance.now()
+		navigationEnabled = astroNavigationEnabled(params.initializationOptions)
+		definitionLinkSupport =
+			params.capabilities.textDocument?.definition?.linkSupport === true
+		declarationLinkSupport =
+			params.capabilities.textDocument?.declaration?.linkSupport === true
 
 		clientSupportsDynamicWatchedFiles =
 			params.capabilities.workspace?.didChangeWatchedFiles
@@ -714,6 +748,22 @@ export function createLasertagLspServer(
 		return createInitializeResult(params)
 	})
 	connection.onInitialized(() => {
+		if (navigationEnabled && clientSupportsDynamicWatchedFiles) {
+			void connection.client
+				.register(DidChangeWatchedFilesNotification.type, {
+					watchers: [
+						{
+							globPattern: `**/*.{ts,js,jsx,mts,cts,json,jsonc}`,
+							kind: allWatchedFileChangeKinds(),
+						},
+					],
+				})
+				.catch((error: unknown) =>
+					logger.warn(`navigation`, `could not register dependency watchers`, {
+						error: messageFromError(error),
+					}),
+				)
+		}
 		if (clientSupportsDynamicWatchedFiles) {
 			logger.info(`watchers`, `registering dynamic file watchers`, {
 				globPatterns: [`**/*.module.css`, `**/*.tsx`, `**/*.astro`],
@@ -767,6 +817,64 @@ export function createLasertagLspServer(
 	})
 	connection.onCodeAction(createCodeActions)
 	connection.onCompletion(createCompletions)
+	async function navigate(
+		params: TextDocumentPositionParams,
+		token: CancellationToken,
+		kind: AstroNavigationTarget[`kind`],
+	) {
+		const filePath = filePathFromUri(params.textDocument.uri)
+		const document = documents.get(params.textDocument.uri)
+		if (
+			!navigationEnabled ||
+			!filePath?.endsWith(`.astro`) ||
+			!document ||
+			token.isCancellationRequested
+		)
+			return []
+		// Opt-in applies to the configured workspace, not arbitrary external files.
+		if (
+			!workspaceFolderPaths.some((folder) => {
+				const relative = path.relative(folder, filePath)
+				return (
+					relative !== `..` &&
+					!relative.startsWith(`..${path.sep}`) &&
+					!path.isAbsolute(relative)
+				)
+			})
+		)
+			return []
+		const revision = navigationRevision
+		const targets = await navigation.request(
+			{
+				filePath,
+				sourceText: document.getText(),
+				offset: document.offsetAt(params.position),
+				diskRevision: navigationDiskRevision,
+				openFiles: documents.all().flatMap((open) => {
+					const name = filePathFromDocument(open)
+					return name && !isCssModulePath(name)
+						? [[name, open.getText()] as [string, string]]
+						: []
+				}),
+			},
+			token,
+		)
+		if (
+			token.isCancellationRequested ||
+			navigationRevision !== revision ||
+			!navigationEnabled
+		)
+			return []
+		return navigationLocations(
+			targets,
+			kind,
+			kind === `source` ? definitionLinkSupport : declarationLinkSupport,
+		)
+	}
+	connection.onDefinition((params, token) => navigate(params, token, `source`))
+	connection.onDeclaration((params, token) =>
+		navigate(params, token, `ambient`),
+	)
 	connection.onRequest<LasertagRenderStoryView, never>(
 		LASERTAG_RENDER_STORY_REQUEST,
 		(params: LasertagRenderStoryRequest): LasertagRenderStoryView => {
@@ -778,6 +886,10 @@ export function createLasertagLspServer(
 		},
 	)
 	connection.onDidChangeWatchedFiles((event) => {
+		if (event.changes.some((change) => !change.uri.endsWith(`.css`))) {
+			navigationRevision++
+			navigationDiskRevision++
+		}
 		logger.info(`watchers`, `received file changes`, {
 			changeCount: event.changes.length,
 		})
@@ -846,6 +958,13 @@ export function createLasertagLspServer(
 		const filePath = filePathFromDocument(event.document)
 
 		if (!filePath) return
+		if (!isCssModulePath(filePath)) navigationRevision++
+		if (
+			!documents
+				.all()
+				.some((document) => filePathFromDocument(document)?.endsWith(`.astro`))
+		)
+			void navigation.reset()
 
 		logger.debug(`document`, `closed`, {
 			filePath,
@@ -874,7 +993,9 @@ export function createLasertagLspServer(
 	}
 }
 
-if (import.meta.main) {
+if (import.meta.main && process.argv.includes(`--${ASTRO_NAVIGATION_WORKER}`)) {
+	runAstroNavigationWorker()
+} else if (import.meta.main) {
 	const server = createLasertagLspServer()
 
 	registerProcessCrashLogging(server.logger)

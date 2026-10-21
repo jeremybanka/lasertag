@@ -394,6 +394,62 @@ The restart action uses the `lasertag.restartServer` command. Clients other than
 the bundled VS Code extension must implement that client-side command if they
 want to expose it.
 
+### Opt-in Astro component navigation
+
+Astro navigation is disabled by default. Install a content mapper in the trusted
+project, such as `@astrojs/ts-content-mapper@0.2.0`, and add its registration to the
+project's `tsconfig.json`:
+
+```json
+{
+	"contentMappers": [
+		{ "package": "@astrojs/ts-content-mapper", "extensions": [".astro"] }
+	]
+}
+```
+
+In VS Code, enable `lasertag.astro.navigation.enabled`. This setting permits the
+project's configured TypeScript content mappers to execute when navigation is
+requested, and requires workspace trust. Changing it restarts the server.
+
+For another LSP client, pass both flags in `initialize.initializationOptions`:
+
+```json
+{
+	"astroNavigation": { "enabled": true, "runExternalCode": true }
+}
+```
+
+Provide the workspace root and synchronize open documents, including imported
+`.ts`, `.tsx`, JavaScript, Astro, and JSON configuration files. Also forward file
+changes for `**/*.{ts,js,jsx,mts,cts,json,jsonc}` when dynamic watcher registration
+is unavailable. Restart the client/server to change the initialization options.
+
+On an opening or closing Astro component name inside the configured workspace:
+
+| Request                                            | Targets                                                                                                                                                                      |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Go to Definition** (`textDocument/definition`)   | Source declarations, including aliases and namespace imports. An Astro default component may open at the start of its source file when no authored declaration range exists. |
+| **Go to Declaration** (`textDocument/declaration`) | Ambient declarations, including `.d.ts` files and `declare` bindings in ordinary source files. These describe types; they do not identify component implementations.         |
+
+The server returns `LocationLink` objects when the client supports them and
+`Location` objects otherwise. Local dynamic bindings lead to their declaration;
+navigation does not guess which runtime component they will contain. MDX
+`<Content>` references can lead only to an ambient declaration, so Definition
+returns no source target while Declaration can open the type declaration.
+
+Navigation starts its separate analysis process only on request and reuses the
+TypeScript session. It includes unsaved imports, discards replies superseded by
+document or file changes, and closes the process when the last Astro document
+closes or the server shuts down. A request that exceeds ten seconds returns no
+target and stops the analysis process and its compiler/mapper subprocesses; the
+next request can start a fresh session. Missing, broken, ambiguous, or unmapped
+evidence also returns no target.
+
+Enabling navigation does not run mappers for diagnostics, completions, cleanup,
+or the Render Story sidebar. Those retain their existing template structure and
+CSS ownership rules.
+
 ## VS Code Extension
 
 Install the extension shipped in the npm package with `pnpm lasertag vsix`. It
@@ -402,13 +458,14 @@ needs no path configuration. In addition to diagnostics and completions, the
 Command Palette provides **Lasertag: Clean up Dead Selectors** and **Lasertag:
 Restart Lasertag Server**.
 
-| Setting                        | Purpose                                                                                          |
-| ------------------------------ | ------------------------------------------------------------------------------------------------ |
-| `lasertag.lsp.path`            | Use another `lasertag-lsp` executable; relative paths resolve from the first workspace root      |
-| `lasertag.server.path`         | Use another server module; ignored when `lasertag.lsp.path` is set                               |
-| `lasertag.typescript.sdk.path` | Use another TypeScript 7 native executable; relative paths resolve from the first workspace root |
-| `lasertag.log.level`           | Operational logging: `off`, `error`, `warn`, `info`, or `debug`                                  |
-| `lasertag.trace.server`        | Protocol tracing: `off`, `messages`, or `verbose`                                                |
+| Setting                             | Purpose                                                                                                     |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `lasertag.lsp.path`                 | Use another `lasertag-lsp` executable; relative paths resolve from the first workspace root                 |
+| `lasertag.server.path`              | Use another server module; ignored when `lasertag.lsp.path` is set                                          |
+| `lasertag.typescript.sdk.path`      | Use another TypeScript 7 native executable; relative paths resolve from the first workspace root            |
+| `lasertag.astro.navigation.enabled` | Opt in to on-demand Astro source/ambient navigation and executing project mappers; requires workspace trust |
+| `lasertag.log.level`                | Operational logging: `off`, `error`, `warn`, `info`, or `debug`                                             |
+| `lasertag.trace.server`             | Protocol tracing: `off`, `messages`, or `verbose`                                                           |
 
 ## Troubleshooting
 
@@ -427,7 +484,8 @@ Restart Lasertag Server**.
 - In VS Code, open the **Lasertag** output channel, set
   `lasertag.log.level` to `debug`, and use `lasertag.trace.server` only when
   protocol messages are needed. Run **Developer: Reload Window** after changing
-  any extension setting; the restart command does not rebuild the client's
+  extension settings other than `lasertag.astro.navigation.enabled`, which
+  restarts automatically; the restart command does not rebuild the client's
   configuration.
 - A custom TypeScript SDK path points to the TypeScript 7 native executable, not
   its containing package directory.

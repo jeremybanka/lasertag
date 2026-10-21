@@ -6,7 +6,7 @@ import { performance } from "node:perf_hooks"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { promisify } from "node:util"
-import * as ts from "typescript/unstable/ast"
+import * as ts from "typescript/ast"
 
 import { analyzeTsxRenderStories } from "../packages/lasertag/src/refractor/analyze-tsx.ts"
 import { createTsxSourceFile } from "../packages/lasertag/src/refractor/typescript-ast.ts"

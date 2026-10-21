@@ -5,6 +5,8 @@ export type TypescriptRuntimeEnvironment = Record<string, string | undefined>
 export type TypescriptRuntimeOptions = {
 	environment?: TypescriptRuntimeEnvironment
 	typescriptSdkPath?: string
+	/** Opt in to executing the trusted project's configured content mappers. */
+	runExternalCode?: boolean
 }
 
 export function resolveTypescriptSdkPath({

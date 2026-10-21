@@ -27,6 +27,8 @@ file changes. If both source siblings exist, Lasertag reports an ambiguity error
   branch opens its selector in the CSS Module.
 - Offers a quick fix and a command to remove diagnosed selectors safely from
   selector lists or whole rules.
+- Offers opt-in Astro component navigation: **Go to Definition** opens source
+  targets; **Go to Declaration** opens ambient type declarations.
 
 Diagnostics are conservative. Dynamic or unsupported render paths are treated
 as uncertain rather than reported as dead CSS.
@@ -70,20 +72,46 @@ Fix.
 ## Settings
 
 All settings are optional. The bundled server and TypeScript runtime work
-without configuration. Run **Developer: Reload Window** after changing a
-setting; restarting the existing Lasertag client does not reload its extension
-configuration.
+without configuration. Changing `lasertag.astro.navigation.enabled` restarts the
+server automatically. Run **Developer: Reload Window** after changing other
+settings; restarting the existing Lasertag client does not reload those settings.
 
-| Setting                        | Default  | Purpose                                                                                                                                                            |
-| ------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `lasertag.lsp.path`            | `""`     | Path to a `lasertag-lsp` executable. Relative paths resolve from the first workspace root. When set, this takes precedence over `lasertag.server.path`.            |
-| `lasertag.server.path`         | `""`     | Path to a language-server module. Leave empty to use the bundled server; ignored when `lasertag.lsp.path` is set.                                                  |
-| `lasertag.typescript.sdk.path` | `""`     | Path to the TypeScript 7 native executable used for TSX analysis. Relative paths resolve from the first workspace root. Leave empty to use the bundled executable. |
-| `lasertag.log.level`           | `"info"` | Operational logging: `off`, `error`, `warn`, `info`, or `debug`.                                                                                                   |
-| `lasertag.trace.server`        | `"off"`  | Client/server protocol tracing: `off`, `messages`, or `verbose`. This is separate from operational logging.                                                        |
+| Setting                             | Default  | Purpose                                                                                                                                                            |
+| ----------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `lasertag.lsp.path`                 | `""`     | Path to a `lasertag-lsp` executable. Relative paths resolve from the first workspace root. When set, this takes precedence over `lasertag.server.path`.            |
+| `lasertag.server.path`              | `""`     | Path to a language-server module. Leave empty to use the bundled server; ignored when `lasertag.lsp.path` is set.                                                  |
+| `lasertag.typescript.sdk.path`      | `""`     | Path to the TypeScript 7 native executable used for TSX analysis. Relative paths resolve from the first workspace root. Leave empty to use the bundled executable. |
+| `lasertag.log.level`                | `"info"` | Operational logging: `off`, `error`, `warn`, `info`, or `debug`.                                                                                                   |
+| `lasertag.trace.server`             | `"off"`  | Client/server protocol tracing: `off`, `messages`, or `verbose`. This is separate from operational logging.                                                        |
+| `lasertag.astro.navigation.enabled` | `false`  | Enable on-demand Astro navigation and permit execution of project content mappers in trusted workspaces.                                                           |
 
 Operational logs and protocol traces appear in **View: Toggle Output** under
 **Lasertag**.
+
+## Astro navigation
+
+Install `@astrojs/ts-content-mapper` in your project and register it in
+`tsconfig.json`:
+
+```json
+{
+	"contentMappers": [
+		{ "package": "@astrojs/ts-content-mapper", "extensions": [".astro"] }
+	]
+}
+```
+
+Enable `lasertag.astro.navigation.enabled` in a trusted workspace. This permits
+TypeScript to execute the project's configured content mappers when you navigate
+from an Astro component tag. The compiler session is reused, including unsaved
+source and dependency edits, and released when the last Astro document closes.
+
+**Go to Definition** follows source declarations, including aliases and namespace
+members. A mapped Astro component without a precise range opens at the beginning
+of its source file. **Go to Declaration** follows ambient declarations; an MDX
+`Content` type declaration does not establish the MDX implementation. Unresolved
+or conflicting mappings return no target. Render stories, CSS diagnostics,
+completions, and cleanup continue to use the template parser.
 
 ## Troubleshooting
 

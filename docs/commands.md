@@ -10,6 +10,7 @@ Following the [mise Node.js cookbook](https://mise.jdx.dev/mise-cookbook/nodejs.
 | `check:fmt`        | Validate formatting without rewriting maintained files; language-specific validators are listed below.             |
 | `check`            | Run every static check listed below. Generated prerequisites and caches may be written; source fixes are explicit. |
 | `test`             | Run the normal test suite once and return a failing status when tests fail.                                        |
+| `test:breakage`    | Replay the latest released public consumer contracts against current source.                                       |
 | `test:watch`       | Watch the available interactive test suites.                                                                       |
 | `build`            | Build distributable artifacts.                                                                                     |
 | `change`           | Author pending release notes.                                                                                      |
@@ -25,6 +26,16 @@ Following the [mise Node.js cookbook](https://mise.jdx.dev/mise-cookbook/nodejs.
 - `check:spelling`: `cspell .`.
 
 `check:vp` runs linting and TypeScript typechecking through Vite Plus with `lint.options.typeAware` and `lint.options.typeCheck` enabled. `check:fmt` handles formatting separately.
+
+## Experimental Astro benchmark
+
+The Astro and CSS benchmarks use the Lasertag website corpus, maintained separately from the package. If it is absent from this checkout, set `LASERTAG_BENCHMARK_SITE_PATH` to an installed `apps/lasertagcss.com` directory from a website checkout. The commands copy its authored inputs into a temporary project and leave the original files untouched.
+
+Run `pnpm --silent --filter lasertag benchmark:astro --runExternalCode --iterations 10` to compare template analysis with the official Astro content mapper on an isolated copy of the website. The command executes the pinned development mapper and writes JSON results to stdout. See the [Astro validation notes](../packages/lasertag/docs/astro-support-plan.md#official-mapper-validation) for scope, correctness assertions, and interpretation.
+
+## Experimental CSS ownership benchmark
+
+Run `pnpm --silent --filter lasertag benchmark:css --runExternalCode --iterations 5` to resolve class attachments through the pinned development CSS and Astro mappers in an isolated copy of the website. It checks stories, CSS diagnostics, completion results, cleanup ranges, and authored declaration locations, then writes coverage and timing samples as JSON to stdout. It also measures at least thirty samples each of unchanged requests, unique TSX/Astro edits, import renames, unsaved CSS edits, and alternating edited documents. The [CSS mapper prototype notes](../packages/lasertag/docs/render-story-css-validation-plan.md#css-mapper-ownership-prototype) describe the evidence and its limits. To inspect a configured trusted project directly, run `node scripts/inspect-css-ownership.node.ts --runExternalCode path/to/AppPanel.tsx` (or `.astro`). These commands execute project-configured mappers; ordinary analysis remains unchanged.
 
 ## Migration
 
