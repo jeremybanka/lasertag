@@ -38,7 +38,7 @@ import {
 	type AstroNavigationTask,
 } from "../../../src/lsp/astro-navigation.ts"
 import { createOfficialAstroProject } from "../../public/lsp/fixtures/astro-project.ts"
-import { astroNavigationInitializationOptions } from "../../../src/vscode/config.ts"
+import { mapperInitializationOptions } from "../../../src/vscode/config.ts"
 
 describe(`Astro navigation lifecycle`, () => {
 	beforeEach(() => {
@@ -46,18 +46,12 @@ describe(`Astro navigation lifecycle`, () => {
 		lifecycle.closed = 0
 	})
 
-	it(`requires workspace trust as well as the VS Code setting`, () => {
-		for (const [enabled, trusted] of [
-			[false, false],
-			[true, false],
-			[false, true],
-		]) {
-			expect(astroNavigationInitializationOptions(enabled!, trusted!)).toEqual({
-				astroNavigation: { enabled: false, runExternalCode: false },
-			})
-		}
-		expect(astroNavigationInitializationOptions(true, true)).toEqual({
-			astroNavigation: { enabled: true, runExternalCode: true },
+	it(`passes workspace trust without a navigation preference`, () => {
+		expect(mapperInitializationOptions(false)).toEqual({
+			workspaceTrusted: false,
+		})
+		expect(mapperInitializationOptions(true)).toEqual({
+			workspaceTrusted: true,
 		})
 	})
 

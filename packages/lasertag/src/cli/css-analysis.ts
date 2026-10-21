@@ -39,6 +39,7 @@ export function createCliCssAnalysis(
 			)
 			if (sibling.kind !== `ready`) return
 			const task: CssAnalysisTask = {
+				scopeToCssClassRoots: true,
 				cssPath,
 				cssSource: fs.readFile(cssPath),
 				sourcePath: sibling.source.path,

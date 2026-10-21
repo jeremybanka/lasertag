@@ -393,7 +393,10 @@ export function isLasertagWorkerData(
 
 export async function runLasertagWorker(
 	data: LasertagWorkerData,
-	processTask: (task: LasertagWorkTask, workerId: number) => LasertagWorkResult,
+	processTask: (
+		task: LasertagWorkTask,
+		workerId: number,
+	) => LasertagWorkResult | Promise<LasertagWorkResult>,
 ): Promise<void> {
 	if (!parentPort) {
 		throw new Error(`Lasertag worker requires a parent message port.`)
@@ -405,17 +408,20 @@ export async function runLasertagWorker(
 function runWorkerMessageLoop(
 	port: MessagePort,
 	data: LasertagWorkerData,
-	processTask: (task: LasertagWorkTask, workerId: number) => LasertagWorkResult,
+	processTask: (
+		task: LasertagWorkTask,
+		workerId: number,
+	) => LasertagWorkResult | Promise<LasertagWorkResult>,
 ): Promise<void> {
 	return new Promise((resolve) => {
-		port.on(`message`, (message: CoordinatorMessage) => {
+		port.on(`message`, async (message: CoordinatorMessage) => {
 			if (message.type === `stop`) {
 				port.close()
 				resolve()
 				return
 			}
 
-			const result = processTask(message.task, data.workerId)
+			const result = await processTask(message.task, data.workerId)
 			const response: WorkerMessage = { result, type: `result` }
 
 			port.postMessage(response)

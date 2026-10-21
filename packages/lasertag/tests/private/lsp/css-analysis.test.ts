@@ -13,7 +13,7 @@ import {
 } from "../../../src/refractor/css-analysis.ts"
 import { runLasertagCheck } from "../../../src/cli/check.ts"
 import { runLasertagFix } from "../../../src/cli/fix.ts"
-import { cssOwnershipInitializationOptions } from "../../../src/vscode/config.ts"
+import { mapperInitializationOptions } from "../../../src/vscode/config.ts"
 import { createLspClient } from "../../public/lsp/helpers/client.ts"
 import {
 	createCssMapperProject,
@@ -23,18 +23,11 @@ import {
 const source = `import css from "./AppPanel.module.css"; export const AppPanel = () => <app-panel className={css.class}><span /></app-panel>`
 const css = `app-panel.class { > missing {} > span {} }`
 
-it(`requires workspace trust for CSS mapper analysis`, () => {
-	for (const [enabled, trusted] of [
-		[false, false],
-		[true, false],
-		[false, true],
-	])
-		expect(cssOwnershipInitializationOptions(enabled!, trusted!)).toEqual({
-			cssOwnership: { enabled: false, runExternalCode: false },
-		})
-	expect(cssOwnershipInitializationOptions(true, true)).toEqual({
-		cssOwnership: { enabled: true, runExternalCode: true },
+it(`passes workspace trust without feature settings`, () => {
+	expect(mapperInitializationOptions(false)).toEqual({
+		workspaceTrusted: false,
 	})
+	expect(mapperInitializationOptions(true)).toEqual({ workspaceTrusted: true })
 })
 
 function observedProject() {
@@ -94,7 +87,7 @@ it(
 		const files = [`AppPanel`, `OtherPanel`].map((name) =>
 			path.join(project.root, `${name}.module.css`),
 		)
-		const checked = await runLasertagCheck(files, { cssOwnership: true })
+		const checked = await runLasertagCheck(files)
 		expect(checked.failures).toEqual([])
 		expect(
 			checked.fileResults.every(
@@ -104,7 +97,7 @@ it(
 			),
 		).toBe(true)
 		expect(readFileSync(marker, `utf8`).trim().split(`\n`)).toHaveLength(1)
-		const fixed = await runLasertagFix(files, { cssOwnership: true })
+		const fixed = await runLasertagFix(files)
 		expect(fixed.failures).toEqual([])
 		expect(fixed.changedFiles).toHaveLength(2)
 		for (const file of fixed.fileResults) {
@@ -119,6 +112,30 @@ it(
 			).toBe(`class`)
 		}
 		expect(readFileSync(marker, `utf8`).trim().split(`\n`)).toHaveLength(2)
+		const parallel = await runLasertagCheck(files, {
+			workerCount: 2,
+			workerModuleUrl: new URL(`../../../src/cli/main.ts`, import.meta.url),
+		})
+		expect(parallel.workerCount).toBe(2)
+		expect(
+			parallel.fileResults.every(
+				(file) => file.ownership?.status === `available`,
+			),
+		).toBe(true)
+		const processIds = readFileSync(marker, `utf8`)
+			.trim()
+			.split(`\n`)
+			.map(Number)
+		expect(processIds).toHaveLength(
+			2 + new Set(parallel.fileResults.map((file) => file.workerId)).size,
+		)
+		await vi.waitFor(
+			() => {
+				for (const pid of processIds)
+					expect(() => process.kill(pid, 0)).toThrow()
+			},
+			{ timeout: 3_000 },
+		)
 	},
 )
 
@@ -130,9 +147,7 @@ it(
 		using project = observed.project
 		const { marker } = observed
 		await using client = createLspClient(project.root)
-		await client.initialize({
-			cssOwnership: { enabled: true, runExternalCode: true },
-		})
+		await client.initialize()
 		const sourcePath = path.join(project.root, `AppPanel.tsx`)
 		const query = () =>
 			client.request(`lasertag/renderStory`, {

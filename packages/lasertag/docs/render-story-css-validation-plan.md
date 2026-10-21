@@ -1,13 +1,12 @@
 # Render Story CSS Validation Plan
 
-Status: implemented with opt-in CSS ownership analysis; historical design notes follow.
+Status: implemented with automatic configured CSS mapper analysis; historical design notes follow.
 
 ## CSS mapper ownership analysis
 
 The source module `src/refractor/css-ownership-evidence.ts` supplies CSS Module
-ownership evidence to CLI `check --css-ownership` and `fix --css-ownership`, and
-to the LSP with `cssOwnership.enabled` and `runExternalCode` enabled. VS Code
-exposes the trusted-workspace setting `lasertag.css.ownership.enabled`.
+ownership evidence automatically to CLI `check` and `fix`, and to the LSP in
+trusted workspaces, using the project's TypeScript mapper configuration.
 See the [consumer setup and output contract](tooling-guide.md#css-mapper-ownership-analysis).
 
 The consumers reuse a bounded analysis process and TypeScript session, including

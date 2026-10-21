@@ -48,7 +48,6 @@ export type LasertagCheckFileSystem = {
 }
 
 export type RunLasertagCheckOptions = {
-	cssOwnership?: boolean
 	fileSystem?: Partial<LasertagCheckFileSystem>
 	includeStoryEvidence?: boolean
 	typescriptSdkPath?: string
@@ -179,16 +178,31 @@ function summarizeCheck(
 	}
 }
 
-export function processLasertagCheckTask(
+export async function processLasertagCheckTask(
 	task: LasertagWorkTask,
 	workerId: number,
 	typescriptSession: TypescriptAstSession,
-): LasertagCheckFileResult {
+	mapper?: ReturnType<typeof createCliCssAnalysis>,
+	fileSystem: LasertagCheckFileSystem = defaultFileSystem,
+): Promise<LasertagCheckFileResult> {
 	if (task.operation !== `check`) {
 		throw new Error(`Cannot process ${task.operation} task as a check.`)
 	}
 
-	return checkFile(task, workerId, defaultFileSystem, typescriptSession)
+	let prepared: PreparedCssAnalysis | undefined
+	try {
+		prepared = await mapper?.prepare(task.cssPath, fileSystem)
+	} catch {
+		/* File failures are reported by the ordinary path. */
+	}
+	const result = checkFile(
+		task,
+		workerId,
+		fileSystem,
+		typescriptSession,
+		prepared,
+	)
+	return result
 }
 
 export async function runLasertagCheck(
@@ -205,7 +219,7 @@ export async function runLasertagCheck(
 		options.fileSystem !== undefined &&
 		Object.keys(options.fileSystem).length > 0
 
-	const mapper = options.cssOwnership
+	const mapper = !hasCustomFileSystem
 		? createCliCssAnalysis(
 				options.workerModuleUrl ?? new URL(`./main.ts`, import.meta.url),
 				typescriptSession,
@@ -215,29 +229,21 @@ export async function runLasertagCheck(
 	try {
 		const work = await runWorkStealing<LasertagCheckFileResult>({
 			files,
-			forceSerial: hasCustomFileSystem || !!mapper,
+			forceSerial: hasCustomFileSystem,
 			...(options.includeStoryEvidence ? { includeStoryEvidence: true } : {}),
 			operation: `check`,
-			processSerial: async (task, workerId) => {
-				let prepared: PreparedCssAnalysis | undefined
-				try {
-					prepared = await mapper?.prepare(task.cssPath, fileSystem)
-				} catch {
-					/* File failures are reported by the ordinary path. */
-				}
-				const result = checkFile(
+			processSerial: (task, workerId) =>
+				processLasertagCheckTask(
 					task,
 					workerId,
-					fileSystem,
 					typescriptSession,
-					prepared,
-				)
-				return result
-			},
+					mapper,
+					fileSystem,
+				),
 			...(options.typescriptSdkPath
 				? { typescriptSdkPath: options.typescriptSdkPath }
 				: {}),
-			...(options.workerCount ? { workerCount: options.workerCount } : {}),
+			workerCount: options.workerCount ?? 1,
 			...(options.workerModuleUrl
 				? { workerModuleUrl: options.workerModuleUrl }
 				: {}),

@@ -17,26 +17,6 @@ import { createTypescriptAstSession } from "../refractor/typescript-ast.ts"
 
 export const ASTRO_NAVIGATION_WORKER = `lasertag-astro-navigation`
 
-export function astroNavigationEnabled(
-	initializationOptions: unknown,
-): boolean {
-	if (
-		!initializationOptions ||
-		typeof initializationOptions !== `object` ||
-		!(`astroNavigation` in initializationOptions)
-	)
-		return false
-	const options = initializationOptions.astroNavigation
-	return (
-		typeof options === `object` &&
-		options !== null &&
-		`enabled` in options &&
-		options.enabled === true &&
-		`runExternalCode` in options &&
-		options.runExternalCode === true
-	)
-}
-
 export type AstroNavigationTask = {
 	filePath: string
 	sourceText: string

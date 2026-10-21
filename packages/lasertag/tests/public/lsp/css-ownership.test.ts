@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs"
 import path from "node:path"
 import { pathToFileURL } from "node:url"
 
@@ -7,7 +8,7 @@ import type { LasertagRenderStoryView } from "../../../src/lsp/render-story-view
 import { createCssMapperProject } from "./fixtures/css-project.ts"
 import { createLspClient } from "./helpers/client.ts"
 
-const enabled = { cssOwnership: { enabled: true, runExternalCode: true } }
+const enabled = {}
 const source = `import css from "./AppPanel.module.css"; export const AppPanel = () => <app-panel className={css.class}><span /></app-panel>`
 const css = `app-panel.class { > span {} > missing {} }\n.extra {}`
 
@@ -56,17 +57,13 @@ it(`discards a mapped story superseded by an edit and honors cancellation`, asyn
 	})
 })
 
-it.each([
-	{},
-	{ cssOwnership: { enabled: true } },
-	{ cssOwnership: { runExternalCode: true } },
-])(`requires both CSS mapper opt-in flags: %j`, async (options) => {
+it(`does not execute CSS mappers in an untrusted workspace`, async () => {
 	using project = createCssMapperProject({
 		"AppPanel.tsx": source,
 		"AppPanel.module.css": css,
 	})
 	await using client = createLspClient(project.root)
-	await client.initialize(options)
+	await client.initialize({ workspaceTrusted: false })
 	const sourcePath = path.join(project.root, `AppPanel.tsx`)
 	client.open(sourcePath, source, `typescriptreact`)
 	const view = await client.request(`lasertag/renderStory`, {
@@ -92,7 +89,7 @@ it.each([`tsx`, `astro`])(
 		const uri = pathToFileURL(cssPath).href
 		await using ordinary = createLspClient(project.root)
 		await using mapped = createLspClient(project.root)
-		await ordinary.initialize()
+		await ordinary.initialize({ workspaceTrusted: false })
 		await mapped.initialize(enabled)
 		for (const client of [ordinary, mapped]) {
 			client.open(
@@ -159,7 +156,7 @@ it.each([`tsx`, `astro`])(
 	},
 )
 
-it(`refreshes imported bindings and configuration without changing the structural story`, async () => {
+it(`uses inherited mapper configuration and refreshes imported bindings without changing structure`, async () => {
 	const text = source.replace(`"./AppPanel.module.css"`, `"./binding"`)
 	using project = createCssMapperProject({
 		"AppPanel.tsx": text,
@@ -167,6 +164,11 @@ it(`refreshes imported bindings and configuration without changing the structura
 		"Other.module.css": `.class {}`,
 		"binding.ts": `export { default } from "./AppPanel.module.css"`,
 	})
+	project.write(
+		`base.json`,
+		readFileSync(path.join(project.root, `tsconfig.json`), `utf8`),
+	)
+	project.write(`tsconfig.json`, JSON.stringify({ extends: `./base.json` }))
 	await using client = createLspClient(project.root)
 	await client.initialize(enabled)
 	const sourcePath = path.join(project.root, `AppPanel.tsx`)
@@ -199,7 +201,6 @@ it(`refreshes imported bindings and configuration without changing the structura
 		changes: [{ uri: pathToFileURL(config).href, type: 2 }],
 	})
 	const view = await query()
-	if (view.kind !== `ready` || view.ownership?.status !== `available`)
-		throw new Error(`No analysis`)
-	expect(view.ownership.attachments[0]!.status).not.toBe(`sibling`)
+	expect(view.kind).toBe(`ready`)
+	expect(view).not.toHaveProperty(`ownership`)
 })

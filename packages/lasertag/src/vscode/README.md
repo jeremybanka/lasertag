@@ -27,7 +27,7 @@ file changes. If both source siblings exist, Lasertag reports an ambiguity error
   branch opens its selector in the CSS Module.
 - Offers a quick fix and a command to remove diagnosed selectors safely from
   selector lists or whole rules.
-- Offers opt-in Astro component navigation: **Go to Definition** opens source
+- Offers automatic Astro component navigation: **Go to Definition** opens source
   targets; **Go to Declaration** opens ambient type declarations.
 
 Diagnostics are conservative. Dynamic or unsupported render paths are treated
@@ -72,19 +72,16 @@ Fix.
 ## Settings
 
 All settings are optional. The bundled server and TypeScript runtime work
-without configuration. Changing `lasertag.astro.navigation.enabled` restarts the
-server automatically. Run **Developer: Reload Window** after changing other
+without configuration. Run **Developer: Reload Window** after changing
 settings; restarting the existing Lasertag client does not reload those settings.
 
-| Setting                             | Default  | Purpose                                                                                                                                                            |
-| ----------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `lasertag.lsp.path`                 | `""`     | Path to a `lasertag-lsp` executable. Relative paths resolve from the first workspace root. When set, this takes precedence over `lasertag.server.path`.            |
-| `lasertag.server.path`              | `""`     | Path to a language-server module. Leave empty to use the bundled server; ignored when `lasertag.lsp.path` is set.                                                  |
-| `lasertag.typescript.sdk.path`      | `""`     | Path to the TypeScript 7 native executable used for TSX analysis. Relative paths resolve from the first workspace root. Leave empty to use the bundled executable. |
-| `lasertag.log.level`                | `"info"` | Operational logging: `off`, `error`, `warn`, `info`, or `debug`.                                                                                                   |
-| `lasertag.trace.server`             | `"off"`  | Client/server protocol tracing: `off`, `messages`, or `verbose`. This is separate from operational logging.                                                        |
-| `lasertag.css.ownership.enabled`    | `false`  | Enable CSS ownership analysis and authored stylesheet targets in trusted workspaces.                                                                               |
-| `lasertag.astro.navigation.enabled` | `false`  | Enable on-demand Astro navigation and permit execution of project content mappers in trusted workspaces.                                                           |
+| Setting                        | Default  | Purpose                                                                                                                                                            |
+| ------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `lasertag.lsp.path`            | `""`     | Path to a `lasertag-lsp` executable. Relative paths resolve from the first workspace root. When set, this takes precedence over `lasertag.server.path`.            |
+| `lasertag.server.path`         | `""`     | Path to a language-server module. Leave empty to use the bundled server; ignored when `lasertag.lsp.path` is set.                                                  |
+| `lasertag.typescript.sdk.path` | `""`     | Path to the TypeScript 7 native executable used for TSX analysis. Relative paths resolve from the first workspace root. Leave empty to use the bundled executable. |
+| `lasertag.log.level`           | `"info"` | Operational logging: `off`, `error`, `warn`, `info`, or `debug`.                                                                                                   |
+| `lasertag.trace.server`        | `"off"`  | Client/server protocol tracing: `off`, `messages`, or `verbose`. This is separate from operational logging.                                                        |
 
 Operational logs and protocol traces appear in **View: Toggle Output** under
 **Lasertag**.
@@ -102,7 +99,7 @@ Install `@astrojs/ts-content-mapper` in your project and register it in
 }
 ```
 
-Enable `lasertag.astro.navigation.enabled` in a trusted workspace. This permits
+In a trusted workspace, Lasertag automatically permits
 TypeScript to execute the project's configured content mappers when you navigate
 from an Astro component tag. The compiler session is reused, including unsaved
 source and dependency edits, and released when the last Astro document closes.
@@ -118,9 +115,7 @@ completions, and cleanup continue to use the template parser.
 
 Install and register `css-modules-content-mapper` for `.module.css` in the
 project's `contentMappers` configuration. Astro files also need the Astro mapper
-shown above. Enable `lasertag.css.ownership.enabled` in a trusted workspace.
-This separately permits project mapper execution during CSS analysis and
-restarts the server.
+shown above. Lasertag uses these registrations automatically in trusted workspaces.
 
 Diagnostics, completions, cleanup, and the sidebar share the mapped story while
 retaining existing structural rules. The **CSS ownership** section shows each
@@ -156,3 +151,6 @@ changes to MPL-covered files, make those files' source available under MPL 2.0;
 separate files remain under terms of your choice. See Mozilla's
 [official MPL 2.0 FAQ](https://www.mozilla.org/en-US/MPL/2.0/FAQ/) for the
 plain-language explanation and the included `LICENSE` file for the full terms.
+
+Mapper execution is disabled in restricted workspaces. Granting workspace trust
+restarts the server automatically. No additional Lasertag feature settings are needed.

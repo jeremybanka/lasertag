@@ -8,7 +8,7 @@ import { TextDocument } from "vscode-languageserver-textdocument"
 import { createOfficialAstroProject } from "./fixtures/astro-project.ts"
 import { createLspClient } from "./helpers/client.ts"
 
-const enabled = { astroNavigation: { enabled: true, runExternalCode: true } }
+const enabled = {}
 const card = `// 🌱 café\nexport function ActualCard() { return <actual-card /> }`
 const child = `---\nconst title = "hello"\n---\n<child-body><slot /></child-body>`
 const files = {
@@ -39,16 +39,12 @@ function params(filePath: string, text: string, needle: string) {
 	}
 }
 
-describe(`opt-in Astro LSP navigation`, () => {
-	it.each([
-		{},
-		{ astroNavigation: { enabled: true } },
-		{ astroNavigation: { runExternalCode: true } },
-	])(`requires both explicit flags: %j`, async (options) => {
+describe(`automatic Astro LSP navigation`, () => {
+	it(`does not execute navigation mappers in an untrusted workspace`, async () => {
 		using project = createOfficialAstroProject(files)
 		const { filePath } = project.options(source)
 		await using client = createLspClient(project.root)
-		const result = await client.initialize(options)
+		const result = await client.initialize({ workspaceTrusted: false })
 		expect(result.capabilities).not.toHaveProperty(`definitionProvider`)
 		expect(result.capabilities).not.toHaveProperty(`declarationProvider`)
 		client.open(filePath, source)
@@ -259,7 +255,9 @@ describe(`opt-in Astro LSP navigation`, () => {
 						`{ "compilerOptions": { "jsx": "preserve" } }`,
 					)
 				await using client = createLspClient(project.root)
-				await client.initialize(mode === `disabled` ? {} : enabled)
+				await client.initialize(
+					mode === `disabled` ? { workspaceTrusted: false } : enabled,
+				)
 				client.open(filePath, source)
 				client.open(
 					cssPath,

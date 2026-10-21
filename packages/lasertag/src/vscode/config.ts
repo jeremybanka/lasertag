@@ -4,28 +4,9 @@ import { LASERTAG_TYPESCRIPT_SDK_PATH } from "../refractor/typescript-runtime.ts
 
 export { LASERTAG_TYPESCRIPT_SDK_PATH }
 
-export function astroNavigationInitializationOptions(
-	enabled: boolean,
-	trusted: boolean,
-) {
-	return {
-		astroNavigation: {
-			enabled: enabled && trusted,
-			runExternalCode: enabled && trusted,
-		},
-	}
-}
-
-export function cssOwnershipInitializationOptions(
-	enabled: boolean,
-	trusted: boolean,
-) {
-	return {
-		cssOwnership: {
-			enabled: enabled && trusted,
-			runExternalCode: enabled && trusted,
-		},
-	}
+/** Workspace trust is client context, not a feature preference. */
+export function mapperInitializationOptions(trusted: boolean) {
+	return { workspaceTrusted: trusted }
 }
 
 export function resolveWorkspacePath(

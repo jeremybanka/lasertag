@@ -28,6 +28,22 @@ async function cli(cwd: string, args: string[]) {
 	}
 }
 
+async function ordinaryCli(
+	project: ReturnType<typeof createCssMapperProject>,
+	args: string[],
+) {
+	const configPath = `${project.root}/tsconfig.json`
+	const original = readFileSync(configPath, `utf8`)
+	const config = JSON.parse(original)
+	delete config.contentMappers
+	project.write(`tsconfig.json`, JSON.stringify(config))
+	try {
+		return await cli(project.root, args)
+	} finally {
+		project.write(`tsconfig.json`, original)
+	}
+}
+
 it.each([`tsx`, `astro`])(
 	`ships CSS evidence through check for %s while preserving diagnostics`,
 	async (extension) => {
@@ -38,12 +54,8 @@ it.each([`tsx`, `astro`])(
 					: `---\nimport css from "./AppPanel.module.css"\n---\n<app-panel class={css.class}><span /></app-panel>`,
 			"AppPanel.module.css": css,
 		})
-		const ordinary = await cli(project.root, [`check`, `--format=json`])
-		const mapped = await cli(project.root, [
-			`check`,
-			`--format=json`,
-			`--css-ownership`,
-		])
+		const ordinary = await ordinaryCli(project, [`check`, `--format=json`])
+		const mapped = await cli(project.root, [`check`, `--format=json`])
 		const { ownership, ...output } = JSON.parse(mapped.stdout)
 		expect(output).toEqual(JSON.parse(ordinary.stdout))
 		expect(mapped.code).toBe(ordinary.code)
@@ -75,14 +87,13 @@ it(
 			"Other.module.css": `.class {}`,
 		})
 		const result = JSON.parse(
-			(await cli(project.root, [`check`, `--css-ownership`, `--format=json`]))
-				.stdout,
+			(await cli(project.root, [`check`, `--format=json`])).stdout,
 		)
 		expect(result.ownership[0].attachments[0].status).toBe(`foreign`)
-		const ordinary = await cli(project.root, [`fix`])
+		const ordinary = await ordinaryCli(project, [`fix`])
 		const expected = readFileSync(`${project.root}/AppPanel.module.css`, `utf8`)
 		project.write(`AppPanel.module.css`, css)
-		const mapped = await cli(project.root, [`fix`, `--css-ownership`])
+		const mapped = await cli(project.root, [`fix`])
 		expect(mapped.code).toBe(ordinary.code)
 		expect(readFileSync(`${project.root}/AppPanel.module.css`, `utf8`)).toBe(
 			expected,
@@ -97,14 +108,13 @@ it(`keeps ordinary check and fix usable with no configured CSS mapper`, async ()
 		false,
 	)
 	const ordinary = JSON.parse(
-		(await cli(project.root, [`check`, `--format=json`])).stdout,
+		(await ordinaryCli(project, [`check`, `--format=json`])).stdout,
 	)
 	const { ownership, ...mapped } = JSON.parse(
-		(await cli(project.root, [`check`, `--format=json`, `--css-ownership`]))
-			.stdout,
+		(await cli(project.root, [`check`, `--format=json`])).stdout,
 	)
 	expect(mapped).toEqual(ordinary)
-	expect(ownership[0].attachments[0].status).not.toBe(`sibling`)
+	expect(ownership).toBeUndefined()
 })
 
 it(`preserves check diagnostics when the configured CSS mapper crashes`, async () => {
@@ -135,14 +145,11 @@ it(`preserves check diagnostics when the configured CSS mapper crashes`, async (
 		}),
 	)
 	const ordinary = JSON.parse(
-		(await cli(project.root, [`check`, `--format=json`])).stdout,
+		(await ordinaryCli(project, [`check`, `--format=json`])).stdout,
 	)
 	const { ownership, ...mapped } = JSON.parse(
-		(await cli(project.root, [`check`, `--format=json`, `--css-ownership`]))
-			.stdout,
+		(await cli(project.root, [`check`, `--format=json`])).stdout,
 	)
 	expect(mapped).toEqual(ordinary)
-	expect(ownership).toHaveLength(1)
-	if (ownership[0].status === `available`)
-		expect(ownership[0].attachments[0].status).not.toBe(`sibling`)
+	expect(ownership).toBeUndefined()
 })

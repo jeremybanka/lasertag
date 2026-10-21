@@ -1281,7 +1281,14 @@ export function createLasertagLspState(
 				sourcePath: source.sourcePath,
 			})
 			const mapped = silo.getState(mappedCssAnalysesAtom)[source.sourcePath]
-			return view.kind === `ready` && mapped
+			return view.kind === `ready` &&
+				mapped?.result.ownership.status === `available` &&
+				mapped.result.ownership.attachments.some((reference) =>
+					reference.targets.some(
+						(target) =>
+							target.status === `sibling` || target.status === `foreign`,
+					),
+				)
 				? { ...view, ownership: mapped.result.ownership }
 				: view
 		},

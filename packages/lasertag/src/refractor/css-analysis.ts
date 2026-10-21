@@ -24,23 +24,11 @@ export type CssAnalysisTask = {
 	sourceText: string
 	cssPath: string
 	cssSource: string
+	/** CLI validation scopes during extraction; editor views retain the full story. */
+	scopeToCssClassRoots?: boolean
 	openFiles?: Array<[string, string]>
 	diskRevision?: number
 	typescriptSdkPath?: string
-}
-
-export function cssOwnershipEnabled(options: unknown): boolean {
-	if (!options || typeof options !== `object` || !(`cssOwnership` in options))
-		return false
-	const value = options.cssOwnership
-	return (
-		!!value &&
-		typeof value === `object` &&
-		`enabled` in value &&
-		value.enabled === true &&
-		`runExternalCode` in value &&
-		value.runExternalCode === true
-	)
 }
 
 export function runCssAnalysisWorker(): void {
@@ -75,7 +63,7 @@ export function runCssAnalysisWorker(): void {
 					{
 						...task,
 						expectedCssPath: task.cssPath,
-						scopeToCssClassRoots: false,
+						scopeToCssClassRoots: task.scopeToCssClassRoots ?? false,
 						typescriptSource: { openFiles, invalidate },
 					},
 					session,
@@ -113,7 +101,7 @@ export function fallbackCssAnalysis(
 ): CssOwnershipResult {
 	return {
 		renderStory: analyzeRenderStory(
-			{ ...task, scopeToCssClassRoots: false },
+			{ ...task, scopeToCssClassRoots: task.scopeToCssClassRoots ?? false },
 			session,
 		),
 		ownership: {

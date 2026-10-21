@@ -12,8 +12,7 @@ import {
 	type RenderStoryViewLocation,
 } from "../lsp/render-story-view.ts"
 import {
-	astroNavigationInitializationOptions,
-	cssOwnershipInitializationOptions,
+	mapperInitializationOptions,
 	resolveBundledTypescriptSdkPath,
 	resolveTypescriptSdkPath,
 	resolveWorkspacePath,
@@ -133,11 +132,8 @@ type VscodeModule = {
 	}
 	workspace: {
 		isTrusted: boolean
-		onDidChangeConfiguration(
-			listener: (event: {
-				affectsConfiguration(section: string): boolean
-			}) => unknown,
-		): Disposable
+		onDidGrantWorkspaceTrust(listener: () => unknown): Disposable
+
 		createFileSystemWatcher(globPattern: string): unknown
 		getConfiguration(section: string): {
 			get<T>(key: string, defaultValue: T): T
@@ -433,20 +429,8 @@ function createServerOptions(context: ExtensionContext) {
 
 function createClientOptions() {
 	return {
-		initializationOptions: () => ({
-			...cssOwnershipInitializationOptions(
-				vscode.workspace
-					.getConfiguration("lasertag")
-					.get("css.ownership.enabled", false),
-				vscode.workspace.isTrusted,
-			),
-			...astroNavigationInitializationOptions(
-				vscode.workspace
-					.getConfiguration("lasertag")
-					.get("astro.navigation.enabled", false),
-				vscode.workspace.isTrusted,
-			),
-		}),
+		initializationOptions: () =>
+			mapperInitializationOptions(vscode.workspace.isTrusted),
 		documentSelector: [
 			{
 				language: "css",
@@ -518,12 +502,8 @@ export async function activate(context: ExtensionContext) {
 	await client.setTrace(traceFromSetting(trace))
 	await client.start()
 	context.subscriptions.push(
-		vscode.workspace.onDidChangeConfiguration((event) => {
-			if (
-				event.affectsConfiguration("lasertag.astro.navigation.enabled") ||
-				event.affectsConfiguration("lasertag.css.ownership.enabled")
-			)
-				void client?.restart()
+		vscode.workspace.onDidGrantWorkspaceTrust(() => {
+			void client?.restart()
 		}),
 	)
 

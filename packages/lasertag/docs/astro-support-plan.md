@@ -7,9 +7,9 @@ The workspace uses TypeScript `7.1.0-beta`. The experimental source module
 story with separate component-reference evidence from a configured content mapper.
 It is intentionally outside the `lasertag/refractor` exports while its contract
 is being evaluated. Public render stories and CSS decisions continue to use the
-template analyzer. The LSP now consumes the semantic evidence for explicitly
-enabled, on-demand component navigation; see the
-[editor setup](tooling-guide.md#opt-in-astro-component-navigation).
+template analyzer. The LSP now consumes the semantic evidence for on-demand component navigation using
+the project’s TypeScript mapper configuration; see the
+[editor setup](tooling-guide.md#astro-component-navigation).
 
 From the repository root, inspect an Astro file in a trusted project with an
 installed mapper registered for `.astro` in `tsconfig.json`:
@@ -119,7 +119,7 @@ hash for this run is
 
 The demonstrated improvement is component identity and navigation evidence that
 survives authored aliases and does not depend on component naming conventions.
-The LSP now exposes that evidence through opt-in navigation. Go to Definition
+The LSP now exposes that evidence through automatic configured navigation. Go to Definition
 returns source targets; Go to Declaration returns ambient targets, including
 `declare` declarations in ordinary TypeScript files. A separate process reuses
 the native compiler session, supplies current unsaved documents, discards stale

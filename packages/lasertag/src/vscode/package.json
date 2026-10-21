@@ -78,18 +78,6 @@
 		"configuration": {
 			"title": "Lasertag",
 			"properties": {
-				"lasertag.css.ownership.enabled": {
-					"type": "boolean",
-					"default": false,
-					"scope": "window",
-					"description": "Use project content mappers during CSS analysis and show ownership of authored CSS in the render-story view. Requires workspace trust and a configured CSS mapper (plus an Astro mapper for Astro sources). Changing this setting restarts the server."
-				},
-				"lasertag.astro.navigation.enabled": {
-					"type": "boolean",
-					"default": false,
-					"scope": "window",
-					"description": "Enable on-demand Astro component navigation in trusted workspaces. This permits executing content mappers configured by the project. Go to Definition opens source targets; Go to Declaration opens ambient declarations. Requires a project-installed Astro mapper. Changing this setting restarts the server."
-				},
 				"lasertag.lsp.path": {
 					"type": "string",
 					"default": "",

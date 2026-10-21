@@ -2,7 +2,6 @@
 
 import {
 	CSS_ANALYSIS_WORKER,
-	cssOwnershipEnabled,
 	createCssAnalysisService,
 	fallbackCssAnalysis,
 	runCssAnalysisWorker,
@@ -67,7 +66,6 @@ import {
 } from "./render-story-view.ts"
 import {
 	ASTRO_NAVIGATION_WORKER,
-	astroNavigationEnabled,
 	createAstroNavigationService,
 	navigationLocations,
 	runAstroNavigationWorker,
@@ -154,12 +152,22 @@ export function createRefractorDiagnostics(
 	return state.getDiagnostics(filePath)
 }
 
+/** Standalone clients are trusted unless they explicitly report restricted mode. */
+function workspaceAllowsMappers(options: unknown): boolean {
+	return !(
+		options &&
+		typeof options === `object` &&
+		`workspaceTrusted` in options &&
+		options.workspaceTrusted === false
+	)
+}
+
 export function createInitializeResult(
 	params?: InitializeParams,
 ): InitializeResult {
 	return {
 		capabilities: {
-			...(astroNavigationEnabled(params?.initializationOptions)
+			...(workspaceAllowsMappers(params?.initializationOptions)
 				? { definitionProvider: true, declarationProvider: true }
 				: {}),
 			codeActionProvider: {
@@ -831,8 +839,8 @@ export function createLasertagLspServer(
 
 	connection.onInitialize((params) => {
 		const startedAt = performance.now()
-		navigationEnabled = astroNavigationEnabled(params.initializationOptions)
-		cssEnabled = cssOwnershipEnabled(params.initializationOptions)
+		navigationEnabled = workspaceAllowsMappers(params.initializationOptions)
+		cssEnabled = workspaceAllowsMappers(params.initializationOptions)
 		definitionLinkSupport =
 			params.capabilities.textDocument?.definition?.linkSupport === true
 		declarationLinkSupport =

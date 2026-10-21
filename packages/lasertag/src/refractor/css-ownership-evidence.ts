@@ -492,7 +492,7 @@ function storyFromParsedSource(
 }
 
 /**
- * Semantic evidence used by opted-in CLI and LSP analysis.
+ * Semantic evidence used by project-configured CLI and LSP analysis.
  * Evidence describes stylesheet references, never permission to expand a subtree
  * or remove CSS. Structural policies remain authoritative.
  */

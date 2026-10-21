@@ -4,6 +4,7 @@ import {
 	CSS_ANALYSIS_WORKER,
 	runCssAnalysisWorker,
 } from "../refractor/css-analysis.ts"
+import { createCliCssAnalysis } from "./css-analysis.ts"
 import type { CssOwnershipResult } from "../refractor/css-ownership-evidence.ts"
 
 import { existsSync, readFileSync } from "node:fs"
@@ -120,16 +121,7 @@ const rootOptionsSchema = z.object({
 	version: z.boolean().default(false),
 })
 
-const cssOwnershipOption = {
-	completion: { repeatable: false },
-	description: `execute project content mappers and report CSS ownership evidence`,
-	example: `--css-ownership`,
-	parse: parseBooleanOption,
-	required: false,
-}
-
 const checkOptionsSchema = z.object({
-	"css-ownership": z.boolean().optional(),
 	format: z.enum(FORMAT_OPTIONS).default(`stylish`),
 	"max-files": z
 		.string()
@@ -149,7 +141,7 @@ const vsixOptionsSchema = z.object({
 
 type RootOptions = z.infer<typeof rootOptionsSchema>
 type CheckOptions = z.infer<typeof checkOptionsSchema>
-const fixOptionsSchema = z.object({ "css-ownership": z.boolean().optional() })
+const fixOptionsSchema = z.object({})
 type FixOptions = z.infer<typeof fixOptionsSchema>
 type VsixOptions = z.infer<typeof vsixOptionsSchema>
 
@@ -227,7 +219,6 @@ const checkRouteOptions = options(
 	`Validate component-owned CSS modules.`,
 	checkOptionsSchema,
 	{
-		"css-ownership": cssOwnershipOption,
 		format: {
 			completion: { repeatable: false },
 			description: `output format`,
@@ -255,7 +246,7 @@ const checkRouteOptions = options(
 const fixRouteOptions = options(
 	`Clean up fixable diagnostics in component-owned CSS modules.`,
 	fixOptionsSchema,
-	{ "css-ownership": cssOwnershipOption },
+	{},
 )
 
 const lasertagCli = cli({
@@ -1067,7 +1058,15 @@ function ownershipReports(
 	}>,
 ) {
 	return files.flatMap(({ cssPath, tsxPath, ownership }) =>
-		ownership ? [{ cssPath, sourcePath: tsxPath, ...ownership }] : [],
+		ownership &&
+		ownership.status === `available` &&
+		ownership.attachments.some((reference) =>
+			reference.targets.some(
+				(target) => target.status === `sibling` || target.status === `foreign`,
+			),
+		)
+			? [{ cssPath, sourcePath: tsxPath, ...ownership }]
+			: [],
 	)
 }
 function formatOwnership(
@@ -1075,17 +1074,13 @@ function formatOwnership(
 	cwd: string,
 ): string {
 	return reports
-		.flatMap((report) =>
-			report.status === `unavailable`
-				? [`${displayPath(cwd, report.cssPath)}: ${report.reason}`]
-				: [
-						`${displayPath(cwd, report.cssPath)}: ${report.attachments.length} CSS ownership references`,
-						...report.attachments.map(
-							(reference) =>
-								`  ${reference.expression}: ${reference.status}${reference.targets.length ? ` (${reference.targets.map((target) => displayPath(cwd, target.sourcePath)).join(`, `)})` : ``}`,
-						),
-					],
-		)
+		.flatMap((report) => [
+			`${displayPath(cwd, report.cssPath)}: ${report.attachments.length} CSS ownership references`,
+			...report.attachments.map(
+				(reference) =>
+					`  ${reference.expression}: ${reference.status}${reference.targets.length ? ` (${reference.targets.map((target) => displayPath(cwd, target.sourcePath)).join(`, `)})` : ``}`,
+			),
+		])
 		.join(`\n`)
 }
 
@@ -1100,7 +1095,6 @@ async function runCheck(
 	const files = discoverCssModuleFiles(targets, environment)
 	const fileSystem = checkFileSystemFromEnvironment(environment)
 	const checkResult = await runLasertagCheck(files, {
-		...(options[`css-ownership`] ? { cssOwnership: true } : {}),
 		...(options[`show-story`] && options.format === `stylish`
 			? { includeStoryEvidence: true }
 			: {}),
@@ -1146,13 +1140,16 @@ async function runCheck(
 			cwd,
 			readCssSource,
 			styler,
-			options[`css-ownership`]
+			ownershipReports(checkResult.fileResults).length
 				? ownershipReports(checkResult.fileResults)
 				: undefined,
 		),
 	)
 
-	if (options[`css-ownership`] && options.format !== `json`)
+	if (
+		ownershipReports(checkResult.fileResults).length &&
+		options.format !== `json`
+	)
 		io.log(formatOwnership(ownershipReports(checkResult.fileResults), cwd))
 
 	return {
@@ -1281,7 +1278,6 @@ async function runFix(
 
 	try {
 		fixResult = await runLasertagFix(files, {
-			...(options[`css-ownership`] ? { cssOwnership: true } : {}),
 			...(environment.fixWorkerCount
 				? { workerCount: environment.fixWorkerCount }
 				: {}),
@@ -1352,7 +1348,7 @@ async function runFix(
 		)
 	}
 
-	if (options[`css-ownership`])
+	if (ownershipReports(fixResult.fileResults).length)
 		io.log(formatOwnership(ownershipReports(fixResult.fileResults), cwd))
 	return {
 		changedFiles: fixResult.changedFiles,
@@ -1564,16 +1560,32 @@ if (
 			: {},
 	)
 
+	const mapper = createCliCssAnalysis(
+		new URL(import.meta.url),
+		typescriptSession,
+		workerData.typescriptSdkPath,
+	)
 	try {
 		await runLasertagWorker(workerData, (task, workerId) => {
 			switch (task.operation) {
 				case `check`:
-					return processLasertagCheckTask(task, workerId, typescriptSession)
+					return processLasertagCheckTask(
+						task,
+						workerId,
+						typescriptSession,
+						mapper,
+					)
 				case `fix`:
-					return processLasertagFixTask(task, workerId, typescriptSession)
+					return processLasertagFixTask(
+						task,
+						workerId,
+						typescriptSession,
+						mapper,
+					)
 			}
 		})
 	} finally {
+		await mapper.close()
 		typescriptSession.close()
 	}
 } else if (isMainThread && import.meta.main) {
