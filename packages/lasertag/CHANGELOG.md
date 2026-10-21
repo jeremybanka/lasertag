@@ -1,5 +1,12 @@
 # lasertag
 
+## 0.8.9
+
+### Patch Changes
+
+- 84d3b85: Use Node 26.12.1, which blocks certificate chains containing the compromised intermediate CA keys.
+- 84d3b85: Update the declared pnpm toolchain requirement to 12.15.0 to include the certificate-verification security fixes.
+
 ## 0.8.8
 
 ### Patch Changes
