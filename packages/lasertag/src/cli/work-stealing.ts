@@ -56,7 +56,10 @@ export type RunWorkStealingOptions<TResult extends LasertagWorkResult> = {
 	onProgress?: (progress: WorkStealingProgress<TResult>) => void
 	onStart?: (start: WorkStealingStart) => void
 	operation: LasertagWorkerOperation
-	processSerial: (task: LasertagWorkTask, workerId: number) => TResult
+	processSerial: (
+		task: LasertagWorkTask,
+		workerId: number,
+	) => TResult | Promise<TResult>
 	typescriptSdkPath?: string
 	workerCount?: number
 	workerModuleUrl?: string | URL
@@ -172,13 +175,13 @@ function orderedResults<TResult extends LasertagWorkResult>(
 	return [...fileResults].sort((left, right) => left.index - right.index)
 }
 
-function runSerial<TResult extends LasertagWorkResult>(
+async function runSerial<TResult extends LasertagWorkResult>(
 	options: RunWorkStealingOptions<TResult>,
-): WorkStealingRunResult<TResult> {
+): Promise<WorkStealingRunResult<TResult>> {
 	const fileResults: TResult[] = []
 
 	for (const [index, cssPath] of options.files.entries()) {
-		const result = options.processSerial(
+		const result = await options.processSerial(
 			{
 				cssPath,
 				...(options.includeStoryEvidence ? { includeStoryEvidence: true } : {}),
@@ -390,7 +393,10 @@ export function isLasertagWorkerData(
 
 export async function runLasertagWorker(
 	data: LasertagWorkerData,
-	processTask: (task: LasertagWorkTask, workerId: number) => LasertagWorkResult,
+	processTask: (
+		task: LasertagWorkTask,
+		workerId: number,
+	) => LasertagWorkResult | Promise<LasertagWorkResult>,
 ): Promise<void> {
 	if (!parentPort) {
 		throw new Error(`Lasertag worker requires a parent message port.`)
@@ -402,17 +408,20 @@ export async function runLasertagWorker(
 function runWorkerMessageLoop(
 	port: MessagePort,
 	data: LasertagWorkerData,
-	processTask: (task: LasertagWorkTask, workerId: number) => LasertagWorkResult,
+	processTask: (
+		task: LasertagWorkTask,
+		workerId: number,
+	) => LasertagWorkResult | Promise<LasertagWorkResult>,
 ): Promise<void> {
 	return new Promise((resolve) => {
-		port.on(`message`, (message: CoordinatorMessage) => {
+		port.on(`message`, async (message: CoordinatorMessage) => {
 			if (message.type === `stop`) {
 				port.close()
 				resolve()
 				return
 			}
 
-			const result = processTask(message.task, data.workerId)
+			const result = await processTask(message.task, data.workerId)
 			const response: WorkerMessage = { result, type: `result` }
 
 			port.postMessage(response)

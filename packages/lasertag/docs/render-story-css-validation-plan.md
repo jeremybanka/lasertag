@@ -1,6 +1,208 @@
 # Render Story CSS Validation Plan
 
-Status: planning
+Status: implemented with automatic configured CSS mapper analysis; historical design notes follow.
+
+## CSS mapper ownership analysis
+
+The source module `src/refractor/css-ownership-evidence.ts` supplies CSS Module
+ownership evidence automatically to CLI `check` and `fix`, and to the LSP in
+trusted workspaces, using the project's TypeScript mapper configuration.
+See the [consumer setup and output contract](tooling-guide.md#css-mapper-ownership-analysis).
+
+The consumers reuse a bounded analysis process and TypeScript session, including
+current unsaved overlays and explicit invalidation. TSX stories and evidence
+share parsed source; the template parser remains authoritative for Astro
+structure. Mapper results are consumed by CLI reporting and the editor's
+render-story view. Existing structural rules still determine CSS diagnostics,
+completions, and cleanup. Worker failures fall back to ordinary extraction.
+The implementation remains outside the `lasertag/refractor` exports.
+
+Development validation pins `css-modules-content-mapper` `0.1.1` and runs its
+unmodified executable. Astro inputs also use `@astrojs/ts-content-mapper` `0.2.0`.
+The CSS mapper's generated `readonly class` declaration is mapped back to the
+authored stylesheet. Generated ambient scaffolding alone is not an ambient-only
+result: an actual content-mapped CSS property can establish stylesheet provenance.
+A plain `declare module "*.module.css"` declaration cannot.
+
+To inspect a file in a trusted, configured project:
+
+```sh
+node scripts/inspect-css-ownership.node.ts --runExternalCode path/to/AppPanel.tsx
+```
+
+The same command accepts `.astro`. Register the CSS mapper for `.module.css` in
+the project's `contentMappers` array; Astro also needs its own mapper. These
+experimental commands require explicit permission to execute project mappers.
+The benchmark below creates that configuration only in a temporary copy.
+
+Results contain the ordinary `renderStory` and separate `ownership` evidence.
+For `.class` property or literal bracket accesses inside `class`, `className`,
+or `class:list` expressions, the evidence records authored UTF-16 ranges,
+the resolved declaration path, and its relationship to the expected sibling:
+
+| Status                     | Meaning                                                                                              |
+| -------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `sibling`                  | A mapped local `.class` token and binding provenance identify the expected stylesheet.               |
+| `foreign`                  | The same checks identify another stylesheet.                                                         |
+| `ambient` / `non-css`      | The declaration supplies a type or another source binding, without mapped CSS evidence.              |
+| `unmapped` / `unverified`  | A projection lacks usable Definition mappings, or its authored token or receiver cannot be verified. |
+| `unresolved` / `ambiguous` | Resolution fails or the available targets disagree.                                                  |
+
+`usage: "expression"` distinguishes a reference in a conditional, array or mixed
+expression from a direct attribute reference. Neither status proves that a
+particular branch renders or that an arbitrary expression applies the class.
+`legacyExpressionRecognized` records what the current textual attachment policy
+recognizes; differences are evidence for future review, not behavior changes.
+An overall `available` status means the input could be analyzed, not that every
+reference has verified CSS evidence.
+
+The analysis verifies the authored token as well as the mapper's symbol. The
+generic mapper exports IDs and names inside global selectors; those are not
+sibling ownership proof. Comments, attribute strings, partial names, escaped
+tokens, missing or feature-disabled mappings, and stale CSS source are rejected
+or left unverified. Selectors involving `:global` are conservatively unverified,
+including local tokens alongside a global selector.
+
+Validation also found that TypeScript can collapse a conditional choice between
+structurally identical CSS Module export types and return only one property's
+declaration. Receiver provenance now follows imports and constant aliases,
+preserves ambiguous conditional origins, and leaves mutable bindings, asserted
+objects, and declaration-only values unverified. A type match cannot independently
+establish runtime stylesheet identity.
+
+Private tests exercise real TSX and Astro mappings, aliases, barrels, namespaces,
+path mappings, optional and bracket accesses, shadowing, different modules,
+unsaved CSS and import edits, closing overlays, disk changes, ambiguous types,
+mapper failures, and deliberately defective projections. The `.class`-only rule
+still diagnoses other local classes even though the generic development mapper
+can expose them to TypeScript. This analysis does not adopt imported DOM, infer
+selector reachability from a class symbol, or replace the CSS parser.
+
+Run the repeatable website validation from the repository root:
+
+```sh
+pnpm --silent --filter lasertag benchmark:css --runExternalCode --iterations 5
+```
+
+It copies the site's inputs into a temporary project, enables both mappers there,
+and checks every sibling pair. Assertions compare stories, CSS diagnostics,
+completion results and cleanup ranges with ordinary analysis, account for every
+conventional `css.class` reference, and verify authored CSS locations. The JSON
+report includes versions, a source-content hash, per-reference evidence, and
+median/p95 timing samples. Timings include ordinary story extraction plus evidence
+collection, with verification and fixture copying outside the timers. The shared
+session corpus workload switches files. Separate warmed-session workloads measure
+at least thirty unique TSX edits, import renames, Astro edits, unsaved CSS edits,
+alternating edited documents, and unchanged requests. Their timed analysis includes
+story extraction, ownership evidence, diagnostics, completion results, and cleanup
+ranges; it excludes correctness comparisons, editor debounce and LSP transport.
+
+The initial two-pass 2026-10-20 run on Linux ARM64 with Node `26.10.0`, TypeScript `7.1.0-beta`,
+CSS mapper `0.1.1` and Astro mapper `0.2.0` checked eleven sibling pairs: eight
+TSX and three Astro. All eleven conventional references resolved to the expected
+sibling `.class` token. Every story, diagnostic set, completion result, and
+cleanup range matched ordinary analysis. The corpus hash was
+`93589980682d9e98fe7785aeda19370c1151581b89b6900d101d9abbae1caba6`.
+
+| Entire eleven-file scan                              | Median (ms) | p95 (ms) |
+| ---------------------------------------------------- | ----------- | -------- |
+| Ordinary story extraction                            | 968.0       | 1111.6   |
+| Story plus evidence, fresh semantic session per file | 3074.4      | 3218.7   |
+| Story plus evidence, shared semantic session         | 2093.5      | 2152.4   |
+
+Each row has five samples with warm OS/package caches. The evidence path also
+computes an ordinary story with mapper execution disabled, so these numbers
+include the current separation between story generation and semantic evidence.
+Session reuse reduces startup work, but the experiment still adds substantial
+cost. These initial measurements preceded the incremental changes described below.
+The demonstrated gain is verified stylesheet binding and identification of
+cases the textual policy cannot distinguish. It does not justify changing public
+ownership decisions or enabling mappers on the default analysis path.
+
+### Incremental extraction and project state
+
+TSX stories and CSS evidence now share the same parsed native source and project
+analysis. A small session adapter invokes the existing public story extractor
+without opening another compiler session. If a story query encounters a mapped
+component declaration, it falls back to ordinary analysis so generated framework
+scaffolding cannot change public render semantics. Astro stories continue to use
+their template parser.
+
+Ordinary root switches and source/CSS overlay edits update the current snapshot.
+Closed overlays are explicitly restored from disk or marked missing, and restored
+disk copies are refreshed on subsequent requests. Dependency observations survive
+intervening files; edits to an earlier root's imports cannot be hidden by querying
+another document. New roots notify native config-glob discovery. Configuration
+changes and explicit full invalidations still start fresh snapshots.
+
+Lifecycle tests assert one native API and one initial snapshot for a multi-file
+story/evidence sequence. Regression tests cover extended config changes, separate
+JSX configurations, closed missing overlays, later disk creation/deletion,
+dependency edits across intervening roots, and the generated-component fallback.
+
+The final run used the same versions, eleven-file corpus and content hash as the
+initial run above. Five corpus samples measured the following:
+
+| Entire eleven-file scan                         | Median (ms) | p95 (ms) |
+| ----------------------------------------------- | ----------- | -------- |
+| Ordinary extraction, fresh session per TSX file | 1090.7      | 1363.7   |
+| Ordinary extraction, shared session             | 36.7        | 305.8    |
+| Story plus evidence, fresh session per file     | 2450.0      | 2929.7   |
+| Story plus evidence, shared session             | 76.9        | 502.4    |
+
+The shared-session corpus rows include initial project loading in the first
+sample, which dominates their p95. Their medians predominantly represent retained
+project state. The previous two-pass shared scan took 2093.5 ms median; the final
+combined scan took 76.9 ms. The matched ordinary shared scan shows that evidence
+still adds work even after duplicated analysis and startup work are removed.
+
+The edit measurements below use thirty samples per workload. Each path analyzes
+the original document before timing begins. Every timed edit supplies unique source text
+or CSS; the unchanged workload deliberately repeats identical text. Baseline
+generation, correctness assertions and fixture work are outside the timed calls.
+Both paths include story extraction, CSS diagnostics, completions and cleanup;
+the evidence path also resolves and validates stylesheet ownership references.
+
+| Workload                         | Ordinary median (ms) | With evidence median (ms) | With evidence p95 (ms) |
+| -------------------------------- | -------------------- | ------------------------- | ---------------------- |
+| Unchanged TSX request            | 2.0                  | 3.2                       | 3.7                    |
+| TSX render edit                  | 20.3                 | 34.9                      | 75.0                   |
+| TSX import rename                | 24.7                 | 23.9                      | 41.1                   |
+| Astro render edit                | 7.9                  | 39.9                      | 53.2                   |
+| Unsaved CSS edit                 | 2.4                  | 8.9                       | 10.0                   |
+| Alternating edited TSX documents | 18.4                 | 22.3                      | 37.1                   |
+
+TSX samples use `ResponsiveNavPanel.tsx`, alternating with `ToggleButton.tsx` in
+the final workload. Astro samples edit `Layout.astro`. Every edited result matched
+ordinary stories and CSS outputs, and every reference retained the expected CSS
+identity and current authored range. The ordinary and evidence groups run
+separately on a shared host; small timing differences, such as the import-rename
+medians, should not be read as evidence being faster. These measurements exclude
+editor debounce and LSP transport, and do not establish latency for other projects
+or the exceptional mapped-component fallback. Fresh-session startup remains
+expensive; callers need to retain sessions.
+
+### Comparison with release 0.8.7
+
+A separate run used the tagged 0.8.7 source with its original TypeScript 7.0.2
+dependency against the same eleven-file corpus. Five corpus samples and thirty
+samples per edit workload produced these medians; current prototype measurements
+include ownership evidence.
+
+| Workload                 | Release 0.8.7 (ms) | Current prototype (ms) |
+| ------------------------ | ------------------ | ---------------------- |
+| Shared-session corpus    | 3242.7             | 73.6                   |
+| TSX render edit          | 406.7              | 24.2                   |
+| TSX import rename        | 409.7              | 19.4                   |
+| Astro render edit        | 8.1                | 37.9                   |
+| CSS edit with reanalysis | 396.3              | 8.2                    |
+
+The corpus stories and CSS results matched. Alternating edited documents exposed
+stale stories in 29 of 30 release samples, so those timings are excluded. Current
+alternating results matched fresh analysis. These are analysis benchmarks on the
+same shared Linux ARM64 host, not complete editor or navigation timings. The
+reuse improvements benefit TypeScript extraction; Astro ownership evidence adds
+work beyond its existing template parser.
 
 ## Idea
 

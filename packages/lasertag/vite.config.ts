@@ -1,4 +1,21 @@
+import { createRequire } from "node:module"
+import path from "node:path"
+
 import { defineConfig } from "vite-plus"
+
+// Vite Plus 1.0 detects only TypeScript 7.0 when choosing its native generator.
+const requireFromTypescript = createRequire(
+	import.meta.resolve("typescript/package.json"),
+)
+const typescriptExecutable = path.join(
+	path.dirname(
+		requireFromTypescript.resolve(
+			`@typescript/typescript-${process.platform}-${process.arch}/package.json`,
+		),
+	),
+	"lib",
+	process.platform === "win32" ? "tsc.exe" : "tsc",
+)
 
 export default defineConfig({
 	pack: [
@@ -17,6 +34,9 @@ export default defineConfig({
 			},
 			dts: {
 				entry: ["src/eslint/plugin.ts", "src/refractor/index.ts"],
+				// Select the native compiler explicitly for prerelease TypeScript.
+				generator: "tsgo",
+				tsgo: { path: typescriptExecutable },
 				sourcemap: true,
 			},
 			entry: {
@@ -31,6 +51,8 @@ export default defineConfig({
 		},
 	],
 	test: {
+		// Integration files launch native compilers and mapper subprocesses too.
+		maxWorkers: 2,
 		include: ["tests/**/*.test.ts"],
 	},
 })

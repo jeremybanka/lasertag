@@ -1,10 +1,16 @@
+import {
+	createCliCssAnalysis,
+	currentCssAnalysis,
+	type PreparedCssAnalysis,
+} from "./css-analysis.ts"
+import { validateCssAnalysis } from "../refractor/css-analysis.ts"
+import type { CssOwnershipResult } from "../refractor/css-ownership-evidence.ts"
 import { existsSync, readFileSync } from "node:fs"
 
 import {
 	ambiguousRenderSourceMessage,
 	createTypescriptAstSession,
 	resolveSiblingRenderSource,
-	validateRenderSourceCssReachability,
 	type CssReachabilityDiagnostic,
 	type TypescriptAstSession,
 } from "../refractor/index.ts"
@@ -17,6 +23,7 @@ import {
 export type LasertagCheckFileStatus = `checked` | `failed` | `skipped`
 
 export type LasertagCheckFileResult = LasertagWorkResult & {
+	ownership?: CssOwnershipResult[`ownership`]
 	diagnostics: CssReachabilityDiagnostic[]
 	status: LasertagCheckFileStatus
 	error?: string
@@ -62,6 +69,7 @@ function checkFile(
 	workerId: number,
 	fileSystem: LasertagCheckFileSystem,
 	typescriptSession: TypescriptAstSession,
+	prepared?: PreparedCssAnalysis,
 ): LasertagCheckFileResult {
 	const { cssPath, index, stolenFrom } = task
 	const assignment = stolenFrom === undefined ? {} : { stolenFrom }
@@ -90,15 +98,23 @@ function checkFile(
 		sourcePath = resolution.source.path
 
 		const cssSource = fileSystem.readFile(cssPath)
-		const diagnostics = validateRenderSourceCssReachability(
+		const sourceText = fileSystem.readFile(sourcePath)
+		const mapped = currentCssAnalysis(
+			prepared,
+			sourcePath,
+			sourceText,
+			cssSource,
+		)
+		const diagnostics = validateCssAnalysis(
 			{
 				cssPath,
 				cssSource,
 				...(task.includeStoryEvidence ? { includeStoryEvidence: true } : {}),
 				sourcePath,
-				sourceText: fileSystem.readFile(sourcePath),
+				sourceText,
 			},
 			typescriptSession,
+			mapped,
 		).diagnostics
 
 		return {
@@ -106,6 +122,7 @@ function checkFile(
 			diagnostics,
 			index,
 			status: `checked`,
+			...(mapped ? { ownership: mapped.ownership } : {}),
 			...assignment,
 			tsxPath: sourcePath,
 			workerId,
@@ -161,16 +178,31 @@ function summarizeCheck(
 	}
 }
 
-export function processLasertagCheckTask(
+export async function processLasertagCheckTask(
 	task: LasertagWorkTask,
 	workerId: number,
 	typescriptSession: TypescriptAstSession,
-): LasertagCheckFileResult {
+	mapper?: ReturnType<typeof createCliCssAnalysis>,
+	fileSystem: LasertagCheckFileSystem = defaultFileSystem,
+): Promise<LasertagCheckFileResult> {
 	if (task.operation !== `check`) {
 		throw new Error(`Cannot process ${task.operation} task as a check.`)
 	}
 
-	return checkFile(task, workerId, defaultFileSystem, typescriptSession)
+	let prepared: PreparedCssAnalysis | undefined
+	try {
+		prepared = await mapper?.prepare(task.cssPath, fileSystem)
+	} catch {
+		/* File failures are reported by the ordinary path. */
+	}
+	const result = checkFile(
+		task,
+		workerId,
+		fileSystem,
+		typescriptSession,
+		prepared,
+	)
+	return result
 }
 
 export async function runLasertagCheck(
@@ -187,6 +219,13 @@ export async function runLasertagCheck(
 		options.fileSystem !== undefined &&
 		Object.keys(options.fileSystem).length > 0
 
+	const mapper = !hasCustomFileSystem
+		? createCliCssAnalysis(
+				options.workerModuleUrl ?? new URL(`./main.ts`, import.meta.url),
+				typescriptSession,
+				options.typescriptSdkPath,
+			)
+		: undefined
 	try {
 		const work = await runWorkStealing<LasertagCheckFileResult>({
 			files,
@@ -194,11 +233,17 @@ export async function runLasertagCheck(
 			...(options.includeStoryEvidence ? { includeStoryEvidence: true } : {}),
 			operation: `check`,
 			processSerial: (task, workerId) =>
-				checkFile(task, workerId, fileSystem, typescriptSession),
+				processLasertagCheckTask(
+					task,
+					workerId,
+					typescriptSession,
+					mapper,
+					fileSystem,
+				),
 			...(options.typescriptSdkPath
 				? { typescriptSdkPath: options.typescriptSdkPath }
 				: {}),
-			...(options.workerCount ? { workerCount: options.workerCount } : {}),
+			workerCount: options.workerCount ?? 1,
 			...(options.workerModuleUrl
 				? { workerModuleUrl: options.workerModuleUrl }
 				: {}),
@@ -206,6 +251,7 @@ export async function runLasertagCheck(
 
 		return summarizeCheck(work.fileResults, work.workerCount, work.stealCount)
 	} finally {
+		await mapper?.close()
 		typescriptSession.close()
 	}
 }

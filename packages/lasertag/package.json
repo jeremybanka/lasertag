@@ -55,6 +55,8 @@
 		"AGENTS.md"
 	],
 	"scripts": {
+		"benchmark:astro": "node benchmarks/astro-semantics.ts",
+		"benchmark:css": "node benchmarks/css-ownership.ts",
 		"benchmark:lsp": "node benchmarks/lsp-analysis.ts",
 		"build": "vp pack",
 		"check:eslint": "eslint",
@@ -72,13 +74,14 @@
 		"rolldown": "1.2.14",
 		"takua": "0.2.3",
 		"tinyglobby": "0.2.17",
-		"typescript": "7.0.2",
+		"typescript": "7.1.0-beta",
 		"vscode-languageclient": "10.1.2",
 		"vscode-languageserver": "10.1.2",
 		"vscode-languageserver-textdocument": "1.0.15",
 		"zod": "4.6.7"
 	},
 	"devDependencies": {
+		"@astrojs/ts-content-mapper": "0.2.0",
 		"@babel/core": "8.0.7",
 		"@eslint/core": "1.2.1",
 		"@types/babel__core": "7.20.5",
@@ -89,6 +92,7 @@
 		"@typescript-eslint/utils": "8.72.0",
 		"babel-preset-solid": "1.9.16",
 		"breakage": "0.8.5",
+		"css-modules-content-mapper": "0.1.1",
 		"eslint": "10.13.0",
 		"hono": "4.13.13",
 		"jiti": "2.7.0",

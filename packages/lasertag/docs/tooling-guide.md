@@ -394,12 +394,127 @@ The restart action uses the `lasertag.restartServer` command. Clients other than
 the bundled VS Code extension must implement that client-side command if they
 want to expose it.
 
+### TypeScript content mapper setup
+
+Lasertag uses the project's TypeScript content mapper configuration automatically.
+Lasertag supplies its TypeScript `7.1.0-beta` runtime. Install the mappers needed
+by your project (the versions below are tested with this release):
+
+```sh
+pnpm add -D @astrojs/ts-content-mapper@0.2.0 css-modules-content-mapper@0.1.1
+```
+
+Register them at the top level of `tsconfig.json`, alongside `compilerOptions`:
+
+```json
+{
+	"contentMappers": [
+		{ "package": "@astrojs/ts-content-mapper", "extensions": [".astro"] },
+		{ "package": "css-modules-content-mapper", "extensions": [".module.css"] }
+	]
+}
+```
+
+TSX-only projects need only the CSS mapper. TypeScript resolves the mapper
+packages from the project and uses their generated declarations and source maps.
+You do not need to replace your project's TypeScript version to use Lasertag's
+bundled runtime. To use the same configuration in a separate compiler invocation,
+install a compatible compiler (tested with `typescript@7.1.0-beta`) and permit mapper execution with
+`pnpm exec tsc --noEmit --runExternalCode`. Lasertag grants the equivalent native
+API permission internally; no Lasertag feature flags or editor preferences are
+needed. Its bundled TypeScript runtime supplies API support, while the project
+supplies mapper packages and registration.
+
+VS Code workspace trust controls mapper execution. Restricted workspaces retain
+ordinary structural analysis; granting trust restarts the server automatically.
+Standalone LSP clients may report restricted mode with
+`initialize.initializationOptions.workspaceTrusted: false`; otherwise the server
+assumes the client has launched it for a trusted workspace.
+
+Provide the workspace root and synchronize open documents, including imported
+TypeScript, JavaScript, Astro, CSS Module, and JSON configuration files. Forward
+watched-file changes when dynamic registration is unavailable. TypeScript handles
+project configuration and mapper resolution; Lasertag does not modify tsconfig.
+
+### Verify the editor integration
+
+After installing the VSIX at the path printed by `pnpm lasertag vsix --build-only`,
+run **Developer: Reload Window** in a trusted workspace. Open a component and its
+same-named CSS Module, then open the Lasertag Activity Bar view.
+
+- **Output → Lasertag** reports the extension version, selected server and native
+  compiler paths, and `TypeScript native runtime: 7.1.0-beta` with the bundled
+  runtime. It identifies configured overrides and whether workspace trust permits
+  mappers. Permission alone does not establish successful mapper resolution.
+- Expand **CSS ownership**, then expand `css.class`. A `sibling` entry should
+  point to the component's CSS Module; click the stylesheet target to open its
+  authored declaration. `foreign` means the binding points to a different stylesheet.
+- In an Astro file, use **Go to Definition** on an imported component tag to open
+  its source. **Go to Declaration** follows ambient declarations. A declaration
+  alone does not establish an implementation target.
+- Insert a blank line before the stylesheet's root selector without saving, then
+  reopen its ownership target. The location should follow the edit. Ordinary
+  diagnostics and cleanup still use the same structural rules.
+
+If ownership is missing, verify that the mapper packages resolve from the
+component's TypeScript project and that its nearest `tsconfig.json` registers
+the required extensions (directly or through `extends`). For Astro navigation,
+also check the file's language mode is **Astro** and imports resolve under that
+project's module resolution settings. Restart Lasertag after changing mapper
+installation or configuration. Clear server and SDK path overrides and reload
+the window when testing the bundled runtime.
+
+### Astro component navigation
+
+Navigation is available automatically when TypeScript can map the project’s Astro
+sources. **Go to Definition** follows source declarations, including aliases and
+namespace imports; **Go to Declaration** follows ambient declarations, including
+`.d.ts` and `declare` bindings. An Astro component without a precise authored range
+opens at the beginning of its source file. Ambient MDX declarations do not
+establish source targets.
+
+The server returns `LocationLink` when supported and `Location` otherwise.
+Navigation starts its separate analysis process on demand and reuses the session,
+including unsaved dependencies. Stale or canceled replies are discarded. Closing
+the last Astro document or shutting down releases the process. Missing, broken,
+ambiguous, or unmapped evidence produces no navigation target. A ten-second
+worker timeout terminates the owned process tree; subsequent requests can recover.
+The template parser remains authoritative for Astro render-story structure.
+
+### CSS mapper ownership analysis
+
+Ordinary `pnpm lasertag check` and `pnpm lasertag fix` automatically use configured
+CSS mappers. TSX story extraction and ownership queries share native analysis;
+Astro structure still comes from the template parser. The CLI reuses one analysis
+session per worker and refreshes ownership ranges after writing CSS.
+
+When authored stylesheet targets are available, stylish output reports ownership
+and `check --format=json` adds an `ownership` array beside `diagnostics` and
+`files`. Without those targets, the existing output is preserved. Target ranges
+are UTF-16 offsets. A `sibling` target identifies the expected stylesheet;
+`foreign` identifies another. Ambient declarations and unresolved or conflicting
+evidence do not prove ownership.
+
+The LSP shares mapped analysis across diagnostics, completions, cleanup, and
+render-story requests. The `lasertag/renderStory` response and sidebar include
+ownership evidence when authored stylesheet targets are available. Sidebar links
+open verified declarations. Unsaved edits and watched-file changes invalidate
+prior evidence; stale replies are discarded.
+
+Ownership explains references while existing structural rules determine
+reachability, diagnostics, and cleanup. The `.class`-only contract and component
+ownership boundaries remain intact. Missing or failed mappings fall back to
+ordinary analysis. Worker failures or ten-second timeouts terminate the owned
+process tree; subsequent edits can recover. Closing the last relevant document,
+removing workspace folders, or shutting down releases the session. There are no
+new `lasertag/refractor` exports.
+
 ## VS Code Extension
 
 Install the extension shipped in the npm package with `pnpm lasertag vsix`. It
 bundles `lasertag-lsp` and its TypeScript runtime, so the default installation
 needs no path configuration. In addition to diagnostics and completions, the
-Command Palette provides **Lasertag: Clean up Dead Selectors** and **Lasertag:
+Command Palette provides **Lasertag: Clean up Diagnostics** and **Lasertag:
 Restart Lasertag Server**.
 
 | Setting                        | Purpose                                                                                          |
@@ -427,7 +542,7 @@ Restart Lasertag Server**.
 - In VS Code, open the **Lasertag** output channel, set
   `lasertag.log.level` to `debug`, and use `lasertag.trace.server` only when
   protocol messages are needed. Run **Developer: Reload Window** after changing
-  any extension setting; the restart command does not rebuild the client's
+  extension settings; the restart command does not rebuild the client's
   configuration.
 - A custom TypeScript SDK path points to the TypeScript 7 native executable, not
   its containing package directory.

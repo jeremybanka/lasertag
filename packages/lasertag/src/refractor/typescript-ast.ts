@@ -1,14 +1,19 @@
 import { readFileSync } from "node:fs"
 import path from "node:path"
 
-import type { Node, SourceFile } from "typescript/unstable/ast"
-import type { FileSystem } from "typescript/unstable/fs"
+import type { Node, SourceFile } from "typescript/ast"
+import {
+	createFileSystemLayer,
+	serverFS,
+	type FileSystemCallbacks,
+} from "typescript/fs"
 import {
 	API,
 	type CompilerOptions,
 	type Project,
+	type Snapshot,
 	SymbolFlags,
-} from "typescript/unstable/sync"
+} from "typescript/sync"
 
 import {
 	resolveTypescriptSdkPath,
@@ -23,6 +28,8 @@ export type TypescriptAstAnalysis = {
 	resolveValueDeclarations?(name: string, location: Node): Node[]
 	resolveAliasedDeclarations(node: Node): Node[]
 	isDefaultLibrary?(sourceFile: SourceFile): boolean
+	/** Includes parse diagnostics reported by a content mapper for this source. */
+	hasSyntacticErrors?(): boolean
 }
 
 export type TypescriptAstSession = {
@@ -32,28 +39,46 @@ export type TypescriptAstSession = {
 		sourceText: string,
 		filePath: string,
 		use: (sourceFile: SourceFile, analysis: TypescriptAstAnalysis) => TResult,
+		sourceOptions?: TypescriptAstSourceOptions,
 	): TResult
+}
+
+export type TypescriptAstSourceOptions = {
+	/** Complete current set of unsaved documents, including imported files. */
+	openFiles?: ReadonlyMap<string, string>
+	/** Host file notifications since the last request. */
+	invalidate?: boolean
 }
 
 function createTypescriptAstAnalysis(
 	project: Project,
 	dependencySources: Map<string, string>,
 	rootFilePath: string,
+	onUnresolvedSymbol: () => void,
 ): TypescriptAstAnalysis {
-	let compilerOptions: CompilerOptions | undefined
-	try {
-		const configSource = readFileSync(project.configFileName, `utf8`)
-		dependencySources.set(
-			normalizeFilePath(project.configFileName),
-			configSource,
-		)
-		compilerOptions = project.compilerOptions
-	} catch {
-		// Inferred projects have a synthetic config path and default to React JSX.
-		// Those defaults are parser settings, not evidence about the application.
+	function unresolvedDeclarations(): Node[] {
+		onUnresolvedSymbol()
+		return []
 	}
+	let compilerOptions: CompilerOptions | undefined
+	if (project.configFileName) {
+		try {
+			const configSource = readFileSync(project.configFileName, `utf8`)
+			dependencySources.set(
+				normalizeFilePath(project.configFileName),
+				configSource,
+			)
+			compilerOptions = project.parsedCommandLine.options
+		} catch {
+			// Unreadable project settings cannot establish a JSX runtime.
+		}
+	}
+	// Inferred project defaults are parser settings, not application evidence.
 	return {
 		...(compilerOptions ? { compilerOptions } : {}),
+		hasSyntacticErrors() {
+			return project.program.getSyntacticDiagnostics(rootFilePath).length > 0
+		},
 		resolveValueDeclarations(name, location) {
 			const symbol = project.checker.resolveName(
 				name,
@@ -77,7 +102,7 @@ function createTypescriptAstAnalysis(
 		resolveAliasedDeclarations(node) {
 			const symbol = project.checker.getSymbolAtLocation(node)
 
-			if (!symbol) return []
+			if (!symbol) return unresolvedDeclarations()
 
 			let resolvedSymbol = symbol
 			const seenSymbols = new Set<number>()
@@ -91,10 +116,15 @@ function createTypescriptAstAnalysis(
 					if (!resolvedDeclaration) continue
 
 					const sourceFile = resolvedDeclaration.getSourceFile()
-					const sourceFilePath = normalizeFilePath(sourceFile.fileName)
+					const sourceFilePath = normalizeFilePath(
+						sourceFile.canonicalSourceFileName ?? sourceFile.fileName,
+					)
 
 					if (sourceFilePath !== rootFilePath) {
-						dependencySources.set(sourceFilePath, sourceFile.text)
+						dependencySources.set(
+							sourceFilePath,
+							sourceFile.originalText ?? sourceFile.text,
+						)
 					}
 				}
 
@@ -103,12 +133,16 @@ function createTypescriptAstAnalysis(
 				const aliasedSymbol =
 					project.checker.getImmediateAliasedSymbol(resolvedSymbol)
 
-				if (!aliasedSymbol) break
+				if (!aliasedSymbol) return unresolvedDeclarations()
 
 				resolvedSymbol = aliasedSymbol
 			}
 
-			if (project.checker.isUnknownSymbol(resolvedSymbol)) return []
+			if (
+				(resolvedSymbol.flags & SymbolFlags.Alias) !== 0 ||
+				project.checker.isUnknownSymbol(resolvedSymbol)
+			)
+				return unresolvedDeclarations()
 
 			return resolvedSymbol.declarations.flatMap((declaration) => {
 				const resolvedDeclaration = declaration.resolve(project)
@@ -119,21 +153,23 @@ function createTypescriptAstAnalysis(
 	}
 }
 
-function dependencySourceChanged(
+function dependencySourceChanges(
 	dependencySources: ReadonlyMap<string, string>,
 	virtualSources: ReadonlyMap<string, string>,
-): boolean {
+): string[] {
+	const changed: string[] = []
 	for (const [filePath, previousSource] of dependencySources) {
 		if (virtualSources.has(filePath)) continue
 
 		try {
-			if (readFileSync(filePath, `utf8`) !== previousSource) return true
+			if (readFileSync(filePath, `utf8`) !== previousSource)
+				changed.push(filePath)
 		} catch {
-			return true
+			changed.push(filePath)
 		}
 	}
 
-	return false
+	return changed
 }
 
 function normalizeFilePath(filePath: string): string {
@@ -141,18 +177,18 @@ function normalizeFilePath(filePath: string): string {
 }
 
 function createSessionFileSystem(
-	sources: Map<string, string>,
 	configurationSources: Map<string, string>,
-): FileSystem {
+): FileSystemCallbacks {
 	return {
-		fileExists(candidate) {
-			return sources.has(normalizeFilePath(candidate)) ? true : undefined
-		},
+		directoryExists: serverFS.useOS,
+		fileExists: serverFS.useOS,
+		getAccessibleEntries: serverFS.useOS,
+		realpath: serverFS.useOS,
+		stat: serverFS.useOS,
+		writeFile: serverFS.error,
+		removeFile: serverFS.error,
 		readFile(candidate) {
 			const normalizedCandidate = normalizeFilePath(candidate)
-
-			if (sources.has(normalizedCandidate))
-				return sources.get(normalizedCandidate)
 			// An extended config can have any JSON filename or come from a package.
 			// Observe TypeScript's reads rather than duplicating its config resolver.
 			if (path.extname(normalizedCandidate) === `.json`) {
@@ -164,12 +200,7 @@ function createSessionFileSystem(
 					return undefined
 				}
 			}
-			return undefined
-		},
-		realpath(candidate) {
-			const normalizedCandidate = normalizeFilePath(candidate)
-
-			return sources.has(normalizedCandidate) ? normalizedCandidate : undefined
+			return serverFS.useOS
 		},
 	}
 }
@@ -178,17 +209,24 @@ export function createTypescriptAstSession(
 	options: TypescriptRuntimeOptions = {},
 ): TypescriptAstSession {
 	const sources = new Map<string, string>()
+	// A filesystem layer retains earlier overlays. Explicitly restore closed
+	// overlays from disk, and refresh these copies until they are overlaid again.
+	const restoredSources = new Set<string>()
+	const knownRoots = new Set<string>()
 	const dependencySources = new Map<string, string>()
 	const configurationSources = new Map<string, string>()
 	const typescriptSdkPath = resolveTypescriptSdkPath(options)
 	let api: API | undefined
+	let snapshot: Snapshot | undefined
 	let closed = false
 	let openFilePath: string | undefined
+	let unresolvedSymbol = false
 
 	function getApi(filePath: string): API {
 		api ??= new API({
 			cwd: path.dirname(filePath),
-			fs: createSessionFileSystem(sources, configurationSources),
+			fs: createSessionFileSystem(configurationSources),
+			runExternalCode: options.runExternalCode ?? false,
 			...(typescriptSdkPath ? { tsserverPath: typescriptSdkPath } : {}),
 		})
 
@@ -203,14 +241,18 @@ export function createTypescriptAstSession(
 			if (closed) return
 
 			closed = true
+			snapshot?.dispose()
+			snapshot = undefined
 			openFilePath = undefined
 			sources.clear()
+			restoredSources.clear()
+			knownRoots.clear()
 			api?.close()
 			api = undefined
 			dependencySources.clear()
 			configurationSources.clear()
 		},
-		withSourceFile(sourceText, filePath, use) {
+		withSourceFile(sourceText, filePath, use, sourceOptions = {}) {
 			if (closed) {
 				throw new Error(`Cannot parse TSX with a closed TypeScript session.`)
 			}
@@ -218,90 +260,125 @@ export function createTypescriptAstSession(
 			const normalizedFilePath = normalizeFilePath(filePath)
 			const activeApi = getApi(normalizedFilePath)
 			const previousFilePath = openFilePath
-
-			// TypeScript keeps open files alive across snapshots. Reopening the same
-			// path in one update leaves its unstable sync API on the previous source,
-			// so release it before replacing the virtual file contents.
-			if (previousFilePath === normalizedFilePath) {
-				const closingSnapshot = activeApi.updateSnapshot({
-					closeFiles: [previousFilePath],
-				})
-
-				closingSnapshot.dispose()
-				openFilePath = undefined
-			}
-
-			sources.set(normalizedFilePath, sourceText)
-			const dependencyChanged = dependencySourceChanged(
+			const currentSources = new Map(
+				[...(sourceOptions.openFiles ?? [])].map(([name, text]) => [
+					normalizeFilePath(name),
+					text,
+				]),
+			)
+			currentSources.set(normalizedFilePath, sourceText)
+			const configurationOverlayChanged = [
+				...new Set([...sources.keys(), ...currentSources.keys()]),
+			].some(
+				(name) =>
+					/\.jsonc?$/.test(name) &&
+					sources.get(name) !== currentSources.get(name),
+			)
+			const dependencyChanges = dependencySourceChanges(
 				dependencySources,
-				sources,
+				currentSources,
 			)
-			const configurationChanged = dependencySourceChanged(
+			const configurationChanges = dependencySourceChanges(
 				configurationSources,
-				sources,
+				currentSources,
+			)
+			// A failed module lookup can become valid when a file is created or
+			// restored, without changing any dependency we could read last time.
+			// This session has no directory watcher, so retry after unresolved queries.
+			const invalidate =
+				configurationChanges.length > 0 ||
+				configurationOverlayChanged ||
+				unresolvedSymbol ||
+				sourceOptions.invalidate === true
+			unresolvedSymbol = false
+			const previousSnapshot = snapshot
+			const reuseSnapshot =
+				previousSnapshot &&
+				configurationChanges.length === 0 &&
+				!configurationOverlayChanged &&
+				sourceOptions.invalidate !== true
+			if (!reuseSnapshot) {
+				restoredSources.clear()
+				knownRoots.clear()
+			} else
+				for (const name of sources.keys()) {
+					if (!currentSources.has(name)) restoredSources.add(name)
+				}
+			for (const name of currentSources.keys()) restoredSources.delete(name)
+			const restored: Array<[string, string]> = []
+			const removedPaths: string[] = []
+			for (const name of restoredSources) {
+				try {
+					restored.push([name, readFileSync(name, `utf8`)])
+				} catch {
+					removedPaths.push(name)
+					knownRoots.delete(name)
+				}
+			}
+			const fileSystem = createFileSystemLayer(
+				[...currentSources, ...restored],
+				{ removedPaths },
 			)
 
-			if (dependencyChanged) dependencySources.clear()
-			if (configurationChanged) configurationSources.clear()
-
-			const snapshot = activeApi.updateSnapshot({
-				...(previousFilePath && previousFilePath !== normalizedFilePath
-					? { closeFiles: [previousFilePath] }
-					: {}),
-				// Imported component roots are ownership evidence. Rebuild the program
-				// when one of their declarations changes so a long-lived editor session
-				// never retains a verified root after its implementation changes.
-				fileChanges:
-					dependencyChanged || configurationChanged
-						? { invalidateAll: true }
-						: previousFilePath === normalizedFilePath
-							? { changed: [normalizedFilePath] }
+			// Keep configured projects alive when switching roots. Closing a native
+			// open file and replacing its virtual contents are separate operations.
+			// Keep observations for every visited root, including across broad
+			// invalidations. Only consume changed versions; callbacks record new ones.
+			for (const name of dependencyChanges) dependencySources.delete(name)
+			for (const name of configurationChanges) configurationSources.delete(name)
+			snapshot = reuseSnapshot
+				? previousSnapshot.update({
+						fileSystem,
+						ensurePrograms: true,
+						...(previousFilePath !== normalizedFilePath
+							? {
+									openFiles: [normalizedFilePath],
+									closeFiles: previousFilePath ? [previousFilePath] : [],
+								}
+							: {}),
+						fileNotifications: invalidate
+							? { invalidateAll: true }
 							: {
-									// Closing a root only removes its virtual overlay. Report the
-									// underlying file as changed so a new root can still import it.
-									...(previousFilePath ? { changed: [previousFilePath] } : {}),
-									created: [normalizedFilePath],
+									...(dependencyChanges.length
+										? { changed: dependencyChanges }
+										: {}),
+									// Opening a newly authored root must reevaluate tsconfig globs.
+									...(!knownRoots.has(normalizedFilePath)
+										? { created: [normalizedFilePath] }
+										: {}),
 								},
-				openFiles: [normalizedFilePath],
-			})
+					})
+				: activeApi.createSnapshot({
+						fileSystem,
+						openFiles: [normalizedFilePath],
+						...(invalidate
+							? { fileNotifications: { invalidateAll: true } }
+							: {}),
+					})
+			previousSnapshot?.dispose()
+			openFilePath = normalizedFilePath
+			knownRoots.add(normalizedFilePath)
+			sources.clear()
+			for (const [name, text] of currentSources) sources.set(name, text)
 
-			try {
-				// The unstable client retains decoded source files even after a path is
-				// closed. Each task supplies fresh text, so never carry that AST cache
-				// across worker queue entries.
-				activeApi.clearSourceFileCache()
-
-				if (previousFilePath && previousFilePath !== normalizedFilePath) {
-					sources.delete(previousFilePath)
-				}
-
-				openFilePath = normalizedFilePath
-
-				const project = snapshot.getDefaultProjectForFile(normalizedFilePath)
-				const sourceFile = project?.program.getSourceFile(normalizedFilePath)
-
-				if (!project || !sourceFile) {
-					throw new Error(
-						`Unable to parse TSX source file ${normalizedFilePath}.`,
-					)
-				}
-
-				// The comparison above consumed the previous analysis's dependency
-				// snapshot. Record only dependencies discovered by this analysis so
-				// serial worker queues do not accumulate unrelated projects.
-				dependencySources.clear()
-
-				return use(
-					sourceFile,
-					createTypescriptAstAnalysis(
-						project,
-						dependencySources,
-						normalizedFilePath,
-					),
+			const project = snapshot.getDefaultProjectForFile(normalizedFilePath)
+			const sourceFile = project?.program.getSourceFile(normalizedFilePath)
+			if (!project || !sourceFile) {
+				throw new Error(
+					`Unable to parse TSX source file ${normalizedFilePath}.`,
 				)
-			} finally {
-				snapshot.dispose()
 			}
+			return use(
+				sourceFile,
+				createTypescriptAstAnalysis(
+					project,
+					dependencySources,
+					normalizedFilePath,
+					() => {
+						unresolvedSymbol = true
+					},
+				),
+			)
 		},
 	}
 

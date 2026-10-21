@@ -1,3 +1,10 @@
+import {
+	createCliCssAnalysis,
+	currentCssAnalysis,
+	type PreparedCssAnalysis,
+} from "./css-analysis.ts"
+import { validateCssAnalysis } from "../refractor/css-analysis.ts"
+import type { CssOwnershipResult } from "../refractor/css-ownership-evidence.ts"
 import { existsSync, readFileSync, writeFileSync } from "node:fs"
 
 import {
@@ -11,7 +18,6 @@ import {
 	createTypescriptAstSession,
 	createCssReachabilityDiagnostics,
 	resolveSiblingRenderSource,
-	validateRenderSourceCssReachability,
 	type CssReachabilityDiagnostic,
 	type TypescriptAstSession,
 	type ValidateCssReachabilityResult,
@@ -31,6 +37,7 @@ export type LasertagFixFileStatus =
 	| `unchanged`
 
 export type LasertagFixFileResult = LasertagWorkResult & {
+	ownership?: CssOwnershipResult[`ownership`]
 	diagnostics: CssReachabilityDiagnostic[]
 	fixedCount: number
 	remainingDiagnostics: CssReachabilityDiagnostic[]
@@ -108,8 +115,9 @@ function validateSources(
 	sourcePath: string,
 	sourceText: string,
 	typescriptSession: TypescriptAstSession,
+	mapped?: CssOwnershipResult,
 ): ValidateCssReachabilityResult {
-	return validateRenderSourceCssReachability(
+	return validateCssAnalysis(
 		{
 			cssPath,
 			cssSource,
@@ -117,6 +125,7 @@ function validateSources(
 			sourceText,
 		},
 		typescriptSession,
+		mapped,
 	)
 }
 
@@ -125,6 +134,7 @@ function fixFile(
 	workerId: number,
 	fileSystem: LasertagFixFileSystem,
 	typescriptSession: TypescriptAstSession,
+	prepared?: PreparedCssAnalysis,
 ): LasertagFixFileResult {
 	const { cssPath, index, stolenFrom } = task
 	const assignment = stolenFrom === undefined ? {} : { stolenFrom }
@@ -156,12 +166,19 @@ function fixFile(
 
 		const cssSource = fileSystem.readFile(cssPath)
 		const sourceText = fileSystem.readFile(sourcePath)
+		const mapped = currentCssAnalysis(
+			prepared,
+			sourcePath,
+			sourceText,
+			cssSource,
+		)
 		const validation = validateSources(
 			cssPath,
 			cssSource,
 			sourcePath,
 			sourceText,
 			typescriptSession,
+			mapped,
 		)
 		const { diagnostics } = validation
 		const cleanupRanges = [
@@ -187,6 +204,7 @@ function fixFile(
 				index,
 				remainingDiagnostics: diagnostics,
 				status: `unchanged`,
+				...(mapped ? { ownership: mapped.ownership } : {}),
 				...assignment,
 				tsxPath: sourcePath,
 				workerId,
@@ -208,6 +226,7 @@ function fixFile(
 			index,
 			remainingDiagnostics,
 			status: `changed`,
+			...(mapped ? { ownership: mapped.ownership } : {}),
 			...assignment,
 			tsxPath: sourcePath,
 			workerId,
@@ -273,16 +292,45 @@ function summarizeFix(
 	}
 }
 
-export function processLasertagFixTask(
+export async function processLasertagFixTask(
 	task: LasertagWorkTask,
 	workerId: number,
 	typescriptSession: TypescriptAstSession,
-): LasertagFixFileResult {
+	mapper?: ReturnType<typeof createCliCssAnalysis>,
+	fileSystem: LasertagFixFileSystem = defaultFileSystem,
+): Promise<LasertagFixFileResult> {
 	if (task.operation !== `fix`) {
 		throw new Error(`Cannot process ${task.operation} task as a fix.`)
 	}
 
-	return fixFile(task, workerId, defaultFileSystem, typescriptSession)
+	let prepared: PreparedCssAnalysis | undefined
+	try {
+		prepared = await mapper?.prepare(task.cssPath, fileSystem)
+	} catch {
+		/* File failures are reported by the ordinary path. */
+	}
+	const result = fixFile(
+		task,
+		workerId,
+		fileSystem,
+		typescriptSession,
+		prepared,
+	)
+	if (mapper && result.status === `changed`) {
+		try {
+			result.ownership = (await mapper.prepare(task.cssPath, fileSystem))
+				?.ownership ?? {
+				status: `unavailable`,
+				reason: `Ownership could not be refreshed after cleanup.`,
+			}
+		} catch {
+			result.ownership = {
+				status: `unavailable`,
+				reason: `Ownership could not be refreshed after cleanup.`,
+			}
+		}
+	}
+	return result
 }
 
 export async function runLasertagFix(
@@ -299,6 +347,13 @@ export async function runLasertagFix(
 		options.fileSystem !== undefined &&
 		Object.keys(options.fileSystem).length > 0
 
+	const mapper = !hasCustomFileSystem
+		? createCliCssAnalysis(
+				options.workerModuleUrl ?? new URL(`./main.ts`, import.meta.url),
+				typescriptSession,
+				options.typescriptSdkPath,
+			)
+		: undefined
 	try {
 		const work = await runWorkStealing<LasertagFixFileResult>({
 			files,
@@ -307,11 +362,17 @@ export async function runLasertagFix(
 			...(options.onStart ? { onStart: options.onStart } : {}),
 			operation: `fix`,
 			processSerial: (task, workerId) =>
-				fixFile(task, workerId, fileSystem, typescriptSession),
+				processLasertagFixTask(
+					task,
+					workerId,
+					typescriptSession,
+					mapper,
+					fileSystem,
+				),
 			...(options.typescriptSdkPath
 				? { typescriptSdkPath: options.typescriptSdkPath }
 				: {}),
-			...(options.workerCount ? { workerCount: options.workerCount } : {}),
+			workerCount: options.workerCount ?? 1,
 			...(options.workerModuleUrl
 				? { workerModuleUrl: options.workerModuleUrl }
 				: {}),
@@ -319,6 +380,7 @@ export async function runLasertagFix(
 
 		return summarizeFix(work.fileResults, work.workerCount, work.stealCount)
 	} finally {
+		await mapper?.close()
 		typescriptSession.close()
 	}
 }

@@ -18,13 +18,29 @@ defaults:
     shell: bash
 
 jobs:
-  Vitest:
+  VitestShards:
+    name: Vitest shard ${{ matrix.shard }}/4
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
-      - run: pnpm run test
+      - run: pnpm --filter lasertag run test --shard=${{ matrix.shard }}/4
+
+  Vitest:
+    needs: VitestShards
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: Require every shard to pass
+        env:
+          SHARD_RESULT: ${{ needs.VitestShards.result }}
+        run: test "$SHARD_RESULT" = success
 
   Breakage:
     name: Breakage

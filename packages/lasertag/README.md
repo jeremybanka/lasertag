@@ -41,13 +41,13 @@ For Hono, use `lasertag/hono-jsx` with `jsxImportSource: "hono/jsx"` and
 `class={css.class}`. See the [Hono guide](docs/lasertag-guide.md#hono-jsx)
 and [example](examples/hono) for server rendering and HTML fragments.
 
-Check component-owned CSS Modules for unreachable selectors in parallel:
+Check component-owned CSS Modules for unreachable selectors:
 
 ```sh
 pnpm lasertag check
 ```
 
-Remove unreachable selectors in parallel while reporting progress:
+Remove unreachable selectors while reporting progress:
 
 ```sh
 pnpm lasertag fix
@@ -76,6 +76,24 @@ Build the VSIX without installing it:
 ```sh
 pnpm lasertag vsix --build-only
 ```
+
+Install the exact VSIX path printed by the command, then run **Developer: Reload
+Window**. At the default log level, **Output → Lasertag** identifies the selected
+server and TypeScript runtime.
+
+## CSS ownership and Astro navigation
+
+Lasertag includes TypeScript `7.1.0-beta`. With project-configured content mappers,
+the CLI and editor resolve `css.class` to its authored stylesheet, and the editor
+offers **Go to Definition** and **Go to Declaration** on Astro component tags.
+The **CSS ownership** section in the Lasertag sidebar links verified stylesheet
+targets. Unsaved source and stylesheet edits participate in analysis.
+
+Install the relevant mapper packages and register them in your project's
+`tsconfig.json`; no additional Lasertag feature settings are needed. See
+[mapper setup and verification](docs/tooling-guide.md#typescript-content-mapper-setup).
+Editor mapper execution requires workspace trust. Existing structural analysis,
+the `.class`-only convention, and cleanup rules remain the same.
 
 ## Includes
 

@@ -1,3 +1,4 @@
+import type { CssOwnershipResult } from "../refractor/css-ownership-evidence.ts"
 import { pathToFileURL } from "node:url"
 
 import type {
@@ -69,6 +70,7 @@ export type LasertagRenderStoryView =
 	| {
 			componentName: string
 			cssLocation: RenderStoryViewLocation
+			ownership?: CssOwnershipResult[`ownership`]
 			kind: `ready`
 			possibilities: RenderStoryViewPossibility[]
 			sourceLocation: RenderStoryViewLocation

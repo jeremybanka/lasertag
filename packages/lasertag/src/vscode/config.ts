@@ -4,6 +4,11 @@ import { LASERTAG_TYPESCRIPT_SDK_PATH } from "../refractor/typescript-runtime.ts
 
 export { LASERTAG_TYPESCRIPT_SDK_PATH }
 
+/** Workspace trust is client context, not a feature preference. */
+export function mapperInitializationOptions(trusted: boolean) {
+	return { workspaceTrusted: trusted }
+}
+
 export function resolveWorkspacePath(
 	configuredPath: string,
 	workspaceRoot: string | undefined,

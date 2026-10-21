@@ -1,3 +1,4 @@
+import { pathToFileURL } from "node:url"
 import type {
 	LasertagRenderStoryView,
 	RenderStoryViewLocation,
@@ -96,5 +97,39 @@ export function createRenderStoryTree(
 		})
 	}
 
+	if (view.ownership) {
+		const ownership = view.ownership
+		entries.push({
+			label: `CSS ownership`,
+			icon: `info`,
+			expanded: true,
+			children:
+				ownership.status === `unavailable`
+					? [{ label: ownership.reason, children: [], icon: `question` }]
+					: ownership.attachments.map((reference) => ({
+							label: reference.expression,
+							description: reference.status,
+							tooltip:
+								reference.usage === `expression`
+									? `This reference occurs inside an expression; it does not prove the class is applied.`
+									: `Authored stylesheet ownership evidence.`,
+							location: { uri: view.sourceLocation.uri, ...reference.range },
+							children: reference.targets.map((target) => ({
+								label: target.sourcePath,
+								description: target.status,
+								children: [],
+								...(target.range &&
+								(target.status === `sibling` || target.status === `foreign`)
+									? {
+											location: {
+												uri: pathToFileURL(target.sourcePath).href,
+												...target.range,
+											},
+										}
+									: {}),
+							})),
+						})),
+		})
+	}
 	return entries
 }

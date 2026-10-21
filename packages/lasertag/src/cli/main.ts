@@ -1,5 +1,12 @@
 #!/usr/bin/env node
 
+import {
+	CSS_ANALYSIS_WORKER,
+	runCssAnalysisWorker,
+} from "../refractor/css-analysis.ts"
+import { createCliCssAnalysis } from "./css-analysis.ts"
+import type { CssOwnershipResult } from "../refractor/css-ownership-evidence.ts"
+
 import { existsSync, readFileSync } from "node:fs"
 import path from "node:path"
 import { styleText } from "node:util"
@@ -10,7 +17,6 @@ import {
 	completionResponse,
 	formatWarnings,
 	help,
-	noOptions,
 	options,
 	optional,
 	parseBooleanOption,
@@ -135,7 +141,8 @@ const vsixOptionsSchema = z.object({
 
 type RootOptions = z.infer<typeof rootOptionsSchema>
 type CheckOptions = z.infer<typeof checkOptionsSchema>
-type FixOptions = Record<never, never>
+const fixOptionsSchema = z.object({})
+type FixOptions = z.infer<typeof fixOptionsSchema>
 type VsixOptions = z.infer<typeof vsixOptionsSchema>
 
 export type LasertagCliMode =
@@ -236,8 +243,10 @@ const checkRouteOptions = options(
 	},
 )
 
-const fixRouteOptions = noOptions(
+const fixRouteOptions = options(
 	`Clean up fixable diagnostics in component-owned CSS modules.`,
+	fixOptionsSchema,
+	{},
 )
 
 const lasertagCli = cli({
@@ -968,9 +977,14 @@ function formatDiagnostics(
 	cwd: string,
 	readCssSource: (cssPath: string) => string,
 	styler: CheckOutputStyler,
+	ownership?: ReturnType<typeof ownershipReports>,
 ): string {
 	if (options.format === `json`) {
-		return JSON.stringify({ diagnostics, files }, null, 2)
+		return JSON.stringify(
+			{ diagnostics, files, ...(ownership ? { ownership } : {}) },
+			null,
+			2,
+		)
 	}
 
 	if (diagnostics.length === 0) {
@@ -1036,6 +1050,40 @@ function createDiagnostic(
 	}
 }
 
+function ownershipReports(
+	files: Array<{
+		cssPath: string
+		tsxPath?: string
+		ownership?: CssOwnershipResult[`ownership`]
+	}>,
+) {
+	return files.flatMap(({ cssPath, tsxPath, ownership }) =>
+		ownership &&
+		ownership.status === `available` &&
+		ownership.attachments.some((reference) =>
+			reference.targets.some(
+				(target) => target.status === `sibling` || target.status === `foreign`,
+			),
+		)
+			? [{ cssPath, sourcePath: tsxPath, ...ownership }]
+			: [],
+	)
+}
+function formatOwnership(
+	reports: ReturnType<typeof ownershipReports>,
+	cwd: string,
+): string {
+	return reports
+		.flatMap((report) => [
+			`${displayPath(cwd, report.cssPath)}: ${report.attachments.length} CSS ownership references`,
+			...report.attachments.map(
+				(reference) =>
+					`  ${reference.expression}: ${reference.status}${reference.targets.length ? ` (${reference.targets.map((target) => displayPath(cwd, target.sourcePath)).join(`, `)})` : ``}`,
+			),
+		])
+		.join(`\n`)
+}
+
 async function runCheck(
 	targets: string[],
 	options: CheckOptions,
@@ -1085,8 +1133,24 @@ async function runCheck(
 	}
 
 	io.log(
-		formatDiagnostics(diagnostics, options, files, cwd, readCssSource, styler),
+		formatDiagnostics(
+			diagnostics,
+			options,
+			files,
+			cwd,
+			readCssSource,
+			styler,
+			ownershipReports(checkResult.fileResults).length
+				? ownershipReports(checkResult.fileResults)
+				: undefined,
+		),
 	)
+
+	if (
+		ownershipReports(checkResult.fileResults).length &&
+		options.format !== `json`
+	)
+		io.log(formatOwnership(ownershipReports(checkResult.fileResults), cwd))
 
 	return {
 		diagnostics,
@@ -1195,6 +1259,7 @@ function fixFileSystemFromEnvironment(
 
 async function runFix(
 	targets: string[],
+	options: FixOptions,
 	io: LasertagCliIO,
 	environment: LasertagCliEnvironment,
 ): Promise<LasertagCliResult> {
@@ -1283,6 +1348,8 @@ async function runFix(
 		)
 	}
 
+	if (ownershipReports(fixResult.fileResults).length)
+		io.log(formatOwnership(ownershipReports(fixResult.fileResults), cwd))
 	return {
 		changedFiles: fixResult.changedFiles,
 		diagnostics,
@@ -1290,7 +1357,7 @@ async function runFix(
 		files,
 		fixedCount: fixResult.fixedCount,
 		mode: `fix`,
-		options: {},
+		options,
 		stealCount: fixResult.stealCount,
 		targets,
 		workerCount: fixResult.workerCount,
@@ -1448,9 +1515,19 @@ export async function runLasertagCli(
 			}
 		}
 		case `fix`:
-			return runFix(DEFAULT_TARGET_PATTERNS, io, environment)
+			return runFix(
+				DEFAULT_TARGET_PATTERNS,
+				parsed.inputs.opts,
+				io,
+				environment,
+			)
 		case `fix/$glob`:
-			return runFix(targetsFromGlob(parsed.inputs.path[1]), io, environment)
+			return runFix(
+				targetsFromGlob(parsed.inputs.path[1]),
+				parsed.inputs.opts,
+				io,
+				environment,
+			)
 		case `check`:
 			return runCheck(
 				DEFAULT_TARGET_PATTERNS,
@@ -1470,23 +1547,45 @@ export async function runLasertagCli(
 	}
 }
 
-if (!isMainThread && isLasertagWorkerData(workerData)) {
+if (
+	isMainThread &&
+	import.meta.main &&
+	process.argv.includes(`--${CSS_ANALYSIS_WORKER}`)
+) {
+	runCssAnalysisWorker()
+} else if (!isMainThread && isLasertagWorkerData(workerData)) {
 	const typescriptSession = createTypescriptAstSession(
 		workerData.typescriptSdkPath
 			? { typescriptSdkPath: workerData.typescriptSdkPath }
 			: {},
 	)
 
+	const mapper = createCliCssAnalysis(
+		new URL(import.meta.url),
+		typescriptSession,
+		workerData.typescriptSdkPath,
+	)
 	try {
 		await runLasertagWorker(workerData, (task, workerId) => {
 			switch (task.operation) {
 				case `check`:
-					return processLasertagCheckTask(task, workerId, typescriptSession)
+					return processLasertagCheckTask(
+						task,
+						workerId,
+						typescriptSession,
+						mapper,
+					)
 				case `fix`:
-					return processLasertagFixTask(task, workerId, typescriptSession)
+					return processLasertagFixTask(
+						task,
+						workerId,
+						typescriptSession,
+						mapper,
+					)
 			}
 		})
 	} finally {
+		await mapper.close()
 		typescriptSession.close()
 	}
 } else if (isMainThread && import.meta.main) {

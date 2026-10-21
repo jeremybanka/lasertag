@@ -1,3 +1,5 @@
+import type { CssAnalysisTask } from "../refractor/css-analysis.ts"
+import type { CssOwnershipResult } from "../refractor/css-ownership-evidence.ts"
 import { existsSync, readFileSync } from "node:fs"
 import path from "node:path"
 import { pathToFileURL } from "node:url"
@@ -485,6 +487,24 @@ const siblingRenderSourceSelectors = selectorFamily<
 	key: `siblingRenderSource`,
 })
 
+type MappedAnalysis = { task: CssAnalysisTask; result: CssOwnershipResult }
+const mappedCssAnalysesAtom = atom<Record<string, MappedAnalysis>>({
+	key: `mappedCssAnalyses`,
+	default: {},
+})
+const setMappedCssAnalysisTransaction = transaction<
+	(value: MappedAnalysis | null) => void
+>({
+	key: `setMappedCssAnalysis`,
+	do: ({ get, set }, value) =>
+		set(
+			mappedCssAnalysesAtom,
+			value
+				? { ...get(mappedCssAnalysesAtom), [value.task.sourcePath]: value }
+				: {},
+		),
+})
+
 const unscopedRenderStorySelectors = selectorFamily<
 	RenderStoryAnalysis,
 	string
@@ -495,6 +515,13 @@ const unscopedRenderStorySelectors = selectorFamily<
 			const sourceText = get(fileTextSelectors, sourcePath)
 
 			if (sourceText === null) return { kind: `missing` }
+			const mapped = get(mappedCssAnalysesAtom)[sourcePath]
+			if (
+				mapped &&
+				mapped.task.sourceText === sourceText &&
+				get(fileTextSelectors, mapped.task.cssPath) === mapped.task.cssSource
+			)
+				return { kind: `ready`, renderStory: mapped.result.renderStory }
 
 			try {
 				return {
@@ -815,6 +842,8 @@ function createSilo(): Silo {
 		fileTextSelectors,
 		documentUriSelectors,
 		siblingRenderSourceSelectors,
+		mappedCssAnalysesAtom,
+		setMappedCssAnalysisTransaction,
 		unscopedRenderStorySelectors,
 		renderStorySelectors,
 		cssSelectorAnalysisSelectors,
@@ -1066,6 +1095,21 @@ export function createLasertagLspState(
 	}
 
 	return {
+		setMappedCssAnalysis: silo.runTransaction(setMappedCssAnalysisTransaction),
+		getCssAnalysisInput(activePath: string): CssAnalysisTask | undefined {
+			const normalized = normalizeFilePath(activePath)
+			const cssPath = isCssModulePath(normalized)
+				? normalized
+				: findSiblingCssModulePathFromConvention(normalized)
+			if (!cssPath) return
+			ensureCssDependencies(cssPath)
+			const source = silo.getState(siblingRenderSourceSelectors, cssPath)
+			const cssSource = silo.getState(fileTextSelectors, cssPath)
+			if (source.kind !== `ready` || cssSource === null) return
+			const sourceText = silo.getState(fileTextSelectors, source.sourcePath)
+			if (sourceText === null) return
+			return { cssPath, cssSource, sourcePath: source.sourcePath, sourceText }
+		},
 		closeDocument(filePath: string): void {
 			const normalizedPath = normalizeFilePath(filePath)
 
@@ -1229,13 +1273,24 @@ export function createLasertagLspState(
 				}
 			}
 
-			return createRenderStoryView({
+			const view = createRenderStoryView({
 				cssPath,
 				cssSource: silo.getState(fileTextSelectors, cssPath) ?? ``,
 				reachabilityAnalysis,
 				renderStory: renderStoryAnalysis.renderStory,
 				sourcePath: source.sourcePath,
 			})
+			const mapped = silo.getState(mappedCssAnalysesAtom)[source.sourcePath]
+			return view.kind === `ready` &&
+				mapped?.result.ownership.status === `available` &&
+				mapped.result.ownership.attachments.some((reference) =>
+					reference.targets.some(
+						(target) =>
+							target.status === `sibling` || target.status === `foreign`,
+					),
+				)
+				? { ...view, ownership: mapped.result.ownership }
+				: view
 		},
 		getWatchedTsxPaths(): string[] {
 			return [...silo.getState(watchedTsxPathsAtom)]

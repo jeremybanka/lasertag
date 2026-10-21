@@ -1,5 +1,5 @@
-import * as ts from "typescript/unstable/ast"
-import type { CompilerOptions } from "typescript/unstable/sync"
+import * as ts from "typescript/ast"
+import { type CompilerOptions, JsxEmit } from "typescript/sync"
 
 import type { TypescriptAstAnalysis } from "./typescript-ast.ts"
 
@@ -41,15 +41,14 @@ export function resolveJsxFactory(
 	) {
 		return { kind: `unknown` }
 	}
-	// TypeScript's public unstable API exposes numeric JsxEmit values:
-	// React = 3, ReactJSX = 4, ReactJSXDev = 5.
 	const automatic =
 		runtime === `automatic` ||
 		(runtime === undefined &&
-			(compilerOptions.jsx === 4 || compilerOptions.jsx === 5))
+			(compilerOptions.jsx === JsxEmit.ReactJSX ||
+				compilerOptions.jsx === JsxEmit.ReactJSXDev))
 	const classic =
 		runtime === `classic` ||
-		(runtime === undefined && compilerOptions.jsx === 3)
+		(runtime === undefined && compilerOptions.jsx === JsxEmit.React)
 	const importSource =
 		pragmas.get(`ImportSource`) ?? compilerOptions.jsxImportSource
 	const factory = pragmas.get(`Factory`) ?? compilerOptions.jsxFactory

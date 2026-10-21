@@ -1,4 +1,4 @@
-import type { Node } from "typescript/unstable/ast"
+import type { Node } from "typescript/ast"
 import { expect, it } from "vite-plus/test"
 
 import { analyzeTsxRenderStory } from "../../../src/refractor/analyze-tsx.ts"
