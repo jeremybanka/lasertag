@@ -37,8 +37,8 @@ it(`requires workspace trust for CSS mapper analysis`, () => {
 	})
 })
 
-it(`reuses mapper processes across CLI files and LSP edits, refreshes fix evidence and releases closed editor sessions`, async () => {
-	using project = createCssMapperProject({
+function observedProject() {
+	const project = createCssMapperProject({
 		"AppPanel.tsx": source,
 		"AppPanel.module.css": css,
 		"OtherPanel.tsx": source
@@ -81,60 +81,82 @@ it(`reuses mapper processes across CLI files and LSP edits, refreshes fix eviden
 			],
 		}),
 	)
-	const files = [`AppPanel`, `OtherPanel`].map((name) =>
-		path.join(project.root, `${name}.module.css`),
-	)
-	const checked = await runLasertagCheck(files, { cssOwnership: true })
-	expect(checked.failures).toEqual([])
-	expect(
-		checked.fileResults.every(
-			(file) =>
-				file.ownership?.status === `available` &&
-				file.ownership.attachments[0]?.status === `sibling`,
-		),
-	).toBe(true)
-	expect(readFileSync(marker, `utf8`).trim().split(`\n`)).toHaveLength(1)
-	const fixed = await runLasertagFix(files, { cssOwnership: true })
-	expect(fixed.failures).toEqual([])
-	expect(fixed.changedFiles).toHaveLength(2)
-	for (const file of fixed.fileResults) {
-		if (file.ownership?.status !== `available`)
-			throw new Error(`No evidence after fix`)
-		const target = file.ownership.attachments[0]!.targets[0]!
+	return { project, marker }
+}
+
+it(
+	`reuses one mapper across CLI files and refreshes fix evidence`,
+	{ timeout: 20_000 },
+	async () => {
+		const observed = observedProject()
+		using project = observed.project
+		const { marker } = observed
+		const files = [`AppPanel`, `OtherPanel`].map((name) =>
+			path.join(project.root, `${name}.module.css`),
+		)
+		const checked = await runLasertagCheck(files, { cssOwnership: true })
+		expect(checked.failures).toEqual([])
 		expect(
-			readFileSync(file.cssPath, `utf8`).slice(
-				target.range!.start,
-				target.range!.end,
+			checked.fileResults.every(
+				(file) =>
+					file.ownership?.status === `available` &&
+					file.ownership.attachments[0]?.status === `sibling`,
 			),
-		).toBe(`class`)
-	}
-	expect(readFileSync(marker, `utf8`).trim().split(`\n`)).toHaveLength(2)
-	await using client = createLspClient(project.root)
-	await client.initialize({
-		cssOwnership: { enabled: true, runExternalCode: true },
-	})
-	const sourcePath = path.join(project.root, `AppPanel.tsx`)
-	const query = () =>
-		client.request(`lasertag/renderStory`, {
-			uri: pathToFileURL(sourcePath).href,
+		).toBe(true)
+		expect(readFileSync(marker, `utf8`).trim().split(`\n`)).toHaveLength(1)
+		const fixed = await runLasertagFix(files, { cssOwnership: true })
+		expect(fixed.failures).toEqual([])
+		expect(fixed.changedFiles).toHaveLength(2)
+		for (const file of fixed.fileResults) {
+			if (file.ownership?.status !== `available`)
+				throw new Error(`No evidence after fix`)
+			const target = file.ownership.attachments[0]!.targets[0]!
+			expect(
+				readFileSync(file.cssPath, `utf8`).slice(
+					target.range!.start,
+					target.range!.end,
+				),
+			).toBe(`class`)
+		}
+		expect(readFileSync(marker, `utf8`).trim().split(`\n`)).toHaveLength(2)
+	},
+)
+
+it(
+	`reuses one mapper across LSP edits and releases closed sessions`,
+	{ timeout: 20_000 },
+	async () => {
+		const observed = observedProject()
+		using project = observed.project
+		const { marker } = observed
+		await using client = createLspClient(project.root)
+		await client.initialize({
+			cssOwnership: { enabled: true, runExternalCode: true },
 		})
-	client.open(sourcePath, source, `typescriptreact`)
-	expect(await query()).toMatchObject({ ownership: { status: `available` } })
-	client.change(sourcePath, `${source}\n// edit`)
-	expect(await query()).toMatchObject({ ownership: { status: `available` } })
-	const starts = readFileSync(marker, `utf8`).trim().split(`\n`)
-	expect(starts).toHaveLength(3)
-	client.close(sourcePath)
-	await vi.waitFor(() =>
-		expect(() => process.kill(Number(starts[2]), 0)).toThrow(),
-	)
-	// Allow the ordinary post-close diagnostics debounce to complete.
-	await setTimeout(250)
-	expect(readFileSync(marker, `utf8`).trim().split(`\n`)).toHaveLength(3)
-	client.open(sourcePath, source, `typescriptreact`)
-	expect(await query()).toMatchObject({ ownership: { status: `available` } })
-	expect(readFileSync(marker, `utf8`).trim().split(`\n`)).toHaveLength(4)
-})
+		const sourcePath = path.join(project.root, `AppPanel.tsx`)
+		const query = () =>
+			client.request(`lasertag/renderStory`, {
+				uri: pathToFileURL(sourcePath).href,
+			})
+		client.open(sourcePath, source, `typescriptreact`)
+		expect(await query()).toMatchObject({ ownership: { status: `available` } })
+		client.change(sourcePath, `${source}\n// edit`)
+		expect(await query()).toMatchObject({ ownership: { status: `available` } })
+		const starts = readFileSync(marker, `utf8`).trim().split(`\n`)
+		expect(starts).toHaveLength(1)
+		client.close(sourcePath)
+		await vi.waitFor(
+			() => expect(() => process.kill(Number(starts[0]), 0)).toThrow(),
+			{ timeout: 3_000 },
+		)
+		// Allow the ordinary post-close diagnostics debounce to complete.
+		await setTimeout(250)
+		expect(readFileSync(marker, `utf8`).trim().split(`\n`)).toHaveLength(1)
+		client.open(sourcePath, source, `typescriptreact`)
+		expect(await query()).toMatchObject({ ownership: { status: `available` } })
+		expect(readFileSync(marker, `utf8`).trim().split(`\n`)).toHaveLength(2)
+	},
+)
 
 it(`times out a hung CSS mapper, cleans up its process and recovers on the next request`, async () => {
 	using project = createCssMapperProject({

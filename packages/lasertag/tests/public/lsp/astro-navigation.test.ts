@@ -240,58 +240,62 @@ describe(`opt-in Astro LSP navigation`, () => {
 		).toEqual([])
 	})
 
-	it(`keeps stories, completions and cleanup edits identical with navigation enabled or unavailable`, async () => {
-		using project = createOfficialAstroProject(files)
-		const { filePath } = project.options(source)
-		const cssPath = project.write(
-			`AppPanel.module.css`,
-			`app-panel.class { > renamed {} > missing-tag {} }`,
-		)
-		const cssUri = pathToFileURL(cssPath).href
-		const responses: unknown[] = []
-		for (const mode of [`disabled`, `enabled`, `unavailable`]) {
-			if (mode === `unavailable`)
-				project.write(
-					`tsconfig.json`,
-					`{ "compilerOptions": { "jsx": "preserve" } }`,
-				)
-			await using client = createLspClient(project.root)
-			await client.initialize(mode === `disabled` ? {} : enabled)
-			client.open(filePath, source)
-			client.open(
-				cssPath,
+	it(
+		`keeps stories, completions and cleanup edits identical with navigation enabled or unavailable`,
+		{ timeout: 20_000 },
+		async () => {
+			using project = createOfficialAstroProject(files)
+			const { filePath } = project.options(source)
+			const cssPath = project.write(
+				`AppPanel.module.css`,
 				`app-panel.class { > renamed {} > missing-tag {} }`,
-				`css`,
 			)
-			const baseline = await client.request(`lasertag/renderStory`, {
-				uri: cssUri,
-			})
-			await client.request(
-				`textDocument/definition`,
-				params(filePath, source, `<Renamed`),
-			)
-			expect(
-				await client.request(`lasertag/renderStory`, { uri: cssUri }),
-			).toEqual(baseline)
-			responses.push({
-				story: baseline,
-				completions: await client.request(`textDocument/completion`, {
-					textDocument: { uri: cssUri },
-					position: { line: 0, character: 19 },
-				}),
-				actions: await client.request(`textDocument/codeAction`, {
-					textDocument: { uri: cssUri },
-					range: {
-						start: { line: 0, character: 0 },
-						end: { line: 0, character: 48 },
-					},
-					context: { diagnostics: [] },
-				}),
-			})
-		}
-		expect(responses[1]).toEqual(responses[0])
-		expect(responses[2]).toEqual(responses[0])
-	})
+			const cssUri = pathToFileURL(cssPath).href
+			const responses: unknown[] = []
+			for (const mode of [`disabled`, `enabled`, `unavailable`]) {
+				if (mode === `unavailable`)
+					project.write(
+						`tsconfig.json`,
+						`{ "compilerOptions": { "jsx": "preserve" } }`,
+					)
+				await using client = createLspClient(project.root)
+				await client.initialize(mode === `disabled` ? {} : enabled)
+				client.open(filePath, source)
+				client.open(
+					cssPath,
+					`app-panel.class { > renamed {} > missing-tag {} }`,
+					`css`,
+				)
+				const baseline = await client.request(`lasertag/renderStory`, {
+					uri: cssUri,
+				})
+				await client.request(
+					`textDocument/definition`,
+					params(filePath, source, `<Renamed`),
+				)
+				expect(
+					await client.request(`lasertag/renderStory`, { uri: cssUri }),
+				).toEqual(baseline)
+				responses.push({
+					story: baseline,
+					completions: await client.request(`textDocument/completion`, {
+						textDocument: { uri: cssUri },
+						position: { line: 0, character: 19 },
+					}),
+					actions: await client.request(`textDocument/codeAction`, {
+						textDocument: { uri: cssUri },
+						range: {
+							start: { line: 0, character: 0 },
+							end: { line: 0, character: 48 },
+						},
+						context: { diagnostics: [] },
+					}),
+				})
+			}
+			expect(responses[1]).toEqual(responses[0])
+			expect(responses[2]).toEqual(responses[0])
+		},
+	)
 
 	it(`discards canceled and superseded navigation without blocking other requests`, async () => {
 		using project = createOfficialAstroProject(files)

@@ -62,30 +62,34 @@ it.each([`tsx`, `astro`])(
 	},
 )
 
-it(`reports foreign stylesheet ownership without changing class-only diagnostics or fix output`, async () => {
-	using project = createCssMapperProject({
-		"AppPanel.tsx": source.replace(
-			`./AppPanel.module.css`,
-			`./Other.module.css`,
-		),
-		"AppPanel.module.css": css,
-		"Other.module.css": `.class {}`,
-	})
-	const result = JSON.parse(
-		(await cli(project.root, [`check`, `--css-ownership`, `--format=json`]))
-			.stdout,
-	)
-	expect(result.ownership[0].attachments[0].status).toBe(`foreign`)
-	const ordinary = await cli(project.root, [`fix`])
-	const expected = readFileSync(`${project.root}/AppPanel.module.css`, `utf8`)
-	project.write(`AppPanel.module.css`, css)
-	const mapped = await cli(project.root, [`fix`, `--css-ownership`])
-	expect(mapped.code).toBe(ordinary.code)
-	expect(readFileSync(`${project.root}/AppPanel.module.css`, `utf8`)).toBe(
-		expected,
-	)
-	expect(mapped.stdout).toContain(`css.class: foreign`)
-})
+it(
+	`reports foreign stylesheet ownership without changing class-only diagnostics or fix output`,
+	{ timeout: 20_000 },
+	async () => {
+		using project = createCssMapperProject({
+			"AppPanel.tsx": source.replace(
+				`./AppPanel.module.css`,
+				`./Other.module.css`,
+			),
+			"AppPanel.module.css": css,
+			"Other.module.css": `.class {}`,
+		})
+		const result = JSON.parse(
+			(await cli(project.root, [`check`, `--css-ownership`, `--format=json`]))
+				.stdout,
+		)
+		expect(result.ownership[0].attachments[0].status).toBe(`foreign`)
+		const ordinary = await cli(project.root, [`fix`])
+		const expected = readFileSync(`${project.root}/AppPanel.module.css`, `utf8`)
+		project.write(`AppPanel.module.css`, css)
+		const mapped = await cli(project.root, [`fix`, `--css-ownership`])
+		expect(mapped.code).toBe(ordinary.code)
+		expect(readFileSync(`${project.root}/AppPanel.module.css`, `utf8`)).toBe(
+			expected,
+		)
+		expect(mapped.stdout).toContain(`css.class: foreign`)
+	},
+)
 
 it(`keeps ordinary check and fix usable with no configured CSS mapper`, async () => {
 	using project = createCssMapperProject(

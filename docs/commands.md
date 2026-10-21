@@ -18,6 +18,12 @@ Following the [mise Node.js cookbook](https://mise.jdx.dev/mise-cookbook/nodejs.
 | `release:publish`  | Build as required by the release pipeline and publish packages.                                                    |
 | `workflows:update` | Update pinned workflow tooling references.                                                                         |
 
+## Test execution
+
+CI runs `test` in four shards, each with at most two test workers because integration tests also start native compilers and content mapper processes. Reproduce one shard with `pnpm --filter lasertag run test --shard=1/4`. The aggregate `Vitest` check requires every shard to pass, including when a shard fails or is canceled. `test:breakage` retains the complete public compatibility suite and uses the same worker limit.
+
+Tests that compare multiple real CLI or LSP sessions have an explicit 20-second scenario budget. Individual process and request deadlines, assertions, and production mapper timeouts remain unchanged; retries are not enabled.
+
 ## Static checks
 
 - `check:eslint`: `vp run -r check:eslint`.

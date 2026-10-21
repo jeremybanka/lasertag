@@ -51,6 +51,8 @@ export default defineConfig({
 		},
 	],
 	test: {
+		// Integration files launch native compilers and mapper subprocesses too.
+		maxWorkers: 2,
 		include: ["tests/**/*.test.ts"],
 	},
 })
