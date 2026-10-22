@@ -71,7 +71,7 @@
 		"@vscode/vsce": "4.0.0",
 		"atom.io": "0.53.3",
 		"comline": "0.9.0",
-		"rolldown": "1.2.14",
+		"rolldown": "1.2.15",
 		"takua": "0.2.3",
 		"tinyglobby": "0.2.17",
 		"typescript": "7.1.0-dev.20261021.1",
