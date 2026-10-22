@@ -45,7 +45,7 @@ jobs:
           RENOVATE_ALLOWED_COMMANDS: >-
             ["^pnpm dlx --package=vite-plus@[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)? vp migrate --no-interactive$",
             "^pnpm install --no-frozen-lockfile --ignore-scripts$",
-            "^pnpm exec dprint fmt$"]
+            "^pnpm exec dprint fmt$", "^pnpm install --frozen-lockfile$", "^pnpm exec correctly schemas pull --association '(?:Dprint|Renovate|Mise|pnpm workspace)'$"]
           RENOVATE_REPOSITORIES: ${{ github.repository_owner }}/${{ github.event.repository.name }}
         with:
           configurationFile: renovate.json

@@ -26,6 +26,8 @@ Tests that compare multiple real CLI or LSP sessions have an explicit 20-second 
 
 ## Static checks
 
+- `check:correctly`: `correctly check --offline`, validating configuration against the committed schema snapshots.
+
 - `check:eslint`: `vp run -r check:eslint`.
 - `check:fmt`: `dprint check`.
 - `check:vp`: `vp check --no-fmt`.
@@ -46,3 +48,13 @@ Run `pnpm --silent --filter lasertag benchmark:css --runExternalCode --iteration
 ## Migration
 
 Use `check:fmt` for formatting validation and `check:<tool>` for static checks. Use the canonical commands directly; superseded names have been removed.
+
+## Configuration validation
+
+Run `pnpm run check:correctly` for the same offline validation used by the JSON Schemas CI job. Correctly's associations in `correctly.config.ts` cover repository tooling; TypeScript and editor settings receive JSONC syntax checks. Fixture directories, downloaded corpus providers, generated corpus reports, and package-manager lockfiles are excluded.
+
+Commit the entire `.correctly/` directory, including its lock and schema snapshots. Formatters exclude this directory because changing snapshot bytes invalidates their digests. After intentionally changing associations, run `pnpm exec correctly schemas pull --all`, review the snapshot diff, and rerun the check. For an upstream schema refresh, use `pnpm exec correctly schemas pull --association 'Dprint'` (or another association name). Renovate refreshes only the relevant remote associations after dependency installation. Package-local schemas follow their installed dependency versions.
+
+Editors use the same configuration and snapshots. For VS Code, run `pnpm exec correctly vsix` to build and install the extension matching the installed package. Other LSP clients can run `node_modules/.bin/correctly-lsp --stdio`. Trust the workspace before enabling executable TypeScript configuration.
+
+The initial Renovate snapshot is inherited byte-for-byte from atom.io's reviewed `renovate@44.148.4` snapshot, preserving its digest and discovery metadata. The current upstream schema incorrectly rejects the `installTools` tool names; refreshing Renovate may expose that regression until upstream fixes it. Remote schema downloads permit up to 8 MiB because the current Renovate schema exceeds Correctly's default 2 MiB limit.

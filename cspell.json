@@ -3,7 +3,8 @@
 	"useGitignore": true,
 	"ignorePaths": [
 		"assets/brand/lasertag.ai",
-		"pnpm-lock.yaml"
+		"pnpm-lock.yaml",
+		".correctly/**"
 	],
 	"words": [
 		"affordances",
@@ -27,12 +28,15 @@
 		"lasertagcss",
 		"lowerer",
 		"lowerers",
+		"lockfiles",
 		"malva",
 		"mantinedev",
 		"mpath",
 		"overclaiming",
 		"Pascalish",
 		"quasis",
+		"renovatebot",
+		"schemastore",
 		"rebeccapurple",
 		"reparsing",
 		"seagreen",
