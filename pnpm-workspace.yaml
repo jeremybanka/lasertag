@@ -9,6 +9,7 @@ allowBuilds:
 blockExoticSubdeps: true
 minimumReleaseAge: 1440
 minimumReleaseAgeExclude:
+  - "correctly"
   - typescript@7.1.0-beta
   - "@typescript/*"
   - agents.yaml

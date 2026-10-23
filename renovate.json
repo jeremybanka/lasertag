@@ -109,9 +109,90 @@
 				"breakage",
 				"comline",
 				"takua",
-				"treetrunks"
+				"treetrunks",
+				"correctly"
 			],
 			"minimumReleaseAge": null
+		},
+		{
+			"matchPackageNames": [
+				"dprint",
+				"@dprint/*",
+				"/^dprint-plugin-/"
+			],
+			"postUpgradeTasks": {
+				"commands": [
+					"pnpm install --frozen-lockfile",
+					"pnpm exec correctly schemas pull --association 'Dprint'"
+				],
+				"executionMode": "branch",
+				"fileFilters": [
+					".correctly/**"
+				],
+				"installTools": {
+					"node": {},
+					"pnpm": {}
+				}
+			}
+		},
+		{
+			"matchPackageNames": [
+				"renovatebot/github-action",
+				"ghcr.io/renovatebot/renovate"
+			],
+			"postUpgradeTasks": {
+				"commands": [
+					"pnpm install --frozen-lockfile",
+					"pnpm exec correctly schemas pull --association 'Renovate'"
+				],
+				"executionMode": "branch",
+				"fileFilters": [
+					".correctly/**"
+				],
+				"installTools": {
+					"node": {},
+					"pnpm": {}
+				}
+			}
+		},
+		{
+			"matchPackageNames": [
+				"jdx/mise",
+				"jdx/mise-action"
+			],
+			"postUpgradeTasks": {
+				"commands": [
+					"pnpm install --frozen-lockfile",
+					"pnpm exec correctly schemas pull --association 'Mise'"
+				],
+				"executionMode": "branch",
+				"fileFilters": [
+					".correctly/**"
+				],
+				"installTools": {
+					"node": {},
+					"pnpm": {}
+				}
+			}
+		},
+		{
+			"matchPackageNames": [
+				"pnpm"
+			],
+			"postUpgradeTasks": {
+				"commands": [
+					"pnpm install --frozen-lockfile",
+					"pnpm exec correctly schemas pull --association 'pnpm workspace'"
+				],
+				"executionMode": "branch",
+				"fileFilters": [
+					".correctly/**"
+				],
+				"installTools": {
+					"node": {},
+					"pnpm": {}
+				}
+			}
 		}
 	]
 }
