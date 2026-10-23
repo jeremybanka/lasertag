@@ -232,8 +232,8 @@ importers:
         specifier: 0.53.3
         version: 0.53.3(@types/react@19.3.0)(@typescript-eslint/parser@8.72.0(eslint@10.13.0(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0))(eslint@10.13.0(jiti@2.7.0)(supports-color@7.2.0))(solid-js@1.9.17)
       comline:
-        specifier: 0.9.0
-        version: 0.9.0(arktype@2.2.8)(zod@4.6.7)
+        specifier: 0.9.1
+        version: 0.9.1(arktype@2.2.8)(zod@4.6.7)
       rolldown:
         specifier: 1.2.15
         version: 1.2.15
@@ -2241,6 +2241,17 @@ packages:
       zod:
         optional: true
 
+  comline@0.9.1:
+    resolution: {integrity: sha512-RbB0sJLMiTHe02VpHLK3RmXUk9Y/Jw5H35yx9X8rVWM7SQKDaSJ6AgIY1TbjhbduXhPrJEeiBbInvuYep5I9jw==}
+    peerDependencies:
+      arktype: ^2.1.28
+      zod: ^4.2.0
+    peerDependenciesMeta:
+      arktype:
+        optional: true
+      zod:
+        optional: true
+
   commander@12.1.0:
     resolution: {integrity: sha512-Vw8qHK3bZM9y/P10u3Vib8o/DdkvA2OtPtZvD871QKjy74Wj1WSKFILMPRPSdUSx5RFK1arlJzEtA4PkFgnbuA==}
     engines: {node: '>=18'}
@@ -3175,6 +3186,9 @@ packages:
 
   treetrunks@0.1.12:
     resolution: {integrity: sha512-x9XbZAus9Y4y7WRke6DwOrxmAxrwXNVv/wSmO9aNEfO92gu4Jau/4lmfXE1untxNle1WygPX2wriCtf+oYKMmg==}
+
+  treetrunks@0.1.13:
+    resolution: {integrity: sha512-mnGpuYAWH+EMci3E+4B9nd9K57mR4zSNmTrkzyJwTEmnN75TllJGgVb632unrp2AOfZ/ksgvombhwGH1bERhzw==}
 
   ts-api-utils@2.5.0:
     resolution: {integrity: sha512-OJ/ibxhPlqrMM0UiNHJ/0CKQkoKF243/AEmplt3qpRgkW8VG7IfOS41h7V8TjITqdByHzrjcS/2si+y4lIh8NA==}
@@ -5076,6 +5090,14 @@ snapshots:
       arktype: 2.2.8
       zod: 4.6.7
 
+  comline@0.9.1(arktype@2.2.8)(zod@4.6.7):
+    dependencies:
+      '@standard-schema/spec': 1.1.0
+      treetrunks: 0.1.13
+    optionalDependencies:
+      arktype: 2.2.8
+      zod: 4.6.7
+
   commander@12.1.0: {}
 
   commander@15.0.0: {}
@@ -6034,6 +6056,8 @@ snapshots:
   totalist@3.0.1: {}
 
   treetrunks@0.1.12: {}
+
+  treetrunks@0.1.13: {}
 
   ts-api-utils@2.5.0(typescript@6.0.3):
     dependencies:
