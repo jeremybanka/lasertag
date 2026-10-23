@@ -9,26 +9,15 @@ allowBuilds:
 blockExoticSubdeps: true
 minimumReleaseAge: 1440
 minimumReleaseAgeExclude:
-  - "correctly"
-  - typescript@7.1.0-beta
-  - "@typescript/*"
-  - agents.yaml
+  # Consumed jeremybanka packages are exempt at every version.
+  # Keep aligned with the npm rule in renovate.json.
   - atom.io
-  - break-check
   - breakage
   - comline
+  - correctly
   - takua
   - treetrunks
-  - vite-plus
-  - "@voidzero-dev/*"
-  - oxlint
-  - "@oxlint/*"
-  - oxlint-tsgolint
-  - "@oxlint-tsgolint/*"
-  - oxfmt
-  - "@oxfmt/*"
-  - vitest
-  - "@vitest/*"
+
 verifyDepsBeforeRun: error
 
 peerDependencyRules:
