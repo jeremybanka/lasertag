@@ -75,7 +75,7 @@
 		"takua": "0.2.3",
 		"tinyglobby": "0.2.17",
 		"typescript": "7.1.0-dev.20261022.1",
-		"vscode-languageclient": "10.1.2",
+		"vscode-languageclient": "11.0.0",
 		"vscode-languageserver": "10.1.2",
 		"vscode-languageserver-textdocument": "1.0.16",
 		"zod": "4.6.7"
