@@ -81,6 +81,12 @@
 			"enabled": false
 		},
 		{
+			"groupName": "vscode language client and server",
+			"matchPackageNames": ["vscode-languageclient", "vscode-languageserver"],
+			"separateMajorMinor": false,
+			"groupSingleUpdates": true
+		},
+		{
 			"groupName": "changesets",
 			"matchPackageNames": [
 				"@changesets/cli",
