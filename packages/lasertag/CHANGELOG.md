@@ -1,5 +1,11 @@
 # lasertag
 
+## 0.8.9
+
+### Patch Changes
+
+- b53a534: Improve VS Code language server startup, shutdown, document synchronization, and file watcher cleanup by updating the language client and server to v11.
+
 ## 0.8.8
 
 ### Patch Changes
