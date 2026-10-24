@@ -1,7 +1,7 @@
 import path from "node:path"
 
 import parser from "@typescript-eslint/parser"
-import atomIO from "atom.io/eslint-plugin"
+import atomIO from "@atom.io/eslint-plugin"
 import { defineConfig } from "eslint/config"
 
 export default defineConfig({
