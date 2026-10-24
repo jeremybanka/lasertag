@@ -262,6 +262,9 @@ importers:
       '@astrojs/ts-content-mapper':
         specifier: 0.2.0
         version: 0.2.0(@emnapi/runtime@1.11.3)
+      '@atom.io/eslint-plugin':
+        specifier: 0.1.0
+        version: 0.1.0(@typescript-eslint/parser@8.72.0(eslint@10.13.0(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0))(eslint@10.13.0(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0)(typescript@7.1.0-dev.20261022.1)
       '@babel/core':
         specifier: 8.0.7
         version: 8.0.7
@@ -328,6 +331,13 @@ packages:
 
   '@astrojs/ts-content-mapper@0.2.0':
     resolution: {integrity: sha512-+pfAziGnhsW/TBfeMeQewRID9UOXaAJVx+EJNBto0pZlQt9/p7wzr1YCD+PH9hfj8j/md6gEmmL6N/DeB4uxDg==}
+
+  '@atom.io/eslint-plugin@0.1.0':
+    resolution: {integrity: sha512-LyQIOLdPGRBqxc0ABy2iIo650BkqesuuXHB7b+d6wKFry8n3eM538KfOtC3SUY+oUptpJWfy2GPHew2mtgmXBw==}
+    peerDependencies:
+      '@typescript-eslint/parser': ^8.0.0
+      eslint: ^9.0.0 || ^10.0.0
+      typescript: '>=4.8.4 <6.1.0'
 
   '@azure/abort-controller@2.1.2':
     resolution: {integrity: sha512-nBrLsEWm4J2u5LpAPjxADTlq3trDgVZZXHNKabeXZtpq3d3AbN/KGO82R87rdDz5/lYB024rtEf10/q0urNgsA==}
@@ -3303,6 +3313,15 @@ snapshots:
       vscode-jsonrpc: 9.0.3
     transitivePeerDependencies:
       - '@emnapi/runtime'
+
+  '@atom.io/eslint-plugin@0.1.0(@typescript-eslint/parser@8.72.0(eslint@10.13.0(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0))(eslint@10.13.0(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0)(typescript@7.1.0-dev.20261022.1)':
+    dependencies:
+      '@typescript-eslint/parser': 8.72.0(eslint@10.13.0(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0)
+      '@typescript-eslint/utils': 8.72.0(eslint@10.13.0(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0)
+      eslint: 10.13.0(jiti@2.7.0)(supports-color@7.2.0)
+      typescript: 7.1.0-dev.20261022.1
+    transitivePeerDependencies:
+      - supports-color
 
   '@azure/abort-controller@2.1.2':
     dependencies:

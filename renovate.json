@@ -109,6 +109,7 @@
 		},
 		{
 			"matchPackageNames": [
+				"@atom.io/eslint-plugin",
 				"atom.io",
 				"breakage",
 				"comline",
