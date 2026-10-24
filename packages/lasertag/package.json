@@ -83,7 +83,7 @@
 	"devDependencies": {
 		"@astrojs/ts-content-mapper": "0.2.0",
 		"@atom.io/eslint-plugin": "0.1.0",
-		"@babel/core": "8.0.7",
+		"@babel/core": "8.0.9",
 		"@eslint/core": "1.2.1",
 		"@types/babel__core": "7.20.5",
 		"@types/estree": "1.0.9",
