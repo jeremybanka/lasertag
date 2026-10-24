@@ -1,5 +1,11 @@
 # lasertag
 
+## 0.8.10
+
+### Patch Changes
+
+- e1146e8: Upgrade the language server state engine to atom.io 0.54.0.
+
 ## 0.8.9
 
 ### Patch Changes
