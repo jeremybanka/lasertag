@@ -48,15 +48,6 @@ export default defineConfig({
 			}),
 		},
 		{
-			name: "Breakage",
-			files: ["packages/lasertag/breakage.config.json"],
-			parse: json(),
-			validate: ajv({
-				schema:
-					"packages/lasertag/node_modules/breakage/dist/breakage.main.schema.json",
-			}),
-		},
-		{
 			name: "Refractor corpus",
 			files: ["packages/lasertag/tests/private/refractor/corpus/manifest.json"],
 			parse: json(),

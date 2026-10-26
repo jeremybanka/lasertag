@@ -13,6 +13,7 @@ minimumReleaseAgeExclude:
   # Keep aligned with the npm rule in renovate.json.
   - "@atom.io/eslint-plugin"
   - atom.io
+  - "@breakage/changesets"
   - breakage
   - comline
   - correctly
