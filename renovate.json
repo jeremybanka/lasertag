@@ -111,6 +111,7 @@
 			"matchPackageNames": [
 				"@atom.io/eslint-plugin",
 				"atom.io",
+				"@breakage/changesets",
 				"breakage",
 				"comline",
 				"correctly",
