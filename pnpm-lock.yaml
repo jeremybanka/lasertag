@@ -311,8 +311,8 @@ importers:
         specifier: 2.7.0
         version: 2.7.0
       preact:
-        specifier: 11.0.2
-        version: 11.0.2
+        specifier: 11.1.0
+        version: 11.1.0
       solid-js:
         specifier: 1.9.17
         version: 1.9.17
@@ -2900,8 +2900,8 @@ packages:
     resolution: {integrity: sha512-zkd+e9S1AQHhmaBKye9zlFHWjOwVgqXl1q3ECYy8561K7qxR2cREf/STLskulBFd78k6AOFeA+ff1TtEzk9bAA==}
     engines: {node: ^10 || ^12 || >=14}
 
-  preact@11.0.2:
-    resolution: {integrity: sha512-ofG+Lqznbt13JKDjdWPLTo5ONBqcNgidqnLRzJBG6PZjzGXOLRd5y9r448+HUofTyDbgKWVrPhHP0IgcxEZslQ==}
+  preact@11.1.0:
+    resolution: {integrity: sha512-hz1VsjWx5pSYPDVEzb9w+XyOmQpP1qW/ZEaMiYm+C8ykJr8KP+TKGZIbCW0QmZ/Yr/jg3XkZoziEWn9iWHZ9Mw==}
     peerDependencies:
       preact-render-to-string: '>=6.7.0'
     peerDependenciesMeta:
@@ -5760,7 +5760,7 @@ snapshots:
       picocolors: 1.1.1
       source-map-js: 1.2.2
 
-  preact@11.0.2: {}
+  preact@11.1.0: {}
 
   prelude-ls@1.2.1: {}
 
