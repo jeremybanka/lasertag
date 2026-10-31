@@ -95,7 +95,7 @@
 		"babel-preset-solid": "1.9.16",
 		"breakage": "0.10.1",
 		"css-modules-content-mapper": "0.2.0",
-		"eslint": "10.13.0",
+		"eslint": "10.14.0",
 		"hono": "4.13.14",
 		"jiti": "2.7.0",
 		"preact": "11.1.0",
