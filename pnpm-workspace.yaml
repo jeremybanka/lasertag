@@ -32,6 +32,13 @@ minimumReleaseAgeExclude:
 
 verifyDepsBeforeRun: error
 
+# cspell:ignore astrojs emnapi
+packageExtensions:
+  "@astrojs/astro2tsx@0.1.3":
+    dependencies:
+      # Its WASM runtime needs the same major as its pinned @emnapi/core.
+      "@emnapi/runtime": "1.11.3"
+
 peerDependencyRules:
   allowAny:
     - vite
