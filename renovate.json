@@ -125,6 +125,7 @@
 			"description": "Exempt consumed jeremybanka packages at every version; keep aligned with pnpm-workspace.yaml"
 		},
 		{
+			"groupName": "dprint",
 			"matchPackageNames": [
 				"dprint",
 				"@dprint/*",
