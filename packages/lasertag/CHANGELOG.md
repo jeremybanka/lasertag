@@ -1,5 +1,11 @@
 # lasertag
 
+## 0.8.11
+
+### Patch Changes
+
+- 5a2248e: Remove unused internal helpers and redundant exports while preserving the public API and runtime behavior.
+
 ## 0.8.10
 
 ### Patch Changes
