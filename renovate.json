@@ -34,6 +34,12 @@
 	],
 	"packageRules": [
 		{
+			"groupName": "atom.io",
+			"matchPackageNames": ["atom.io", "@atom.io/*"],
+			"separateMajorMinor": false,
+			"groupSingleUpdates": true
+		},
+		{
 			"matchPackageNames": ["jdx/mise"],
 			"matchDatasources": ["github-releases"],
 			"ignoreUnstable": true
