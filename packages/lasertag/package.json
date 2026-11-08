@@ -96,7 +96,7 @@
 		"breakage": "0.10.2",
 		"css-modules-content-mapper": "0.2.0",
 		"eslint": "10.14.0",
-		"hono": "4.13.16",
+		"hono": "4.13.17",
 		"jiti": "2.7.0",
 		"preact": "11.2.0",
 		"solid-js": "1.9.18"
