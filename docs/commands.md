@@ -32,8 +32,20 @@ Tests that compare multiple real CLI or LSP sessions have an explicit 20-second 
 - `check:fmt`: `dprint check`.
 - `check:vp`: `vp check --no-fmt`.
 - `check:spelling`: `cspell .`.
+- `check:unused`: `knip`.
+- `check:unused:production`: `knip --production`.
 
 `check:vp` runs linting and TypeScript typechecking through Vite Plus with `lint.options.typeAware` and `lint.options.typeCheck` enabled. `check:fmt` handles formatting separately.
+
+## Unused-code checks
+
+Run `pnpm run check:unused` to find unused files, exports, types, and dependencies across the workspace. Run `pnpm run check:unused:production` to analyze production source without tests, examples, benchmarks, or contributor scripts keeping it reachable. Both checks participate in `check` and return a failing status when findings remain. Neither command automatically deletes code.
+
+CI runs both commands in a dedicated `Knip` job alongside the other static checks.
+
+`knip.ts` declares the CLI, ESLint plugin, LSP, refractor API, published type declarations, and separately bundled VS Code extension as production entrypoints. Public entrypoint exports remain available to consumers even when this repository does not import them. The configuration also accounts for directly invoked inspectors, published examples, type-test fixtures, formatter WASM plugins, and dependencies loaded through computed paths or supplied by the extension host.
+
+Review findings before removing code. An unused export may only need its `export` keyword removed. The platform-target resolver and Astro navigation analyzer remain exported for private tests and carry `@internal` tags so production mode ignores those exports; the normal check still verifies their usage. Knip analyzes source reachability; it does not measure which statements survive tree shaking or how much space they occupy in a bundle.
 
 ## Experimental Astro benchmark
 

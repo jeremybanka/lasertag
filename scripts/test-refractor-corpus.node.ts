@@ -9,7 +9,7 @@ import { promisify } from "node:util"
 import * as ts from "typescript/ast"
 
 import { analyzeTsxRenderStories } from "../packages/lasertag/src/refractor/analyze-tsx.ts"
-import { createTsxSourceFile } from "../packages/lasertag/src/refractor/typescript-ast.ts"
+import { createTypescriptAstSession } from "../packages/lasertag/src/refractor/typescript-ast.ts"
 import type {
 	OpaqueStoryNode,
 	RenderStory,
@@ -708,7 +708,12 @@ async function analyzeFile(
 }
 
 function collectSourcePatterns(sourceText: string, filePath: string): string[] {
-	const sourceFile = createTsxSourceFile(sourceText, filePath)
+	using session = createTypescriptAstSession()
+	const sourceFile = session.withSourceFile(
+		sourceText,
+		filePath,
+		(sourceFile) => sourceFile,
+	)
 	const patterns = new Set<string>()
 
 	function visit(node: ts.Node): void {

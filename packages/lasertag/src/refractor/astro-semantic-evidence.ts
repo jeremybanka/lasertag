@@ -22,7 +22,7 @@ type DeclarationEvidence = {
 	kind: `source` | `ambient`
 }
 
-export type AstroComponentEvidence = ComponentReference & {
+type AstroComponentEvidence = ComponentReference & {
 	status: `resolved` | `unresolved` | `unmapped` | `ambiguous`
 	declarations: DeclarationEvidence[]
 }

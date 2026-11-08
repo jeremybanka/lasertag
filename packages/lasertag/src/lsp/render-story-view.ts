@@ -45,11 +45,11 @@ export type RenderStoryViewNode = {
 	tooltip?: string
 }
 
-export type RenderStoryViewPossibility = {
+type RenderStoryViewPossibility = {
 	roots: RenderStoryViewNode[]
 }
 
-export type RenderStoryViewUnreachableStyle = {
+type RenderStoryViewUnreachableStyle = {
 	expected: boolean
 	expectErrorExplanation?: string
 	location: RenderStoryViewLocation

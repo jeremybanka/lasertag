@@ -30,7 +30,6 @@ export default defineConfig({
 				"@dprint/toml",
 				"dprint",
 				"dprint-plugin-malva",
-				"dprint-plugin-markup",
 				"dprint-plugin-yaml",
 			],
 			validate: ajv({ schema: "https://dprint.dev/schemas/v0.json" }),

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vite-plus/test"
 
+import { LASERTAG_TYPESCRIPT_SDK_PATH } from "../../../src/refractor/typescript-runtime.ts"
 import {
-	LASERTAG_TYPESCRIPT_SDK_PATH,
 	resolveBundledTypescriptSdkPath,
 	resolveTypescriptSdkPath,
 	resolveWorkspacePath,

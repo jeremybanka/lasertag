@@ -1,13 +1,13 @@
-export const FIX_COURSE_DRILL_COUNT = 12
+const FIX_COURSE_DRILL_COUNT = 12
 
-export type FixCourseLessonStage =
+type FixCourseLessonStage =
 	| `fundamentals`
 	| `selector-lists`
 	| `safety`
 	| `advanced`
 	| `drill`
 
-export type FixCourseLessonKind =
+type FixCourseLessonKind =
 	| `full-dead-rule`
 	| `mixed-selector-list`
 	| `all-dead-selector-list`
@@ -21,7 +21,7 @@ export type FixCourseLessonKind =
 	| `drill-impossible-class`
 	| `drill-clean-map`
 
-export type FixCourseLesson = {
+type FixCourseLesson = {
 	cohort: `core` | `drill`
 	cssPath: string
 	expectedAction: `changed` | `unchanged` | `skipped`
