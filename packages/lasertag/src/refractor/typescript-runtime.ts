@@ -1,6 +1,6 @@
 export const LASERTAG_TYPESCRIPT_SDK_PATH = `LASERTAG_TYPESCRIPT_SDK_PATH`
 
-export type TypescriptRuntimeEnvironment = Record<string, string | undefined>
+type TypescriptRuntimeEnvironment = Record<string, string | undefined>
 
 export type TypescriptRuntimeOptions = {
 	environment?: TypescriptRuntimeEnvironment

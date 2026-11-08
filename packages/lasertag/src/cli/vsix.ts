@@ -41,7 +41,7 @@ export type LasertagVscodeInstallResult = {
 	exitCode: number
 }
 
-export type LasertagCommandRunner = (
+type LasertagCommandRunner = (
 	command: string,
 	args: string[],
 	options: { cwd: string },
@@ -65,6 +65,7 @@ export function defaultLasertagPackageRoot(): string {
 	return path.resolve(moduleDirectory, `..`)
 }
 
+/** @internal Exported for platform-target tests; the builder calls it locally. */
 export function resolveCurrentVscodePlatformTarget(
 	platform = process.platform,
 	arch = process.arch,

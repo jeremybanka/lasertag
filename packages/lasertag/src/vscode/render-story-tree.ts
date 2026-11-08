@@ -11,10 +11,7 @@ export const LASERTAG_OPEN_RENDER_SOURCE_COMMAND = `lasertag.openRenderSource`
 export const LASERTAG_OPEN_STORY_LOCATION_COMMAND = `lasertag.openStoryLocation`
 export const LASERTAG_IN_CONTEXT_KEY = `lasertag.inContext`
 
-export type RenderStoryTreeDecoration =
-	| `regular`
-	| `unreachable`
-	| `unsupported`
+type RenderStoryTreeDecoration = `regular` | `unreachable` | `unsupported`
 
 export type RenderStoryTreeEntry = {
 	children: RenderStoryTreeEntry[]

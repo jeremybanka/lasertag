@@ -384,21 +384,3 @@ export function createTypescriptAstSession(
 
 	return session
 }
-
-export function createTsxSourceFile(
-	sourceText: string,
-	filePath = `component.tsx`,
-	options: TypescriptRuntimeOptions = {},
-): SourceFile {
-	const session = createTypescriptAstSession(options)
-
-	try {
-		return session.withSourceFile(
-			sourceText,
-			filePath,
-			(sourceFile) => sourceFile,
-		)
-	} finally {
-		session.close()
-	}
-}

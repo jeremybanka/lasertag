@@ -49,7 +49,7 @@ import {
 	type LasertagRenderStoryView,
 } from "./render-story-view.ts"
 
-export { isAstroPath, isRenderSourcePath, isTsxPath }
+export { isRenderSourcePath }
 
 const WATCHED_CSS_PATTERN = `**/*.module.css`
 const WATCHED_TSX_PATTERN = `**/*.tsx`
@@ -79,7 +79,7 @@ export type LspDocumentInput = {
 
 type OpenDocument = Omit<LspDocumentInput, "path">
 
-export type RenderStoryAnalysis =
+type RenderStoryAnalysis =
 	| {
 			kind: `ready`
 			renderStory: RenderStory
@@ -89,7 +89,7 @@ export type RenderStoryAnalysis =
 			message?: string
 	  }
 
-export type CssSelectorAnalysisState =
+type CssSelectorAnalysisState =
 	| {
 			kind: `ready`
 			selectorAnalyses: CssSelectorAnalysis[]
@@ -136,20 +136,6 @@ export function findSiblingTsxPathFromConvention(
 	return `${cssPath.slice(0, -CSS_MODULE_SUFFIX.length)}${TSX_SUFFIX}`
 }
 
-export function findSiblingAstroPathFromConvention(
-	cssPath: string,
-): string | undefined {
-	if (!isCssModulePath(cssPath)) return
-
-	return `${cssPath.slice(0, -CSS_MODULE_SUFFIX.length)}${ASTRO_SUFFIX}`
-}
-
-export function findSiblingCssModulePathFromConvention(
-	sourcePath: string,
-): string | undefined {
-	return sourcePathToSiblingCssModulePath(sourcePath)
-}
-
 function messageFromError(error: unknown): string {
 	return error instanceof Error ? error.message : String(error)
 }
@@ -187,7 +173,7 @@ export function offsetToPosition(
 	return { character, line }
 }
 
-export function mapRefractorDiagnosticToLsp(
+function mapRefractorDiagnosticToLsp(
 	cssSource: string,
 	diagnostic: CssReachabilityDiagnostic,
 ): Diagnostic {
@@ -221,7 +207,7 @@ function isAdoptionWarning(
 	)
 }
 
-export function mapRenderStoryWarningToLsp(
+function mapRenderStoryWarningToLsp(
 	sourceText: string,
 	warning: RenderStoryWarning,
 ): Diagnostic {
@@ -326,7 +312,7 @@ const documentUriSelectors = selectorFamily<string, string>({
 	key: `documentUri`,
 })
 
-export type SiblingRenderSourceAnalysis =
+type SiblingRenderSourceAnalysis =
 	| { kind: `missing`; candidates: RenderSourceCandidateTrace[] }
 	| {
 			kind: `ready`
@@ -339,7 +325,7 @@ export type SiblingRenderSourceAnalysis =
 			message: string
 	  }
 
-export type RenderSourceCandidateTrace = {
+type RenderSourceCandidateTrace = {
 	exists: boolean
 	path: string
 }
@@ -711,7 +697,7 @@ const affectedCssPathsByRenderSourceSelectors = selectorFamily<
 	get:
 		(sourcePath) =>
 		({ get }) => {
-			const candidate = findSiblingCssModulePathFromConvention(sourcePath)
+			const candidate = sourcePathToSiblingCssModulePath(sourcePath)
 
 			if (!candidate) return []
 
@@ -1100,7 +1086,7 @@ export function createLasertagLspState(
 			const normalized = normalizeFilePath(activePath)
 			const cssPath = isCssModulePath(normalized)
 				? normalized
-				: findSiblingCssModulePathFromConvention(normalized)
+				: sourcePathToSiblingCssModulePath(normalized)
 			if (!cssPath) return
 			ensureCssDependencies(cssPath)
 			const source = silo.getState(siblingRenderSourceSelectors, cssPath)
@@ -1206,7 +1192,7 @@ export function createLasertagLspState(
 			const normalizedActivePath = normalizeFilePath(activePath)
 			const cssPath = isCssModulePath(normalizedActivePath)
 				? normalizedActivePath
-				: findSiblingCssModulePathFromConvention(normalizedActivePath)
+				: sourcePathToSiblingCssModulePath(normalizedActivePath)
 
 			if (!cssPath) return { kind: `outside-context` }
 

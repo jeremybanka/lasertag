@@ -9,7 +9,7 @@ import {
 const LASERTAG_WORKER_KIND = `lasertag-cli-worker`
 const WORKER_STOP_GRACE_PERIOD_MS = 5_000
 
-export type LasertagWorkerOperation = `check` | `fix`
+type LasertagWorkerOperation = `check` | `fix`
 
 export type LasertagWorkTask = {
 	cssPath: string

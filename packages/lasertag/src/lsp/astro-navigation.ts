@@ -46,7 +46,10 @@ export function navigationLocations(
 			}))
 }
 
-/** One session per worker. The entire current overlay set is supplied per request. */
+/**
+ * One session per worker. The entire current overlay set is supplied per request.
+ * @internal Exported for session lifecycle tests; the worker calls it locally.
+ */
 export function createAstroNavigationAnalyzer() {
 	const session = createTypescriptAstSession({ runExternalCode: true })
 	let diskRevision: number | undefined

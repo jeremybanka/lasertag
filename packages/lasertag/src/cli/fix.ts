@@ -30,11 +30,7 @@ import {
 	type WorkStealingStart,
 } from "./work-stealing.ts"
 
-export type LasertagFixFileStatus =
-	| `changed`
-	| `failed`
-	| `skipped`
-	| `unchanged`
+type LasertagFixFileStatus = `changed` | `failed` | `skipped` | `unchanged`
 
 export type LasertagFixFileResult = LasertagWorkResult & {
 	ownership?: CssOwnershipResult[`ownership`]
@@ -47,8 +43,6 @@ export type LasertagFixFileResult = LasertagWorkResult & {
 }
 
 export type LasertagFixProgress = WorkStealingProgress<LasertagFixFileResult>
-
-export type LasertagFixStart = WorkStealingStart
 
 export type LasertagFixResult = {
 	changedFiles: string[]
@@ -73,7 +67,7 @@ export type LasertagFixFileSystem = {
 export type RunLasertagFixOptions = {
 	fileSystem?: Partial<LasertagFixFileSystem>
 	onProgress?: (progress: LasertagFixProgress) => void
-	onStart?: (start: LasertagFixStart) => void
+	onStart?: (start: WorkStealingStart) => void
 	typescriptSdkPath?: string
 	workerCount?: number
 	workerModuleUrl?: string | URL

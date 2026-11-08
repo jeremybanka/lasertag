@@ -17,7 +17,7 @@ import {
 } from "./typescript-ast.ts"
 import type { TypescriptRuntimeOptions } from "./typescript-runtime.ts"
 
-export type CssOwnershipStatus =
+type CssOwnershipStatus =
 	| `sibling`
 	| `foreign`
 	| `ambient`
@@ -26,12 +26,12 @@ export type CssOwnershipStatus =
 	| `unverified`
 	| `unresolved`
 	| `ambiguous`
-export type CssOwnershipTarget = {
+type CssOwnershipTarget = {
 	sourcePath: string
 	range?: SourceRange
 	status: Exclude<CssOwnershipStatus, `unresolved` | `ambiguous`>
 }
-export type CssAttachmentEvidence = {
+type CssAttachmentEvidence = {
 	expression: string
 	range: SourceRange
 	attribute: string

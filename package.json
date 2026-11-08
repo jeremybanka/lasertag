@@ -12,6 +12,8 @@
 		"check:fmt": "dprint check",
 		"check:vp": "vp check --no-fmt",
 		"check:spelling": "cspell .",
+		"check:unused": "knip",
+		"check:unused:production": "knip --production",
 		"fmt": "dprint fmt",
 		"refractor:corpus": "./scripts/fetch-refractor-corpus.node.ts",
 		"refractor:corpus:test": "./scripts/test-refractor-corpus.node.ts",
@@ -34,8 +36,8 @@
 		"cspell": "10.4.1",
 		"dprint": "0.64.3",
 		"dprint-plugin-malva": "0.16.0",
-		"dprint-plugin-markup": "0.27.6",
 		"dprint-plugin-yaml": "0.6.0",
+		"knip": "6.44.1",
 		"typescript": "7.1.0-dev.20261106.1",
 		"vite-plus": "catalog:"
 	},

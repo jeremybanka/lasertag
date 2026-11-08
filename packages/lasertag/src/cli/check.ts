@@ -20,7 +20,7 @@ import {
 	type LasertagWorkTask,
 } from "./work-stealing.ts"
 
-export type LasertagCheckFileStatus = `checked` | `failed` | `skipped`
+type LasertagCheckFileStatus = `checked` | `failed` | `skipped`
 
 export type LasertagCheckFileResult = LasertagWorkResult & {
 	ownership?: CssOwnershipResult[`ownership`]
