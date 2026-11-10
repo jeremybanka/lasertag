@@ -38,7 +38,7 @@
 		"dprint-plugin-malva": "0.16.0",
 		"dprint-plugin-yaml": "0.6.0",
 		"knip": "6.44.2",
-		"typescript": "7.1.0-dev.20261108.1",
+		"typescript": "7.1.0-dev.20261109.1",
 		"vite-plus": "catalog:"
 	},
 	"packageManager": "pnpm@12.18.0",
