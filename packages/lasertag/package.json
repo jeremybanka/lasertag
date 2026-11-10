@@ -90,7 +90,7 @@
 		"@types/estree": "1.0.10",
 		"@types/node": "26.6.6",
 		"@types/react": "19.3.0",
-		"@typescript-eslint/parser": "8.72.1",
+		"@typescript-eslint/parser": "8.72.2",
 		"babel-preset-solid": "1.9.16",
 		"breakage": "0.10.2",
 		"css-modules-content-mapper": "0.2.0",
