@@ -213,8 +213,8 @@ importers:
         specifier: 0.6.0
         version: 0.6.0
       knip:
-        specifier: 6.44.2
-        version: 6.44.2
+        specifier: 6.45.0
+        version: 6.45.0
       typescript:
         specifier: 7.1.0-dev.20261110.1
         version: 7.1.0-dev.20261110.1
@@ -3005,8 +3005,8 @@ packages:
   keyv@5.6.0:
     resolution: {integrity: sha512-CYDD3SOtsHtyXeEORYRx2qBtpDJFjRTGXUtmNEMGyzYOKj1TE3tycdlho7kA1Ufx9OYWZzg52QFBGALTirzDSw==}
 
-  knip@6.44.2:
-    resolution: {integrity: sha512-6URO7pnqtOnyvSsXfW6+8C9j1lfcicxUCysXO0RgMtHTZ96HqCXh29op8iabeQW5JeIc8dJWwzSdJVWDokeScQ==}
+  knip@6.45.0:
+    resolution: {integrity: sha512-ywPAhxiJGPWD/1V5dVYawA6el74q4vgX8omkeyl0MbA1CCkdjxrvWXXVqM20a5wQWcl1NbC9ImLHYsbFEbD0Xg==}
     engines: {node: ^20.19.0 || >=22.12.0}
     hasBin: true
 
@@ -3522,8 +3522,8 @@ packages:
     engines: {node: '>=16.20.0'}
     hasBin: true
 
-  unbash@6.0.3:
-    resolution: {integrity: sha512-hRzSpMeM8uYMQkrnIVaVy3f44oLlokglVeEyP5hIQj88z60bKPO9VVbEpGfxChGBh9lBkzuWKOTOzPdfD6KNEA==}
+  unbash@6.0.4:
+    resolution: {integrity: sha512-t3OptUArewg9OpYGDskTSlxhyLDahfmZ4d36hE44Efb1y3HRLLpzsVqwH+AwBVymP4t7pP71xN+nnduudn2awA==}
     engines: {node: '>=14'}
 
   underscore@1.13.8:
@@ -6133,7 +6133,7 @@ snapshots:
     dependencies:
       '@keyv/serialize': 1.1.1
 
-  knip@6.44.2:
+  knip@6.45.0:
     dependencies:
       formatly: 0.11.4
       get-tsconfig: 4.14.3
@@ -6144,9 +6144,8 @@ snapshots:
       smol-toml: 1.9.1
       strip-json-comments: 5.0.3
       tinyglobby: 0.2.17
-      unbash: 6.0.3
+      unbash: 6.0.4
       yaml: 2.9.1
-      zod: 4.6.7
 
   launch-editor@2.14.1:
     dependencies:
@@ -6675,7 +6674,7 @@ snapshots:
       '@typescript/typescript-win32-arm64': 7.1.0-dev.20261110.1
       '@typescript/typescript-win32-x64': 7.1.0-dev.20261110.1
 
-  unbash@6.0.3: {}
+  unbash@6.0.4: {}
 
   underscore@1.13.8: {}
 
