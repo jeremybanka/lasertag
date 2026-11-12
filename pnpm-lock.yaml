@@ -293,7 +293,7 @@ importers:
         version: 8.72.2(eslint@10.14.0(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0)
       babel-preset-solid:
         specifier: 1.9.19
-        version: 1.9.19(@babel/core@8.1.0)(solid-js@1.9.18)
+        version: 1.9.19(@babel/core@8.1.0)(solid-js@1.9.19)
       breakage:
         specifier: 0.10.2
         version: 0.10.2(supports-color@7.2.0)(zod@4.6.7)
@@ -313,8 +313,8 @@ importers:
         specifier: 11.2.0
         version: 11.2.0
       solid-js:
-        specifier: 1.9.18
-        version: 1.9.18
+        specifier: 1.9.19
+        version: 1.9.19
 
 packages:
 
@@ -3432,8 +3432,8 @@ packages:
     resolution: {integrity: sha512-j7WyPdf0CJoutMzMoPLF/bVXHtKZIT9Rb4eGeEbWw8X2t5oirjPgpL+OpaENZrILYaXqYwnVH+qgUwVbl+pUJQ==}
     engines: {node: '>= 18'}
 
-  solid-js@1.9.18:
-    resolution: {integrity: sha512-CHGO5YFk6Y9m/1YSxVtKnXfrW7JD3Tmof8HmR4z6TmCPsS8efo8LnzIR8CQh3cUvffqYm6DWyBFfk8dQw1CNQQ==}
+  solid-js@1.9.19:
+    resolution: {integrity: sha512-NIrV/6o1FtmrA9iuAAYvnQJZaHrGcaH3LKSVj4kCiZfwqjCtJNDgIgR9XcqYl6KR/Lb3oRx1HrlyswPWR8SRvw==}
 
   source-map-js@1.2.2:
     resolution: {integrity: sha512-KGj/8Y43x35aZVDtt+J4mK1hoLGHULMYfSkODJNQjNDC3oW1PqPoxMwo0pLUsWM/UEGzON/NxeHywEfNXNP3Vw==}
@@ -5511,12 +5511,12 @@ snapshots:
       html-entities: 2.3.3
       parse5: 7.3.0
 
-  babel-preset-solid@1.9.19(@babel/core@8.1.0)(solid-js@1.9.18):
+  babel-preset-solid@1.9.19(@babel/core@8.1.0)(solid-js@1.9.19):
     dependencies:
       '@babel/core': 8.1.0
       babel-plugin-jsx-dom-expressions: 0.40.14(@babel/core@8.1.0)
     optionalDependencies:
-      solid-js: 1.9.18
+      solid-js: 1.9.19
 
   balanced-match@4.0.4: {}
 
@@ -6599,7 +6599,7 @@ snapshots:
 
   smol-toml@1.9.1: {}
 
-  solid-js@1.9.18:
+  solid-js@1.9.19:
     dependencies:
       csstype: 3.2.3
       seroval: 1.6.12
