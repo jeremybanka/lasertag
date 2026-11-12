@@ -91,7 +91,7 @@
 		"@types/node": "26.6.6",
 		"@types/react": "19.3.0",
 		"@typescript-eslint/parser": "8.72.2",
-		"babel-preset-solid": "1.9.16",
+		"babel-preset-solid": "1.9.19",
 		"breakage": "0.10.2",
 		"css-modules-content-mapper": "0.2.0",
 		"eslint": "10.14.0",
