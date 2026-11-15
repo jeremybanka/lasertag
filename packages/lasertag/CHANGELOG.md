@@ -1,5 +1,11 @@
 # lasertag
 
+## 0.9.0
+
+### Minor Changes
+
+- a18a4d1: Upgrade the development CSS Modules content mapper to 0.3.0 and locate its package metadata with Node's findPackageJSON API. Accept the historical public test fixture incompatibility caused by the mapper's new package exports; current CSS ownership contracts remain unchanged.
+
 ## 0.8.11
 
 ### Patch Changes
