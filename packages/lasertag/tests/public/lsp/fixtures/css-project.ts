@@ -1,5 +1,5 @@
+import { findPackageJSON } from "node:module"
 import path from "node:path"
-import { fileURLToPath } from "node:url"
 
 import {
 	createOfficialAstroProject,
@@ -7,7 +7,7 @@ import {
 } from "./astro-project.ts"
 
 export const cssMapperPath = path.dirname(
-	fileURLToPath(import.meta.resolve(`css-modules-content-mapper/package.json`)),
+	findPackageJSON(`css-modules-content-mapper`, import.meta.url)!,
 )
 
 /** Real CSS and Astro mappers, enabled only inside this temporary project. */
