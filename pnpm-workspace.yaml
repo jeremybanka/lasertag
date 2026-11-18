@@ -29,6 +29,8 @@ minimumReleaseAgeExclude:
   - "@oxfmt/*"
   - vitest
   - "@vitest/*"
+  - tsrs
+  - "@tsrs/*"
 
 verifyDepsBeforeRun: error
 
@@ -40,13 +42,10 @@ packageExtensions:
       "@emnapi/runtime": "1.11.3"
 
 peerDependencyRules:
-  allowAny:
-    - vite
   allowedVersions:
     typescript: ^5.0.0 || ^6.0.0 || ^7.0.0 || 7.1.0-beta
-    vite: "*"
 catalog:
-  vite: npm:@voidzero-dev/vite-plus-core@1.6.0
-  vite-plus: 1.6.0
+  vite: npm:@voidzero-dev/vite-plus-core@8.3.8000
+  vite-plus: 1.7.0
 overrides:
   vite@*: "catalog:"
