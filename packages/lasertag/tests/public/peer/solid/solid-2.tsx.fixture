@@ -1,0 +1,40 @@
+/** @jsxImportSource @solidjs/web */
+import { createMemo, Errored as ErrorPanel } from "solid-js"
+import * as Web from "@solidjs/web"
+
+const css = { class: "class" }
+
+function BrokenContent() {
+	throw Error("missing")
+}
+
+function Show() {
+	return <mark />
+}
+
+export function ProjectCard() {
+	const waiting = createMemo(() => new Promise(() => {}))
+	return <project-card class={[css.class, { ready: true }]}>
+		<Reveal>
+			<Loading fallback={<aside />}><section>{waiting()}</section></Loading>
+		</Reveal>
+		<ErrorPanel fallback={() => <strong />}><section><BrokenContent /></section></ErrorPanel>
+		<Web.For each={[]} fallback={<small />}>{() => null}</Web.For>
+		<Web.For each={["First"]} keyed={false}>{item => <label>{item()}</label>}</Web.For>
+		<Repeat count={1}><em /></Repeat>
+		<Switch>
+			<Match when={true}><span>Ready</span></Match>
+		</Switch>
+		<Web.NoHydration><time /></Web.NoHydration>
+		<Web.Dynamic component="output" />
+		<Show />
+		<Web.Show
+			{...{ fallback: <nav /> }}
+			when={false}
+			fallback={undefined}
+			children={null}
+		/>
+	</project-card>
+}
+
+export const render = () => <ProjectCard />

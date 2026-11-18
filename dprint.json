@@ -13,6 +13,7 @@
 		"**/*.gen.ts",
 		"**/*.gen.tsx",
 		"**/pnpm-lock.yaml",
+		"**/package-lock.json",
 		"**/*.scss",
 		"**/*.tsdoc.json",
 		"**/.astro/**",

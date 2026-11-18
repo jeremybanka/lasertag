@@ -69,6 +69,20 @@ directly exported named declarations by default. Set
 `checkAllComponentFunctions: true` to apply the component-named root convention
 to every PascalCase component function, including local components.
 
+## Solid JSX
+
+Add `lasertag/css-modules` and the Solid declaration entry point to your
+project's declaration file. Both Solid versions use `jsx: "preserve"` and
+`class={css.class}` on the component's custom root.
+
+| Solid version | Declaration import       | `jsxImportSource` |
+| ------------- | ------------------------ | ----------------- |
+| Solid 1       | `lasertag/solid-jsx`     | `solid-js`        |
+| Solid 2       | `lasertag/solid-web-jsx` | `@solidjs/web`    |
+
+Install `@solidjs/web` alongside `solid-js` in a Solid 2 web project and use
+its matching JSX compiler.
+
 ## Hono JSX
 
 Hono components use the same sibling CSS Modules and named custom roots as
@@ -268,7 +282,8 @@ matching `jsxImportSource` or leading file directive if those external tools
 provide the consumer. Bare `preserve`, inferred TypeScript project defaults,
 and React imports alone do not establish React semantics. Other import sources,
 including React-compatible providers, retain conservative intrinsic children
-analysis; Solid's supported undefined fallthrough remains intact.
+analysis. Solid 1 component props allow undefined to fall through to a spread.
+Solid 2 component props use the last explicit value, including undefined.
 
 Broad descendant selectors are valid in dead-end components whose matching
 subtree is entirely defined in the same file. Ownership analysis is
@@ -461,5 +476,6 @@ lasertag ships JSX intrinsic element types for React, Preact, Solid, and Hono. E
 
 - `lasertag/react-jsx`
 - `lasertag/preact-jsx`
-- `lasertag/solid-jsx`
+- `lasertag/solid-jsx` for Solid 1
+- `lasertag/solid-web-jsx` for Solid 2 with `@solidjs/web`
 - `lasertag/hono-jsx`

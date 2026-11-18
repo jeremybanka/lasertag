@@ -1,0 +1,13 @@
+/** @jsxImportSource solid-js */
+import { Index, Show } from "solid-js"
+
+const css = { class: "class" }
+
+export function ProjectCard() {
+	return <project-card class={css.class}>
+		<Show when={true}><span>Ready</span></Show>
+		<Index each={[1]}>{() => <aside />}</Index>
+	</project-card>
+}
+
+export const render = () => <ProjectCard />

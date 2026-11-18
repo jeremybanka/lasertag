@@ -1,0 +1,82 @@
+import assert from "node:assert/strict"
+import { spawnSync } from "node:child_process"
+import { readFileSync, writeFileSync } from "node:fs"
+import { createRequire } from "node:module"
+import path from "node:path"
+import { test } from "node:test"
+
+import { transformSync } from "@babel/core"
+import { validateCssReachability } from "lasertag/refractor"
+
+const require = createRequire(import.meta.url)
+const { version } = require("solid-js/package.json")
+const solid2 = version.startsWith("2.")
+const fixtures = "tests/public/peer/solid"
+const renderer = solid2 ? "@solidjs/web" : "solid-js/web"
+
+test(`Solid ${version} checks the published JSX declarations`, () => {
+	if (solid2) {
+		writeFileSync(
+			`${fixtures}/ProjectCard.tsx`,
+			readFileSync(`${fixtures}/ProjectCard.tsx.fixture`),
+		)
+	}
+	const config = solid2
+		? `${fixtures}/tsconfig.json`
+		: "tests/public/types/fixtures/solid/tsconfig.json"
+	const result = spawnSync(
+		process.execPath,
+		[
+			path.join(path.dirname(require.resolve("typescript/package.json")), "bin/tsc"),
+			"--project", config, "--skipLibCheck", "false",
+		],
+		{ encoding: "utf8" },
+	)
+	assert.ifError(result.error)
+	assert.equal(result.status, 0, result.stdout + result.stderr)
+})
+
+test(`Solid ${version} SSR and Lasertag agree on rendered CSS paths`, async () => {
+	const basename = solid2 ? "solid-2" : "solid-1"
+	const source = readFileSync(`${fixtures}/${basename}.tsx.fixture`, "utf8")
+	const compiler = solid2 ? "@solidjs/babel-plugin" : "babel-preset-solid"
+	const ssr = [require.resolve(compiler), { generate: "ssr", hydratable: false }]
+	const compiled = transformSync(source, {
+		filename: `${basename}.jsx`,
+		babelrc: false,
+		configFile: false,
+		...(solid2 ? { plugins: [ssr] } : { presets: [ssr] }),
+	})
+	assert.ok(compiled?.code)
+	const executable = compiled.code.replace(
+		/from "(solid-js(?:\/web)?|@solidjs\/web)"/g,
+		(_, specifier) => `from ${JSON.stringify(import.meta.resolve(specifier))}`,
+	)
+	const moduleUrl = `data:text/javascript;base64,${Buffer.from(executable).toString("base64")}`
+	const { render } = await import(moduleUrl)
+	const { renderToString } = await import(renderer)
+	const html = renderToString(render)
+	const rootClass = solid2 ? "class ready" : "class"
+	assert.match(html, new RegExp(`^<project-card\\b[^>]*class="${rootClass}\\s*"[^>]*>`))
+	assert.match(html, /<span>Ready<\/span>/)
+	const liveTags = solid2
+		? ["aside", "strong", "small", "label", "em", "time", "output", "mark"]
+		: ["aside"]
+	for (const tag of liveTags) assert.match(html, new RegExp(`<${tag}[ >]`))
+	assert.doesNotMatch(html, /<nav[ >]/)
+
+	const css = [
+		"project-card.class {",
+		...["span", ...liveTags, "nav"].map((tag) => `> ${tag} {}`),
+		"}",
+	].join("\n")
+	const { diagnostics } = validateCssReachability({
+		tsxSource: source,
+		cssSource: css,
+		componentName: "ProjectCard",
+	})
+	assert.deepEqual(
+		diagnostics.map(({ code, selector }) => ({ code, selector })),
+		[{ code: "dead-selector", selector: "project-card.class > nav" }],
+	)
+})

@@ -2,6 +2,7 @@
 	"version": "0.2",
 	"useGitignore": true,
 	"ignorePaths": [
+		"**/package-lock.json",
 		"assets/brand/lasertag.ai",
 		"pnpm-lock.yaml",
 		".correctly/**"
@@ -42,6 +43,7 @@
 		"reparsing",
 		"seagreen",
 		"selectedcontent",
+		"solidjs",
 		"subclassing",
 		"tagless",
 		"Takua",

@@ -1,6 +1,7 @@
 node_modules/
 dist/
 artifacts/
+packages/lasertag/peer-environments/*/test/
 .mise/
 .pnpm-home/
 .pnpm-store/

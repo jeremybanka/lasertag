@@ -69,19 +69,23 @@ reports `invalid-adoption-directive`. The language server publishes these
 adoption diagnostics on the render-source comment rather than at an unrelated
 CSS location.
 
-For Solid TSX, Refractor recognizes imports from `solid-js` and lowers `Show`,
-`For`, `Index`, `Switch`/`Match`, `ErrorBoundary`, `Suspense`, and
-`SuspenseList` into their possible child branches. It also recognizes `Dynamic`
-and `NoHydration` from `solid-js/web`. Aliased and namespace imports work;
-similarly named user components are not given Solid semantics. Dynamic values
-remain opaque. Recognized portal-style, out-of-tree rendering is excluded from
-the component's descendant story.
+Refractor recognizes Solid 1's `Show`, `For`, `Index`, `Switch`/`Match`,
+`ErrorBoundary`, `Suspense`, and `SuspenseList` from `solid-js`, plus
+`Dynamic` and `NoHydration` from `solid-js/web`. For Solid 2 it recognizes
+`Show`, `For`, `Switch`/`Match`, `Repeat`, `Loading`, `Errored`,
+`Reveal`, `Hydration`, and `NoHydration` from `solid-js` or `@solidjs/web`,
+plus `Dynamic` from `@solidjs/web`. Declare `@solidjs/web` as the JSX import
+source so Refractor can recognize compiler-provided tags and apply Solid 2 prop
+precedence to shared imports from `solid-js`. Named aliases, namespace imports,
+and local components keep their lexical bindings. Unresolved dynamic rendering
+remains opaque.
 
 Intrinsic elements and supported framework components account for explicit
 `children` props and spreads as well as JSX bodies. Solid component bodies
 discard explicit children attributes even when the body contains only comments
-or formatting whitespace; spread children may still render. `For` and `Index`
-use the same effective-prop resolution before analyzing their render functions.
+or formatting whitespace. Spread children may still render when they supply
+the effective prop. `For`, `Index`, and `Repeat` use effective prop resolution
+when analyzing their render functions.
 `Switch` applies its `Match` analysis to directly authored JSX in either its body
 or its effective `children` attribute, preserving local ownership. Unresolved
 children values and relevant spreads retain uncertainty.

@@ -9,6 +9,24 @@ const config: BreakageConfig = defineConfig({
 		resolveDelta: changesetsReleaseDelta(),
 		policy: semverPolicy({ beforeV1: "minor" }),
 	},
+	npm: {
+		artifact: "artifacts/lasertag.tgz",
+		representatives: "peer-environments/solid-*",
+		lockfile: "package-lock.json",
+		prepareCommand:
+			"npm ci --ignore-scripts --workspaces=false --no-audit --no-fund",
+		suites: {
+			"solid-js": {
+				files: [
+					"tests/public/peer/solid/*",
+					"tests/public/types/fixtures/solid/*",
+				],
+				command:
+					"node --input-type=module-typescript < tests/public/peer/solid/contract.ts.fixture",
+			},
+		},
+		baseline: { tagPattern: "refs/tags/lasertag@" },
+	},
 })
 
 export default config

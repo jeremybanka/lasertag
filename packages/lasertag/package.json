@@ -23,6 +23,9 @@
 		"./solid-jsx": {
 			"types": "./src/types/solid-jsx-intrinsic-elements.d.ts"
 		},
+		"./solid-web-jsx": {
+			"types": "./src/types/solid-web-jsx-intrinsic-elements.d.ts"
+		},
 		"./hono-jsx": {
 			"types": "./src/types/hono-jsx-intrinsic-elements.d.ts"
 		},
@@ -62,6 +65,7 @@
 		"check:eslint": "eslint",
 		"test": "vp test",
 		"test:breakage": "breakage breakage.config.ts --verbose",
+		"test:breakage:npm": "pnpm run build && pnpm pack --out artifacts/lasertag.tgz --silent && breakage npm check --config breakage.config.ts",
 		"test:private": "vp test tests/private",
 		"test:public": "vp test tests/public",
 		"test:watch": "vp test watch"
@@ -98,9 +102,10 @@
 		"hono": "4.13.19",
 		"jiti": "2.7.0",
 		"preact": "11.2.0",
-		"solid-js": "2.0.0"
+		"solid-js": "1.9.19"
 	},
 	"peerDependencies": {
+		"@solidjs/web": "^2.0.0",
 		"@types/react": "^19.2",
 		"eslint": "^10.4",
 		"hono": "^4.13.8",
@@ -108,6 +113,9 @@
 		"solid-js": "^1.9 || ^2.0.0"
 	},
 	"peerDependenciesMeta": {
+		"@solidjs/web": {
+			"optional": true
+		},
 		"@types/react": {
 			"optional": true
 		},
