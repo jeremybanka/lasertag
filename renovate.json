@@ -34,6 +34,30 @@
 	],
 	"packageRules": [
 		{
+			"description": "Keep the workspace Solid tests and Solid 1 peer environment on the Solid 1 toolchain",
+			"matchManagers": ["npm"],
+			"matchFileNames": [
+				"packages/lasertag/package.json",
+				"packages/lasertag/peer-environments/solid-1/package.json"
+			],
+			"matchDepTypes": ["dependencies", "devDependencies"],
+			"matchPackageNames": ["solid-js", "babel-preset-solid"],
+			"allowedVersions": "1.x"
+		},
+		{
+			"description": "Keep the Solid 2 peer environment on the Solid 2 toolchain",
+			"matchManagers": ["npm"],
+			"matchFileNames": [
+				"packages/lasertag/peer-environments/solid-2/package.json"
+			],
+			"matchPackageNames": [
+				"solid-js",
+				"@solidjs/web",
+				"@solidjs/babel-plugin"
+			],
+			"allowedVersions": "2.x"
+		},
+		{
 			"groupName": "atom.io",
 			"matchPackageNames": ["atom.io", "@atom.io/*"],
 			"separateMajorMinor": false,
