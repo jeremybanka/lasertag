@@ -1616,9 +1616,13 @@ type RenderPropSemantics = {
 	bodyDiscardsChildrenAttribute?: boolean
 }
 
-const SOLID_RENDER_PROPS: RenderPropSemantics = {
+const SOLID_1_RENDER_PROPS: RenderPropSemantics = {
 	allowFunction: true,
 	undefinedFallsThrough: true,
+	bodyDiscardsChildrenAttribute: true,
+}
+const SOLID_2_RENDER_PROPS: RenderPropSemantics = {
+	allowFunction: true,
 	bodyDiscardsChildrenAttribute: true,
 }
 
@@ -1717,7 +1721,7 @@ function resolveJsxProp(
 			(initializer.expression && isDefinitelyDefined(initializer.expression))
 		)
 			break
-		// Solid mergeProps skips undefined between prop sources, so an earlier
+		// Solid 1 mergeProps skips undefined between prop sources, so an earlier
 		// spread can remain live even after an explicit attribute or JSX body.
 	}
 	return {
@@ -1916,25 +1920,18 @@ function analyzeTransparentChildren(
 	return analyzeJsxRenderProp(context, node, `children`, stack, semantics) ?? []
 }
 
-function analyzeSolidTransparentChildren(
-	context: AnalyzeContext,
-	node: ComponentJsxNode,
-	stack: string[],
-): StoryChild[] {
-	return analyzeTransparentChildren(context, node, stack, SOLID_RENDER_PROPS)
-}
-
 function analyzeSolidRepeatedChildren(
 	context: AnalyzeContext,
 	node: ComponentJsxNode,
 	stack: string[],
+	semantics: RenderPropSemantics,
 ): StoryChild[] {
 	const analyzedChildren = analyzeJsxRenderProp(
 		context,
 		node,
 		`children`,
 		stack,
-		SOLID_RENDER_PROPS,
+		semantics,
 		(child) => {
 			if (ts.isJsxText(child)) return []
 			if (ts.isJsxExpression(child) && !child.expression) return []
@@ -1969,20 +1966,63 @@ function analyzeSolidFallback(
 	context: AnalyzeContext,
 	node: ComponentJsxNode,
 	stack: string[],
+	semantics: RenderPropSemantics,
 ): StoryChild[] | undefined {
-	return analyzeJsxRenderProp(
-		context,
-		node,
-		`fallback`,
-		stack,
-		SOLID_RENDER_PROPS,
+	return analyzeJsxRenderProp(context, node, `fallback`, stack, semantics)
+}
+
+const solidWebAutoImports = new Set([
+	`Show`,
+	`For`,
+	`Repeat`,
+	`Switch`,
+	`Match`,
+	`Loading`,
+	`Errored`,
+	`Reveal`,
+	`Dynamic`,
+])
+const solid2OnlyCoreComponents = new Set([
+	`Repeat`,
+	`Loading`,
+	`Errored`,
+	`Reveal`,
+	`NoHydration`,
+	`Hydration`,
+])
+
+function usesSolidWebJsx(context: AnalyzeContext): boolean {
+	return (
+		context.jsxFactory.kind === `automatic` &&
+		context.jsxFactory.importSource === `@solidjs/web`
 	)
+}
+
+function resolveSolidBinding(
+	context: AnalyzeContext,
+	tag: ts.JsxTagNameExpression,
+): ImportBinding | undefined {
+	if (hasShadowedBinding(context, tag)) return
+	const binding = resolveIndexedImportBinding(context, tag)
+	if (binding) return binding
+	if (
+		usesSolidWebJsx(context) &&
+		ts.isIdentifier(tag) &&
+		solidWebAutoImports.has(tag.text) &&
+		!resolveDeclarations(context, tag).some(
+			(declaration) =>
+				declaration.getSourceFile().fileName === context.sourceFile.fileName,
+		)
+	) {
+		return { moduleName: `@solidjs/web`, importedName: tag.text }
+	}
 }
 
 function analyzeSolidSwitchAlternatives(
 	context: AnalyzeContext,
 	children: readonly ts.JsxChild[],
 	stack: string[],
+	semantics: RenderPropSemantics,
 ): StoryChild[][] {
 	const alternatives: StoryChild[][] = []
 
@@ -1994,20 +2034,26 @@ function analyzeSolidSwitchAlternatives(
 
 		if (ts.isJsxFragment(child)) {
 			alternatives.push(
-				...analyzeSolidSwitchAlternatives(context, child.children, stack),
+				...analyzeSolidSwitchAlternatives(
+					context,
+					child.children,
+					stack,
+					semantics,
+				),
 			)
 			continue
 		}
 
 		if (ts.isJsxElement(child) || ts.isJsxSelfClosingElement(child)) {
-			const binding = resolveImportBinding(context, jsxTagName(child))
+			const binding = resolveSolidBinding(context, jsxTagName(child))
 
 			if (
-				binding?.moduleName === `solid-js` &&
-				binding.importedName === `Match`
+				binding?.importedName === `Match` &&
+				(binding.moduleName === `solid-js` ||
+					binding.moduleName === `@solidjs/web`)
 			) {
 				alternatives.push(
-					analyzeSolidTransparentChildren(context, child, stack),
+					analyzeTransparentChildren(context, child, stack, semantics),
 				)
 				continue
 			}
@@ -2059,17 +2105,30 @@ function lowerSolidComponent(
 	node: ComponentJsxNode,
 	stack: string[],
 ): StoryChild[] | undefined {
-	const binding = resolveImportBinding(context, jsxTagName(node))
+	const binding = resolveSolidBinding(context, jsxTagName(node))
 
 	if (!binding) return
+	const { importedName, moduleName } = binding
+	const solid2 =
+		moduleName === `@solidjs/web` ||
+		(moduleName === `solid-js` &&
+			(usesSolidWebJsx(context) || solid2OnlyCoreComponents.has(importedName)))
+	const semantics = solid2 ? SOLID_2_RENDER_PROPS : SOLID_1_RENDER_PROPS
 
-	if (binding.moduleName === `solid-js`) {
-		if (binding.importedName === `Show`) {
+	if (moduleName === `solid-js` || moduleName === `@solidjs/web`) {
+		if (
+			importedName === `Show` ||
+			(solid2
+				? importedName === `Loading` ||
+					importedName === `Errored` ||
+					importedName === `Repeat`
+				: importedName === `ErrorBoundary` || importedName === `Suspense`)
+		) {
 			return [
 				choice(
 					[
-						analyzeSolidTransparentChildren(context, node, stack),
-						analyzeSolidFallback(context, node, stack) ?? [],
+						analyzeTransparentChildren(context, node, stack, semantics),
+						analyzeSolidFallback(context, node, stack, semantics) ?? [],
 					],
 					context.sourceFile,
 					node,
@@ -2077,12 +2136,12 @@ function lowerSolidComponent(
 			]
 		}
 
-		if (binding.importedName === `For` || binding.importedName === `Index`) {
+		if (importedName === `For` || (!solid2 && importedName === `Index`)) {
 			return [
 				choice(
 					[
-						analyzeSolidRepeatedChildren(context, node, stack),
-						analyzeSolidFallback(context, node, stack) ?? [],
+						analyzeSolidRepeatedChildren(context, node, stack, semantics),
+						analyzeSolidFallback(context, node, stack, semantics) ?? [],
 					],
 					context.sourceFile,
 					node,
@@ -2090,13 +2149,8 @@ function lowerSolidComponent(
 			]
 		}
 
-		if (binding.importedName === `Switch`) {
-			const childrenProp = resolveJsxProp(
-				context,
-				node,
-				`children`,
-				SOLID_RENDER_PROPS,
-			)
+		if (importedName === `Switch`) {
+			const childrenProp = resolveJsxProp(context, node, `children`, semantics)
 			const initializer = childrenProp.attribute?.initializer
 			const expression =
 				initializer && ts.isJsxExpression(initializer) && initializer.expression
@@ -2115,6 +2169,7 @@ function lowerSolidComponent(
 				context,
 				childrenProp.body ?? explicitChildren ?? [],
 				stack,
+				semantics,
 			)
 			if (
 				!hasMeaningfulJsxChildren(childrenProp.body ?? []) &&
@@ -2126,43 +2181,33 @@ function lowerSolidComponent(
 				])
 			}
 
-			alternatives.push(analyzeSolidFallback(context, node, stack) ?? [])
+			alternatives.push(
+				analyzeSolidFallback(context, node, stack, semantics) ?? [],
+			)
 
 			return [choice(alternatives, context.sourceFile, node)]
 		}
 
 		if (
-			binding.importedName === `ErrorBoundary` ||
-			binding.importedName === `Suspense`
+			solid2
+				? importedName === `Reveal` ||
+					importedName === `NoHydration` ||
+					importedName === `Hydration`
+				: importedName === `SuspenseList`
 		) {
-			return [
-				choice(
-					[
-						analyzeSolidTransparentChildren(context, node, stack),
-						analyzeSolidFallback(context, node, stack) ?? [],
-					],
-					context.sourceFile,
-					node,
-				),
-			]
+			return analyzeTransparentChildren(context, node, stack, semantics)
 		}
-
-		if (binding.importedName === `SuspenseList`) {
-			return analyzeSolidTransparentChildren(context, node, stack)
-		}
-
-		return
 	}
 
 	if (
-		binding.moduleName === `solid-js/web` &&
-		binding.importedName === `Dynamic`
+		(moduleName === `solid-js/web` || moduleName === `@solidjs/web`) &&
+		importedName === `Dynamic`
 	) {
 		const { attribute: componentAttribute, unknownSpread } = resolveJsxProp(
 			context,
 			node,
 			`component`,
-			SOLID_RENDER_PROPS,
+			semantics,
 		)
 		const componentValue =
 			componentAttribute && !unknownSpread
@@ -2178,7 +2223,7 @@ function lowerSolidComponent(
 				createStoryNode(
 					context,
 					componentValue.tagName,
-					analyzeSolidTransparentChildren(context, node, stack),
+					analyzeTransparentChildren(context, node, stack, semantics),
 					rangeOf(context.sourceFile, componentAttribute ?? node),
 					jsxAttributes(node),
 					new Set([`component`]),
@@ -2195,11 +2240,8 @@ function lowerSolidComponent(
 		]
 	}
 
-	if (
-		binding.moduleName === `solid-js/web` &&
-		binding.importedName === `NoHydration`
-	) {
-		return analyzeSolidTransparentChildren(context, node, stack)
+	if (moduleName === `solid-js/web` && importedName === `NoHydration`) {
+		return analyzeTransparentChildren(context, node, stack, semantics)
 	}
 }
 

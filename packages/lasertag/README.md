@@ -36,7 +36,9 @@ import "lasertag/css-modules"
 import "lasertag/react-jsx"
 ```
 
-Use `lasertag/preact-jsx` or `lasertag/solid-jsx` instead for Preact or Solid.
+Use `lasertag/preact-jsx` for Preact, `lasertag/solid-jsx` for Solid 1, or
+`lasertag/solid-web-jsx` for Solid 2 with `@solidjs/web`. See the
+[Solid setup](docs/lasertag-guide.md#solid-jsx) for the matching JSX settings.
 For Hono, use `lasertag/hono-jsx` with `jsxImportSource: "hono/jsx"` and
 `class={css.class}`. See the [Hono guide](docs/lasertag-guide.md#hono-jsx)
 and [example](examples/hono) for server rendering and HTML fragments.

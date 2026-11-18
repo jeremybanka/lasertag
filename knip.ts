@@ -36,6 +36,8 @@ export default {
 				"{benchmarks,examples,tests}/**/*.{ts,tsx}",
 			],
 			ignoreDependencies: [
+				// Only consumers of the Solid 2 JSX declaration need this peer.
+				"@solidjs/web",
 				// The VSIX builder resolves the packaging CLI through a computed path.
 				"@vscode/vsce",
 				// Provided by the VS Code extension host.

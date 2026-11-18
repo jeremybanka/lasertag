@@ -48,4 +48,6 @@ catalog:
   vite: npm:@voidzero-dev/vite-plus-core@8.3.8000
   vite-plus: 1.7.0
 overrides:
+  # The workspace runs Solid 1 contracts. The Solid 2 npm environment owns its renderer.
+  "lasertag>@solidjs/web": "-"
   vite@*: "catalog:"

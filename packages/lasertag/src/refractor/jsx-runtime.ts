@@ -81,7 +81,11 @@ export function resolveJsxRuntime(
 	if (factory.kind === `unknown`) return `unknown`
 	if (factory.kind === `automatic`) {
 		if (factory.importSource === `react`) return `react`
-		if (factory.importSource === `solid-js`) return `solid`
+		if (
+			factory.importSource === `solid-js` ||
+			factory.importSource === `@solidjs/web`
+		)
+			return `solid`
 		return `unknown`
 	}
 

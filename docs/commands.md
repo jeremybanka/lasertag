@@ -4,23 +4,28 @@ Run these commands from the repository root with `pnpm run <command>`. `mise.tom
 
 Following the [mise Node.js cookbook](https://mise.jdx.dev/mise-cookbook/nodejs.html#add-node-modules-binaries-to-the-path), mise adds the repository root’s `node_modules/.bin` to `PATH`. With shell activation or `mise exec -- <tool>`, installed dependency CLIs are available from the root and package directories.
 
-| Command            | Contract                                                                                                           |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------ |
-| `fmt`              | Apply the repository formatting policy.                                                                            |
-| `check:fmt`        | Validate formatting without rewriting maintained files; language-specific validators are listed below.             |
-| `check`            | Run every static check listed below. Generated prerequisites and caches may be written; source fixes are explicit. |
-| `test`             | Run the normal test suite once and return a failing status when tests fail.                                        |
-| `test:breakage`    | Replay the latest released public consumer contracts against current source.                                       |
-| `test:watch`       | Watch the available interactive test suites.                                                                       |
-| `build`            | Build distributable artifacts.                                                                                     |
-| `change`           | Author pending release notes.                                                                                      |
-| `release:version`  | Prepare versions and release metadata without publishing.                                                          |
-| `release:publish`  | Build as required by the release pipeline and publish packages.                                                    |
-| `workflows:update` | Update pinned workflow tooling references.                                                                         |
+| Command             | Contract                                                                                                           |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `fmt`               | Apply the repository formatting policy.                                                                            |
+| `check:fmt`         | Validate formatting without rewriting maintained files; language-specific validators are listed below.             |
+| `check`             | Run every static check listed below. Generated prerequisites and caches may be written; source fixes are explicit. |
+| `test`              | Run the normal test suite once and return a failing status when tests fail.                                        |
+| `test:breakage`     | Replay the latest released public consumer contracts against current source.                                       |
+| `test:breakage:npm` | Build and pack Lasertag, then test its public API with the pinned Solid 1 and Solid 2 peer environments.           |
+| `test:watch`        | Watch the available interactive test suites.                                                                       |
+| `build`             | Build distributable artifacts.                                                                                     |
+| `change`            | Author pending release notes.                                                                                      |
+| `release:version`   | Prepare versions and release metadata without publishing.                                                          |
+| `release:publish`   | Build as required by the release pipeline and publish packages.                                                    |
+| `workflows:update`  | Update pinned workflow tooling references.                                                                         |
 
 ## Test execution
 
 CI runs `test` in four shards, each with at most two test workers because integration tests also start native compilers and content mapper processes. Reproduce one shard with `pnpm --filter lasertag run test --shard=1/4`. The aggregate `Vitest` check requires every shard to pass, including when a shard fails or is canceled. `test:breakage` retains the complete public compatibility suite and uses the same worker limit.
+
+The Breakage job also runs `test:breakage:npm`. It uses the npm lockfiles in
+`packages/lasertag/peer-environments/` to install each Solid toolchain and checks
+the packed Lasertag declarations and CSS reachability against compiled SSR.
 
 Tests that compare multiple real CLI or LSP sessions have an explicit 20-second scenario budget. Individual process and request deadlines, assertions, and production mapper timeouts remain unchanged; retries are not enabled.
 

@@ -178,6 +178,7 @@ catalogs:
       version: 1.7.0
 
 overrides:
+  lasertag>@solidjs/web: '-'
   vite@*: npm:@voidzero-dev/vite-plus-core@8.3.8000
 
 packageExtensionsChecksum: sha256-QRbB427jafr2uug/EWFsqEu7c3tQtQOSJcLU8vaXoEA=
@@ -3465,8 +3466,8 @@ packages:
     engines: {node: '>=10'}
     hasBin: true
 
-  seroval-plugins@1.6.8:
-    resolution: {integrity: sha512-N7mWAMydj89EnYTHtRpS3LBrAz3J9O6oVrqpuXuvlAHfAUG8WEKqtbAd7SBiJNY5NfCAFhSdyAh7wI4Shjqy4g==}
+  seroval-plugins@1.6.12:
+    resolution: {integrity: sha512-+reiwp/lYxiyctSrdvX7OQ1YLrcbWYgBiZrhSFL+V43b0/DGRLNVSDyZINbQe+tWplPOI2fw2dPrdv6hcc09kQ==}
     engines: {node: '>=10'}
     peerDependencies:
       seroval: ^1.0
@@ -6671,7 +6672,7 @@ snapshots:
 
   semver@7.8.6: {}
 
-  seroval-plugins@1.6.8(seroval@1.6.12):
+  seroval-plugins@1.6.12(seroval@1.6.12):
     dependencies:
       seroval: 1.6.12
 
@@ -6739,7 +6740,7 @@ snapshots:
     dependencies:
       csstype: 3.2.3
       seroval: 1.6.12
-      seroval-plugins: 1.6.8(seroval@1.6.12)
+      seroval-plugins: 1.6.12(seroval@1.6.12)
 
   source-map-js@1.2.2: {}
 

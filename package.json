@@ -22,6 +22,7 @@
 		"staged": "vp staged",
 		"test": "vp run -r test",
 		"test:breakage": "vp run -r --no-cache test:breakage",
+		"test:breakage:npm": "pnpm --filter lasertag run test:breakage:npm",
 		"test:watch": "vp run -r --parallel --no-cache test:watch",
 		"workflows:update": "./scripts/update-workflows.node.ts"
 	},
