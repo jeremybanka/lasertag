@@ -45,6 +45,15 @@
 			"allowedVersions": "1.x"
 		},
 		{
+			"description": "The Solid 1 peer environment uses babel-preset-solid, which requires Babel 7",
+			"matchManagers": ["npm"],
+			"matchFileNames": [
+				"packages/lasertag/peer-environments/solid-1/package.json"
+			],
+			"matchPackageNames": ["@babel/core"],
+			"allowedVersions": "7.x"
+		},
+		{
 			"description": "Keep the Solid 2 peer environment on the Solid 2 toolchain",
 			"matchManagers": ["npm"],
 			"matchFileNames": [
