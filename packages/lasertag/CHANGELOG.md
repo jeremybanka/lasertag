@@ -1,5 +1,11 @@
 # lasertag
 
+## 0.9.1
+
+### Patch Changes
+
+- 4321a05: Support Solid 2 alongside Solid 1 with JSX custom-element declarations for `@solidjs/web` and render-story analysis for Solid 2 control flow.
+
 ## 0.9.0
 
 ### Minor Changes
