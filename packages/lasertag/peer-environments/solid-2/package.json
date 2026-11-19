@@ -7,7 +7,7 @@
 		"@babel/core": "8.1.2",
 		"@solidjs/babel-plugin": "2.0.1",
 		"@solidjs/web": "2.0.0",
-		"solid-js": "2.0.0",
+		"solid-js": "2.0.1",
 		"typescript": "7.1.0-dev.20261117.1"
 	}
 }
