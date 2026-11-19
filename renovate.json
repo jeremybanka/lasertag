@@ -35,6 +35,7 @@
 	"packageRules": [
 		{
 			"description": "Keep the workspace Solid tests and Solid 1 peer environment on the Solid 1 toolchain",
+			"groupName": "Solid 1 toolchain",
 			"matchManagers": ["npm"],
 			"matchFileNames": [
 				"packages/lasertag/package.json",
@@ -55,6 +56,7 @@
 		},
 		{
 			"description": "Keep the Solid 2 peer environment on the Solid 2 toolchain",
+			"groupName": "Solid 2 toolchain",
 			"matchManagers": ["npm"],
 			"matchFileNames": [
 				"packages/lasertag/peer-environments/solid-2/package.json"
