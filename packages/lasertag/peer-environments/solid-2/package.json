@@ -6,8 +6,8 @@
 	"dependencies": {
 		"@babel/core": "8.1.2",
 		"@solidjs/babel-plugin": "2.0.2",
-		"@solidjs/web": "2.0.2",
-		"solid-js": "2.0.2",
+		"@solidjs/web": "2.0.3",
+		"solid-js": "2.0.3",
 		"typescript": "7.1.0-dev.20261119.1"
 	}
 }
