@@ -42,9 +42,9 @@
 		"typescript": "7.1.0-dev.20261121.1",
 		"vite-plus": "catalog:"
 	},
-	"packageManager": "pnpm@12.21.0",
+	"packageManager": "pnpm@12.23.0",
 	"engines": {
 		"node": "26.13.1",
-		"pnpm": "12.21.0"
+		"pnpm": "12.23.0"
 	}
 }
