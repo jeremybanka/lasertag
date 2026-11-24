@@ -324,8 +324,8 @@ importers:
         specifier: 10.15.0
         version: 10.15.0(jiti@2.7.0)(supports-color@7.2.0)
       hono:
-        specifier: 4.13.20
-        version: 4.13.20
+        specifier: 4.13.21
+        version: 4.13.21
       jiti:
         specifier: 2.7.0
         version: 2.7.0
@@ -2950,8 +2950,8 @@ packages:
     resolution: {integrity: sha512-T2UbfbBEF32wiepXIsMlTW9+dDYC6wMh/t/vYA4tuOMKqWz/n3vr1NFSxQiyP+zk2mXsoMA/i/7qV6LKut1t1A==}
     engines: {node: '>= 0.4'}
 
-  hono@4.13.20:
-    resolution: {integrity: sha512-xo6gecEJQ+CjTtOUUbcLHE8CdRKMeF4qITe+DT+OhFnSUmZR/ZBa9XavAfiGh4HlukmlaHFdaK4dz5tkTYFNmA==}
+  hono@4.13.21:
+    resolution: {integrity: sha512-h9UsguqfVk4kjUwLvQpHOmOaJpW10jz9lp8bvKUUa04wJG/fabKFBqXZ06D6LFaeKQZtUZRVeg0gfkTTEsX7Mw==}
     engines: {node: '>=16.9.0'}
 
   hookified@1.15.1:
@@ -6133,7 +6133,7 @@ snapshots:
     dependencies:
       function-bind: 1.1.2
 
-  hono@4.13.20: {}
+  hono@4.13.21: {}
 
   hookified@1.15.1: {}
 
