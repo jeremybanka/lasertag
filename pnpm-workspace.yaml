@@ -45,8 +45,8 @@ peerDependencyRules:
   allowedVersions:
     typescript: ^5.0.0 || ^6.0.0 || ^7.0.0 || 7.1.0-beta
 catalog:
-  vite: npm:@voidzero-dev/vite-plus-core@8.3.8000
-  vite-plus: 1.7.0
+  vite: npm:@voidzero-dev/vite-plus-core@8.3.8001
+  vite-plus: 1.8.0
 overrides:
   # The workspace runs Solid 1 contracts. The Solid 2 npm environment owns its renderer.
   "lasertag>@solidjs/web": "-"
