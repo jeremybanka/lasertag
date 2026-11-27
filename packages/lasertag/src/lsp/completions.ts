@@ -23,8 +23,27 @@ type CompletionContext =
 	  }
 	| {
 			kind: `selector`
+			refinementTarget: RefinementTarget
 			selectorTexts: string[]
 	  }
+
+/**
+ * What a pseudo refinement typed at the cursor would qualify.
+ * - `compound`: the compound the cursor is continuing.
+ * - `parent`: nothing yet, at the start of a nested selector, where `&` names
+ *   the parent element.
+ * - `none`: nothing, so the refinement alone would be a segment without a tag.
+ */
+type RefinementTarget = `compound` | `none` | `parent`
+
+type SelectorCursor = {
+	/** Whether the cursor is inside a style rule, so `&` has an element to name. */
+	isNested: boolean
+	/** The selectors the cursor may be continuing, flattened through parent rules. */
+	selectorTexts: string[]
+	/** The selector being typed, as written at its own nesting level. */
+	typedText: string
+}
 
 type SelectorPathContext = {
 	path: string[]
@@ -283,12 +302,9 @@ function childSelectorCompletionItems(tagNames: string[]): CompletionItem[] {
 function rootSelectorCompletionItems(
 	renderStory: RenderStory,
 ): CompletionItem[] {
-	return [
-		...rootTagNames(renderStory).map((tagName) =>
-			completionItem(`${tagName}.class`, CompletionItemKind.Class),
-		),
-		completionItem(`.class`, CompletionItemKind.Class),
-	]
+	return rootTagNames(renderStory).map((tagName) =>
+		completionItem(`${tagName}.class`, CompletionItemKind.Class),
+	)
 }
 
 function leadingColonCount(text: string): number {
@@ -325,20 +341,69 @@ function reuseTypedColons(
 	return { ...item, insertText: insertText.slice(removeCount) }
 }
 
-function refinementCompletionItems(typedColonCount: number): CompletionItem[] {
-	return [
-		...REFINEMENT_COMPLETIONS.map((label) =>
-			completionItem(label, CompletionItemKind.Keyword),
-		),
+/**
+ * `&:hover` and the like, for the start of a nested selector. Colons already
+ * typed there are replaced, because `&` has to come before them.
+ */
+function parentRefinementCompletionItem(
+	refinement: string,
+	sourceText: string,
+	offset: number,
+	typedColonCount: number,
+): CompletionItem {
+	const label = `&${refinement}`
+
+	if (typedColonCount === 0) {
+		return completionItem(label, CompletionItemKind.Keyword)
+	}
+
+	return {
+		filterText: refinement,
+		kind: CompletionItemKind.Keyword,
+		label,
+		textEdit: {
+			newText: label,
+			range: {
+				end: offsetToPosition(sourceText, offset),
+				start: offsetToPosition(sourceText, offset - typedColonCount),
+			},
+		},
+	}
+}
+
+function refinementCompletionItems(
+	sourceText: string,
+	offset: number,
+	refinementTarget: RefinementTarget,
+): CompletionItem[] {
+	const typedColonCount = trailingColonCount(sourceText, offset)
+	const continuesTypedColons = (text: string): boolean =>
+		typedColonCount < 2 || leadingColonCount(text) >= typedColonCount
+	const items = [
+		...(refinementTarget === `compound`
+			? REFINEMENT_COMPLETIONS.map((label) =>
+					completionItem(label, CompletionItemKind.Keyword),
+				)
+			: []),
 		...FUNCTIONAL_REFINEMENT_COMPLETIONS,
 		...GLOBAL_COMPLETIONS,
 	]
-		.filter(
-			(item) =>
-				typedColonCount < 2 ||
-				leadingColonCount(item.insertText ?? item.label) >= typedColonCount,
-		)
+		.filter((item) => continuesTypedColons(item.insertText ?? item.label))
 		.map((item) => reuseTypedColons(item, typedColonCount))
+
+	if (refinementTarget !== `parent`) return items
+
+	return [
+		...items,
+		...REFINEMENT_COMPLETIONS.filter(continuesTypedColons).map((refinement) =>
+			parentRefinementCompletionItem(
+				refinement,
+				sourceText,
+				offset,
+				typedColonCount,
+			),
+		),
+	]
 }
 
 function splitSelectorList(selector: string): string[] {
@@ -472,10 +537,91 @@ function currentSelectorListItem(
 	return options.preserveTrailingWhitespace ? text.trimStart() : text.trim()
 }
 
-function selectorContextsBeforeOffset(
+function stripComments(text: string): string {
+	return text.replaceAll(/\/\*[\s\S]*?\*\//g, ` `)
+}
+
+/**
+ * The compound the cursor is continuing: what a refinement typed there would
+ * qualify. Inside `:is(...)`, `:not(...)` and the like, that includes the
+ * compound the function is attached to, so `&:not(` continues `&`.
+ */
+function compoundBeforeCursor(selector: string): string {
+	const compounds = [``]
+	let bracketDepth = 0
+	let quote: `"` | `'` | undefined
+
+	for (let index = 0; index < selector.length; index += 1) {
+		const character = selector[index] ?? ``
+		const innermost = compounds.length - 1
+
+		if (quote) {
+			if (character === quote && selector[index - 1] !== `\\`) {
+				quote = undefined
+			}
+
+			continue
+		}
+
+		if (character === `"` || character === `'`) {
+			quote = character
+			continue
+		}
+
+		if (character === `[`) bracketDepth += 1
+
+		if (bracketDepth > 0) {
+			if (character === `]`) bracketDepth -= 1
+
+			compounds[innermost] += character
+			continue
+		}
+
+		if (character === `(`) {
+			// The function's name qualifies nothing; its argument continues the compound.
+			compounds[innermost] = (compounds[innermost] ?? ``).replace(
+				/::?[-\w]*$/,
+				``,
+			)
+			compounds.push(``)
+			continue
+		}
+
+		if (character === `)`) {
+			if (compounds.length > 1) {
+				compounds.pop()
+				compounds[compounds.length - 1] += `()`
+			}
+
+			continue
+		}
+
+		if (/[\s,>+~]/.test(character)) {
+			compounds[innermost] = ``
+			continue
+		}
+
+		compounds[innermost] += character
+	}
+
+	return compounds.join(``)
+}
+
+function refinementTargetAtCursor({
+	isNested,
+	typedText,
+}: SelectorCursor): RefinementTarget {
+	const beforeTypedColons = typedText.replace(/:+$/, ``)
+
+	if (compoundBeforeCursor(beforeTypedColons).length > 0) return `compound`
+
+	return isNested && beforeTypedColons.trim().length === 0 ? `parent` : `none`
+}
+
+function selectorCursorBeforeOffset(
 	sourceText: string,
 	offset: number,
-): string[] {
+): SelectorCursor {
 	const stack: Array<string | null> = []
 	let preludeStart = 0
 	let quote: `"` | `'` | undefined
@@ -500,14 +646,18 @@ function selectorContextsBeforeOffset(
 		if (character === `/` && sourceText[index + 1] === `*`) {
 			const commentEnd = sourceText.indexOf(`*/`, index + 2)
 
-			if (commentEnd === -1 || commentEnd >= offset) return []
+			if (commentEnd === -1 || commentEnd >= offset) {
+				return { isNested: false, selectorTexts: [], typedText: `` }
+			}
 
 			index = commentEnd + 1
 			continue
 		}
 
 		if (character === `{`) {
-			const selector = sourceText.slice(preludeStart, index).trim()
+			const selector = stripComments(
+				sourceText.slice(preludeStart, index),
+			).trim()
 			stack.push(selector.startsWith(`@`) ? null : selector)
 			preludeStart = index + 1
 			continue
@@ -536,20 +686,27 @@ function selectorContextsBeforeOffset(
 		)
 	}
 
-	const currentSelector = currentSelectorListItem(
-		sourceText.slice(preludeStart, offset),
+	const typedText = currentSelectorListItem(
+		stripComments(sourceText.slice(preludeStart, offset)),
 		{ preserveTrailingWhitespace: true },
 	)
+	const isNested = stack.some((selector) => selector !== null)
 
-	if (!currentSelector.trim()) return selectors
+	if (!typedText.trim()) {
+		return { isNested, selectorTexts: selectors, typedText }
+	}
 
-	const hasTrailingWhitespace = /\s$/.test(currentSelector)
+	const hasTrailingWhitespace = /\s$/.test(typedText)
 
-	return selectors.map((parentSelector) => {
-		const combinedSelector = combineSelectors(parentSelector, currentSelector)
+	return {
+		isNested,
+		selectorTexts: selectors.map((parentSelector) => {
+			const combinedSelector = combineSelectors(parentSelector, typedText)
 
-		return hasTrailingWhitespace ? `${combinedSelector} ` : combinedSelector
-	})
+			return hasTrailingWhitespace ? `${combinedSelector} ` : combinedSelector
+		}),
+		typedText,
+	}
 }
 
 function stripBalancedSections(
@@ -721,9 +878,12 @@ function attributeCompletionContext(
 
 	const attributeText = prefix.slice(openBracketIndex + 1)
 	const equalsIndex = attributeText.indexOf(`=`)
-	const selectors = selectorContextsBeforeOffset(sourceText, openBracketIndex)
+	const { selectorTexts } = selectorCursorBeforeOffset(
+		sourceText,
+		openBracketIndex,
+	)
 	const tagNames = uniqueSorted(
-		selectors.flatMap(
+		selectorTexts.flatMap(
 			(selector) => tokenizeSelectorTags(selector).at(-1) ?? [],
 		),
 	)
@@ -741,12 +901,17 @@ function completionContext(
 	sourceText: string,
 	offset: number,
 ): CompletionContext {
-	return (
-		attributeCompletionContext(sourceText, offset) ?? {
-			kind: `selector`,
-			selectorTexts: selectorContextsBeforeOffset(sourceText, offset),
-		}
-	)
+	const attributeContext = attributeCompletionContext(sourceText, offset)
+
+	if (attributeContext) return attributeContext
+
+	const selectorCursor = selectorCursorBeforeOffset(sourceText, offset)
+
+	return {
+		kind: `selector`,
+		refinementTarget: refinementTargetAtCursor(selectorCursor),
+		selectorTexts: selectorCursor.selectorTexts,
+	}
 }
 
 function nodesForTagNames(
@@ -835,8 +1000,12 @@ function selectorTagItems(
 function selectorItems(
 	renderStory: RenderStory,
 	selectorTexts: string[],
-	typedColonCount: number,
+	refinementItems: CompletionItem[],
+	hasTypedColon: boolean,
 ): CompletionItem[] {
+	// A tag cannot follow a colon, so only refinements complete one.
+	if (hasTypedColon) return uniqueCompletionItems(refinementItems)
+
 	const selectorContexts = selectorTexts.map(selectorPathContext)
 	const tagItems =
 		selectorContexts.length === 0
@@ -845,10 +1014,7 @@ function selectorItems(
 					selectorTagItems(renderStory, context),
 				)
 
-	return uniqueCompletionItems([
-		...tagItems,
-		...refinementCompletionItems(typedColonCount),
-	])
+	return uniqueCompletionItems([...tagItems, ...refinementItems])
 }
 
 function uniqueCompletionItems(items: CompletionItem[]): CompletionItem[] {
@@ -895,7 +1061,8 @@ export function createCssModuleCompletionItems({
 			return selectorItems(
 				renderStory,
 				context.selectorTexts,
-				trailingColonCount(sourceText, offset),
+				refinementCompletionItems(sourceText, offset, context.refinementTarget),
+				trailingColonCount(sourceText, offset) > 0,
 			)
 	}
 }

@@ -395,7 +395,9 @@ The server provides:
 - `disable-explanation-too-short`, `unused-disable`, and `unused-enable`
   diagnostics for invalid or redundant suppression regions
 - an `ambiguous-render-source` error when both source siblings exist
-- render-aware selector, attribute, refinement, and diagnostic-directive completions
+- render-aware selector, attribute, refinement, and diagnostic-directive completions;
+  none writes a selector segment without a tag, so a pseudo refinement at the
+  start of a nested selector completes as `&:hover`
 - a cleanup code action whose edits remove dead or impossible selectors
 - incremental updates when either side of a sibling pair changes
 
