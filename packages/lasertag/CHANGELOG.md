@@ -1,5 +1,19 @@
 # lasertag
 
+## 0.10.0
+
+### Minor Changes
+
+- 765786d: Analyze selectors that contain a comment; a comment used to hide the whole selector from analysis. Fails: `tool-bar.class { > em /* note */ {} }` in a component that renders no `em`, now reported as `dead-selector` and removed by `lasertag fix`. Blessed: delete the dead rule, or, when the element really is added at runtime, put `/* @lasertag-expect-error: <reason> */` on the line above it.
+- 765786d: Stop the language server completing selectors that `selector-segment-without-tag` rejects. Fails: the bare `:hover`, `:focus-visible`, `::before` and `::after` completions at the start of a nested selector or after a combinator, and the bare `.class` completion at the top level, are no longer offered. Blessed: at the start of a nested selector, complete `&:hover`, which also replaces a `:` already typed; after `> `, complete the tag first and then its refinement, as in `> button:hover`; at the top level, complete `tool-bar.class`. After a colon, only refinements are offered, never tags.
+- 765786d: Report `selector-segment-without-tag` for any selector segment that names no tag. These selectors were skipped without comment, so `lasertag check` now fails on modules that used to pass. Fails: `tool-bar.class { > [data-active] {} :hover {} }`. Blessed: start each segment with the tag it selects, and use `&` to qualify the parent: `tool-bar.class { > button[data-active] {} &:hover {} }`. A segment that comes before the root, as in `[data-theme="dark"] tool-bar.class {}`, selects an element outside the component and goes in `:global(...)`: `:global([data-theme="dark"]) tool-bar.class {}`. The message names the element when the render story identifies it, `lasertag fix` leaves these selectors alone, and neither `@lasertag-expect-error` nor `@lasertag-disable` suppresses the diagnostic.
+
+### Patch Changes
+
+- 765786d: Add the opt-in `attach-css-class-to-own-tag` ESLint rule, which requires an exported component's own-name root tag to carry `css.class`. Fails: `export function ToolBar() { return <tool-bar /> }`. Blessed: `import css from "./ToolBar.module.css"`, then `export function ToolBar() { return <tool-bar class={css.class} /> }`; `className={css.class}` passes too.
+- 765786d: Fix tag completions for a selector with a comment above it. The comment was read as part of the selector, so typing `> ` on the line under `/* layout */` inside `tool-bar.class {}` completed nothing; it now completes the root's child tags, and the same holds inside a rule that has a comment above it. No completion that worked before is withdrawn.
+- 765786d: Stop analyzing `@keyframes` offsets as selectors. `@keyframes fade { from { opacity: 0; } to { opacity: 1; } }` reported `from` and `to` as `dead-selector`, and `lasertag fix` deleted both steps; it now passes and is left alone. Fails: an `@lasertag-expect-error` written above `from` or `to` to excuse that report is now an `unused-expect-error`. Blessed: delete the directive, or let `lasertag fix` remove it.
+
 ## 0.9.1
 
 ### Patch Changes
