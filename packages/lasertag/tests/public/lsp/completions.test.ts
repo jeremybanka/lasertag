@@ -1,10 +1,13 @@
-import { describe, expect, it } from "vite-plus/test"
+import { afterAll, describe, expect, it } from "vite-plus/test"
 import {
 	CompletionItemKind,
 	InsertTextFormat,
+	type CompletionItem,
 } from "vscode-languageserver/node"
 
 import type { RenderStory } from "../../../src/refractor/index.ts"
+import { createTypescriptAstSession } from "../../../src/refractor/typescript-ast.ts"
+import { validateCssReachability } from "../../../src/refractor/validate-css-reachability.ts"
 import { createCssModuleCompletionItems } from "../../../src/lsp/completions.ts"
 
 const renderStory: RenderStory = {
@@ -136,10 +139,20 @@ describe(`lasertag lsp selector completions`, () => {
 		)
 	})
 
-	it(`suggests root selectors and the module root class`, () => {
-		expect(labels(``)).toEqual(
-			expect.arrayContaining([`app-panel.class`, `.class`]),
+	it(`suggests the root tag with the module class, never the class alone`, () => {
+		const completionLabels = labels(``)
+
+		expect(completionLabels).toContain(`app-panel.class`)
+		expect(completionLabels).not.toContain(`.class`)
+	})
+
+	it(`suggests tags for a selector with a comment above it`, () => {
+		expect(labels(`app-panel.class {\n\t/* layout */\n\t> `)).toEqual(
+			expect.arrayContaining([`header`, `footer`]),
 		)
+		expect(
+			labels(`app-panel.class {\n\t/* top */\n\t> header {\n\t\t> `),
+		).toContain(`button`)
 	})
 
 	it(`suggests direct child tags from the render story`, () => {
@@ -204,6 +217,104 @@ describe(`lasertag lsp selector completions`, () => {
 		expect(labels(`app-panel.class {\n\t&::`)).not.toContain(`:global(.)`)
 	})
 
+	it(`qualifies the parent with & at the start of a nested selector`, () => {
+		for (const sourceText of [
+			`app-panel.class {\n\t`,
+			`app-panel.class {\n\t> header {\n\t\t`,
+			`app-panel.class {\n\t> header, `,
+		]) {
+			const completionLabels = labels(sourceText)
+
+			expect(completionLabels).toEqual(
+				expect.arrayContaining([
+					`&:hover`,
+					`&:focus-visible`,
+					`&::before`,
+					`&::after`,
+				]),
+			)
+			expect(completionLabels).not.toContain(`:hover`)
+			expect(completionLabels).not.toContain(`::before`)
+		}
+
+		expect(completion(`app-panel.class {\n\t`, `&:hover`)?.insertText).toBe(
+			`&:hover`,
+		)
+	})
+
+	it(`puts & before colons already typed at the start of a nested selector`, () => {
+		expect(completion(`app-panel.class {\n\t:`, `&:hover`)).toMatchObject({
+			filterText: `:hover`,
+			textEdit: {
+				newText: `&:hover`,
+				range: {
+					end: { character: 2, line: 1 },
+					start: { character: 1, line: 1 },
+				},
+			},
+		})
+		expect(completion(`app-panel.class {\n\t::`, `&::before`)).toMatchObject({
+			filterText: `::before`,
+			textEdit: {
+				newText: `&::before`,
+				range: {
+					end: { character: 3, line: 1 },
+					start: { character: 1, line: 1 },
+				},
+			},
+		})
+		expect(labels(`app-panel.class {\n\t::`)).toEqual([`&::after`, `&::before`])
+	})
+
+	it(`suggests no pseudo refinement where there is nothing to refine`, () => {
+		for (const sourceText of [
+			``,
+			`app-panel.class `,
+			`app-panel.class {\n\t> `,
+			`app-panel.class {\n\t> :`,
+			`app-panel.class {\n\t> header `,
+			`app-panel.class {\n\t& `,
+			`app-panel.class {\n\t> :is(`,
+			`app-panel.class {\n\t> :is(header, `,
+		]) {
+			const completionLabels = labels(sourceText)
+
+			expect(completionLabels).toEqual(
+				expect.arrayContaining([`:global(...)`, `:is(...)`, `:where(...)`]),
+			)
+			expect(
+				completionLabels.filter((label) =>
+					/^&?::?(?:hover|focus-visible|before|after)$/.test(label),
+				),
+			).toEqual([])
+		}
+	})
+
+	it(`suggests pseudo refinements for the compound a function is attached to`, () => {
+		expect(labels(`app-panel.class {\n\t&:not(`)).toContain(`:hover`)
+		expect(labels(`app-panel.class {\n\t> header:is(:hover, `)).toContain(
+			`:focus-visible`,
+		)
+		expect(labels(`app-panel.class {\n\t> :is(header, footer)`)).toContain(
+			`::before`,
+		)
+	})
+
+	it(`suggests only refinements after a colon`, () => {
+		expect(labels(`app-panel.class {\n\t> header:`).toSorted()).toEqual(
+			[
+				`::after`,
+				`::before`,
+				`:focus-visible`,
+				`:global(...)`,
+				`:global(.)`,
+				`:hover`,
+				`:is(...)`,
+				`:where(...)`,
+			].toSorted(),
+		)
+	})
+
 	it(`does not suggest unsupported selector constructs`, () => {
 		const completionLabels = labels(`app-panel.class {\n\t`)
 
@@ -212,4 +323,93 @@ describe(`lasertag lsp selector completions`, () => {
 		expect(completionLabels).not.toContain(`:has(...)`)
 		expect(completionLabels).not.toContain(`*`)
 	})
+})
+
+describe(`lasertag lsp completions and selector-segment-without-tag`, () => {
+	const typescriptSession = createTypescriptAstSession()
+
+	afterAll(() => typescriptSession.close())
+
+	function analyze(cssSource: string) {
+		return validateCssReachability(
+			{
+				cssPath: `/project/src/AppPanel.module.css`,
+				cssSource,
+				tsxPath: `/project/src/AppPanel.tsx`,
+				tsxSource: `
+import css from "./AppPanel.module.css"
+
+export function AppPanel() {
+	return (
+		<app-panel class={css.class} data-state="open">
+			<header><button type="button" aria-label="Close" /></header>
+			<footer><a href="/details" /></footer>
+		</app-panel>
+	)
+}`,
+			},
+			typescriptSession,
+		)
+	}
+
+	function accept(sourceText: string, item: CompletionItem): string {
+		const typedLine = sourceText.slice(sourceText.lastIndexOf(`\n`) + 1)
+		const text = (
+			(item.textEdit ? item.textEdit.newText : item.insertText) ?? item.label
+		)
+			.replace(`:global(.$1)`, `:global(.theme)`)
+			.replace(`:global($1)`, `:global(.theme)`)
+			.replace(`($1)`, `(header)`)
+
+		if (!item.textEdit || !(`range` in item.textEdit)) return sourceText + text
+
+		const replacedLength =
+			typedLine.length - item.textEdit.range.start.character
+
+		return sourceText.slice(0, sourceText.length - replacedLength) + text
+	}
+
+	it.each([
+		[``, ` {}`],
+		[`:`, ` {}`],
+		[`app-panel.class `, ` {}`],
+		[`app-panel.class > `, ` {}`],
+		[`app-panel.class {\n\t`, ` {}\n}`],
+		[`app-panel.class {\n\t:`, ` {}\n}`],
+		[`app-panel.class {\n\t::`, ` {}\n}`],
+		[`app-panel.class {\n\t/* note */\n\t:`, ` {}\n}`],
+		[`app-panel.class {\n\t> `, ` {}\n}`],
+		[`app-panel.class {\n\t> :`, ` {}\n}`],
+		[`app-panel.class {\n\t> header`, ` {}\n}`],
+		[`app-panel.class {\n\t> header:`, ` {}\n}`],
+		[`app-panel.class {\n\t> header `, ` {}\n}`],
+		[`app-panel.class {\n\t> header, `, ` {}\n}`],
+		[`app-panel.class {\n\t&:`, ` {}\n}`],
+		[`app-panel.class {\n\t& `, ` {}\n}`],
+		[`app-panel.class {\n\t&:not(`, `) {}\n}`],
+		[`app-panel.class {\n\t> :is(`, `) {}\n}`],
+		[`app-panel.class {\n\t> :is(header, `, `) {}\n}`],
+		[`app-panel.class {\n\t> header {\n\t\t`, ` {}\n\t}\n}`],
+		[`app-panel.class {\n\t> header {\n\t\t:`, ` {}\n\t}\n}`],
+		[`@media (hover: hover) {\n\t`, ` {}\n}`],
+	])(
+		`completes no segment without a tag after %j`,
+		(sourceText, closingText) => {
+			const items = createCssModuleCompletionItems({
+				offset: sourceText.length,
+				renderStory: analyze(`app-panel.class {}`).renderStory,
+				sourceText,
+			})
+			const rejectedLabels = items
+				.filter((item) =>
+					analyze(accept(sourceText, item) + closingText).diagnostics.some(
+						(diagnostic) => diagnostic.code === `selector-segment-without-tag`,
+					),
+				)
+				.map((item) => item.label)
+
+			expect(items.length).toBeGreaterThan(0)
+			expect(rejectedLabels).toEqual([])
+		},
+	)
 })

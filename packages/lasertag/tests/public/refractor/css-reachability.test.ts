@@ -1274,9 +1274,9 @@ describe(`module.css selector unknowns and escapes`, () => {
 		).toEqual([])
 	})
 
-	it(`checks wildcard selectors and skips tagless selectors`, () => {
+	it(`checks wildcard selectors and reports tagless selectors`, () => {
 		expect(
-			diagnosticSelectors(
+			diagnosticSummaries(
 				`
 					import css from "./AppPanel.module.css"
 
@@ -1291,7 +1291,13 @@ describe(`module.css selector unknowns and escapes`, () => {
 					}
 				`,
 			),
-		).toEqual([`app-panel.class > *`])
+		).toEqual([
+			{ code: `dead-selector`, selector: `app-panel.class > *` },
+			{
+				code: `selector-segment-without-tag`,
+				selector: `app-panel.class > [role="button"]`,
+			},
+		])
 	})
 
 	it(`skips unsupported structural selectors`, () => {
@@ -1424,6 +1430,268 @@ describe(`module.css nesting and at-rule reachability`, () => {
 				`,
 			),
 		).toEqual([`:is(app-panel.class, other-panel.class) > footer`])
+	})
+})
+
+describe(`module.css selector segments without a tag`, () => {
+	const appPanel = `
+		import css from "./AppPanel.module.css"
+
+		export function AppPanel() {
+			return (
+				<app-panel className={css.class}>
+					<h1 data-title>Title</h1>
+					<button data-kind="primary" />
+					<span data-kind="hint" />
+				</app-panel>
+			)
+		}
+	`
+
+	function taglessMessages(cssSource: string, tsxSource = appPanel): string[] {
+		return validateCssReachability({
+			tsxPath: `/project/src/AppPanel.tsx`,
+			cssPath: `/project/src/AppPanel.module.css`,
+			tsxSource,
+			cssSource,
+		}).diagnostics.flatMap((diagnostic) =>
+			diagnostic.code === `selector-segment-without-tag`
+				? [diagnostic.message]
+				: [],
+		)
+	}
+
+	const problem = (segment: string) =>
+		`Selector segment "${segment}" names no tag, so it cannot be checked against the render story.`
+
+	it(`names the element the render story gives the attribute to`, () => {
+		expect(
+			taglessMessages(`
+				app-panel.class {
+					> [data-title] {}
+					> [data-kind] {}
+					> [data-kind="primary"] {}
+					> [data-runtime] {}
+				}
+			`),
+		).toEqual([
+			`${problem(`[data-title]`)} Name the element: "h1[data-title]".`,
+			`${problem(`[data-kind]`)} Name the element: "button[data-kind]" or "span[data-kind]".`,
+			`${problem(`[data-kind="primary"]`)} Name the element: "button[data-kind="primary"]".`,
+			`${problem(`[data-runtime]`)} Put the element's tag before it, or give the element its own custom tag and select that.`,
+		])
+	})
+
+	it(`ignores comments inside a selector`, () => {
+		expect(
+			diagnosticSummaries(
+				appPanel,
+				`
+					app-panel.class /* the panel */ {
+						> h1 /* title */ {}
+						> footer /* never rendered */ {}
+					}
+				`,
+			),
+		).toEqual([{ code: `dead-selector`, selector: `app-panel.class > footer` }])
+	})
+
+	it(`reports each segment once, at the rule that authors it`, () => {
+		expect(
+			diagnosticSummaries(
+				appPanel,
+				`
+					app-panel.class {
+						> h1,
+						> button {
+							> [data-a] > [data-b] {
+								&:hover {}
+								&[data-on] {}
+								> em {}
+							}
+						}
+					}
+				`,
+			).filter(({ code }) => code === `selector-segment-without-tag`),
+		).toEqual([
+			{
+				code: `selector-segment-without-tag`,
+				selector: `app-panel.class > h1 > [data-a] > [data-b]`,
+			},
+			{
+				code: `selector-segment-without-tag`,
+				selector: `app-panel.class > h1 > [data-a] > [data-b]`,
+			},
+		])
+	})
+
+	it(`points a nested pseudo-class at the parent element`, () => {
+		expect(
+			taglessMessages(`
+				app-panel.class {
+					:hover {}
+					&:hover {}
+					> h1::before {}
+					> :not([hidden]) {}
+				}
+			`),
+		).toEqual([
+			`${problem(`:hover`)} Write "&:hover" to qualify the parent element, or put the descendant's tag before it.`,
+			`${problem(`:not([hidden])`)} Put the element's tag before it, or "*" to match any element.`,
+		])
+	})
+
+	it(`requires a tag in every :is() alternative`, () => {
+		expect(
+			taglessMessages(`
+				app-panel.class {
+					> :is(h1, button) {}
+					> :is(h1, [data-kind]) {}
+				}
+			`),
+		).toEqual([
+			`${problem(`:is(h1, [data-kind])`)} Name a tag in every alternative.`,
+		])
+	})
+
+	it(`reports a tagless segment beside a sibling combinator`, () => {
+		expect(
+			taglessMessages(`
+				app-panel.class {
+					> h1 + [data-kind] {}
+					> h1 + button {}
+				}
+			`),
+		).toEqual([
+			`${problem(`[data-kind]`)} Name the element: "button[data-kind]" or "span[data-kind]".`,
+		])
+	})
+
+	it(`names the root tag for a bare .class root`, () => {
+		expect(
+			diagnosticSummaries(
+				appPanel,
+				`
+					.class {
+						> h1 {}
+						> footer {}
+					}
+				`,
+			),
+		).toEqual([{ code: `selector-segment-without-tag`, selector: `.class` }])
+		expect(taglessMessages(`.class {}`)).toEqual([
+			`${problem(`.class`)} Name the root: "app-panel.class".`,
+		])
+	})
+
+	it(`leaves :global() escapes and local classes to their own rules`, () => {
+		expect(
+			diagnosticSummaries(
+				appPanel,
+				`
+					app-panel.class {
+						:global(.third-party) {
+							[data-part] {}
+						}
+						> :global([data-part]) {}
+						> .local {}
+					}
+				`,
+			),
+		).toEqual([
+			{ code: `impossible-local-class`, selector: `app-panel.class > .local` },
+		])
+	})
+
+	it(`points a segment that comes before the root at :global()`, () => {
+		expect(
+			taglessMessages(`
+				[data-theme="dark"] app-panel.class {}
+				:global([data-theme="dark"]) app-panel.class {}
+				app-panel.class {
+					[data-theme="dark"] & {}
+					:global([data-theme="dark"]) & {}
+				}
+				:root {}
+				:global(:root) {}
+			`),
+		).toEqual([
+			`${problem(`[data-theme="dark"]`)} It comes before the component's root, so it selects an element outside this component: write ":global([data-theme="dark"])".`,
+			`${problem(`[data-theme="dark"]`)} It comes before "&", so it selects an element above this rule's: write ":global([data-theme="dark"])" if that element is outside this component.`,
+			`${problem(`:root`)} Start the selector at "app-panel.class", or write ":global(:root)" to style an element outside this component.`,
+		])
+	})
+
+	it(`still checks the component's own DOM beneath a :global() context`, () => {
+		expect(
+			taglessMessages(`
+				:global(.dark) app-panel.class {
+					> [data-title] {}
+				}
+				app-panel.class {
+					:global(.dark) & > [data-title] {}
+				}
+			`),
+		).toEqual([
+			`${problem(`[data-title]`)} Name the element: "h1[data-title]".`,
+			`${problem(`[data-title]`)} Name the element: "h1[data-title]".`,
+		])
+	})
+
+	it(`cannot be suppressed`, () => {
+		const { diagnostics } = validateCssReachability({
+			tsxPath: `/project/src/AppPanel.tsx`,
+			cssPath: `/project/src/AppPanel.module.css`,
+			tsxSource: appPanel,
+			cssSource: `app-panel.class {
+	/* @lasertag-expect-error: injected at runtime */
+	> [data-runtime] {}
+	/* @lasertag-expect-error: injected at runtime */
+	> canvas {}
+	/* @lasertag-disable [selector-segment-without-tag] injected at runtime */
+	> [data-injected] {}
+}`,
+		})
+
+		expect(
+			diagnostics.map(({ code, message }) =>
+				code === `selector-segment-without-tag` ? code : message,
+			),
+		).toEqual([
+			`Unused "@lasertag-expect-error" directive.`,
+			`selector-segment-without-tag`,
+			`Unused "@lasertag-disable [selector-segment-without-tag]" directive; "selector-segment-without-tag" diagnostics cannot be suppressed.`,
+			`selector-segment-without-tag`,
+		])
+	})
+})
+
+describe(`module.css keyframes`, () => {
+	it(`treats keyframe selectors as animation offsets, not elements`, () => {
+		expect(
+			diagnosticSummaries(
+				`
+					import css from "./AppPanel.module.css"
+
+					export function AppPanel() {
+						return <app-panel className={css.class} />
+					}
+				`,
+				`
+					app-panel.class {
+						animation: app-panel-pulse 1s;
+					}
+					@keyframes app-panel-pulse {
+						from { opacity: 0; }
+						50% { opacity: 1; }
+						to { opacity: 0; }
+					}
+					@-webkit-keyframes app-panel-pulse {
+						0%, 100% { opacity: 0; }
+					}
+				`,
+			),
+		).toEqual([])
 	})
 })
 

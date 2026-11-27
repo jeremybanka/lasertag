@@ -1,5 +1,8 @@
 import { analyzeCssModuleSelectors } from "./analyze-css-module.ts"
-import type { CssSelectorAnalysis } from "./analyze-css-module.ts"
+import type {
+	CssSelectorAnalysis,
+	CssSelectorSegmentWithoutTag,
+} from "./analyze-css-module.ts"
 import { analyzeRenderStory } from "./analyze-render-source.ts"
 import { analyzeTsxRenderStory } from "./analyze-tsx.ts"
 import type {
@@ -8,6 +11,7 @@ import type {
 	RenderStory,
 	SelectorPath,
 	SourceRange,
+	StoryChild,
 } from "./diagnostics.ts"
 import { applyLasertagSuppressionDirectives } from "./expect-error.ts"
 import {
@@ -75,6 +79,140 @@ function deadSelectorMessage(selector: string): string {
 
 function impossibleLocalClassMessage(className: string): string {
 	return `Local class ".${className}" is unreachable; lasertag CSS modules expose only "css.class".`
+}
+
+const MAX_SUGGESTED_TAGS = 3
+
+function withoutParentheses(text: string): string {
+	let current = text
+	let previous: string
+
+	do {
+		previous = current
+		current = current.replace(/\([^()]*\)/g, ``)
+	} while (current !== previous)
+
+	return current
+}
+
+type SelectedAttribute = {
+	name: string
+	/** Present only for an exact `[name="value"]` match. */
+	value?: string
+}
+
+function selectedAttributes(compound: string): SelectedAttribute[] {
+	const pattern =
+		/\[\s*([^\s~|^$*=\]]+)\s*(?:=\s*(?:"([^"]*)"|'([^']*)'|([^\s\]]+)))?/g
+
+	return [...compound.matchAll(pattern)].flatMap((match) => {
+		const name = match[1]
+		const value = match[2] ?? match[3] ?? match[4]
+
+		if (!name) return []
+
+		return [value === undefined ? { name } : { name, value }]
+	})
+}
+
+function collectTagNames(
+	children: readonly StoryChild[],
+	attributes: readonly SelectedAttribute[] | undefined,
+	tagNames: Set<string>,
+): void {
+	for (const child of children) {
+		if (child.kind === `opaque`) continue
+		if (child.kind === `choice`) {
+			for (const alternative of child.alternatives) {
+				collectTagNames(alternative, attributes, tagNames)
+			}
+			continue
+		}
+
+		// Without attributes, only the story's outermost elements are wanted.
+		if (attributes === undefined) {
+			tagNames.add(child.tagName)
+			continue
+		}
+
+		const hasEveryAttribute = attributes.every((selected) =>
+			child.attributes?.some(
+				(attribute) =>
+					attribute.name === selected.name &&
+					// A dynamic value may be the selected one.
+					(selected.value === undefined ||
+						attribute.value === undefined ||
+						attribute.value === selected.value),
+			),
+		)
+
+		if (hasEveryAttribute) tagNames.add(child.tagName)
+
+		collectTagNames(child.children, attributes, tagNames)
+	}
+}
+
+function quotedAlternatives(alternatives: string[]): string {
+	return alternatives.map((alternative) => `"${alternative}"`).join(` or `)
+}
+
+function segmentWithoutTagMessage(
+	renderStory: RenderStory,
+	{ position, text: segment }: CssSelectorSegmentWithoutTag,
+): string {
+	const problem = `Selector segment "${segment}" names no tag, so it cannot be checked against the render story.`
+	const structure = withoutParentheses(segment)
+	const tagNames = new Set<string>()
+
+	// A tag here would not help: the root has to come first in the selector.
+	if (position === `before-root`) {
+		return `${problem} It comes before the component's root, so it selects an element outside this component: write ":global(${segment})".`
+	}
+
+	if (position === `before-parent`) {
+		return `${problem} It comes before "&", so it selects an element above this rule's: write ":global(${segment})" if that element is outside this component.`
+	}
+
+	if (/\.class(?![-\w])/.test(structure)) {
+		collectTagNames(renderStory.roots, undefined, tagNames)
+
+		return tagNames.size > 0 && tagNames.size <= MAX_SUGGESTED_TAGS
+			? `${problem} Name the root: ${quotedAlternatives([...tagNames].map((tagName) => `${tagName}${segment}`))}.`
+			: `${problem} Put the component's root tag before it.`
+	}
+
+	if (position === `unanchored`) {
+		collectTagNames(renderStory.roots, undefined, tagNames)
+
+		const root =
+			tagNames.size === 1
+				? `"${[...tagNames][0]}.class"`
+				: `the component's root`
+
+		return `${problem} Start the selector at ${root}, or write ":global(${segment})" to style an element outside this component.`
+	}
+
+	const attributes = selectedAttributes(structure)
+
+	if (attributes.length > 0) {
+		collectTagNames(renderStory.roots, attributes, tagNames)
+
+		if (tagNames.size > 0 && tagNames.size <= MAX_SUGGESTED_TAGS) {
+			return `${problem} Name the element: ${quotedAlternatives([...tagNames].map((tagName) => `${tagName}${segment}`))}.`
+		}
+	}
+
+	if (/^:(?:is|where)\(/.test(segment)) {
+		return `${problem} Name a tag in every alternative.`
+	}
+
+	if (segment.startsWith(`:`)) {
+		return position === `opens-nested-selector`
+			? `${problem} Write "&${segment}" to qualify the parent element, or put the descendant's tag before it.`
+			: `${problem} Put the element's tag before it, or "*" to match any element.`
+	}
+
+	return `${problem} Put the element's tag before it, or give the element its own custom tag and select that.`
 }
 
 function ownershipBoundaryMessage(selector: string): string {
@@ -180,9 +318,25 @@ export function analyzeCssReachability({
 	const diagnostics = adoptionDiagnostics(renderStory)
 	const selectorReachability: CssSelectorReachabilityAnalysis[] = []
 	const opaqueCollisions = new Map<string, OpaqueCollision>()
+	const reportedSegmentsWithoutTag = new Set<string>()
 
 	for (const selectorAnalysis of selectorAnalyses) {
 		const { result } = selectorAnalysis
+
+		for (const segment of selectorAnalysis.segmentsWithoutTag ?? []) {
+			// A rule nested under a selector list is flattened once per parent.
+			const segmentKey = `${selectorAnalysis.range.start}\0${segment.text}`
+
+			if (reportedSegmentsWithoutTag.has(segmentKey)) continue
+
+			reportedSegmentsWithoutTag.add(segmentKey)
+			diagnostics.push({
+				code: `selector-segment-without-tag`,
+				message: segmentWithoutTagMessage(renderStory, segment),
+				selector: selectorAnalysis.selector,
+				range: selectorAnalysis.range,
+			})
+		}
 
 		if (result.kind === `unknown`) {
 			selectorReachability.push({

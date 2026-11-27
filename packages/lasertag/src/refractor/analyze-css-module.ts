@@ -1,8 +1,33 @@
 import type { SelectorPath, SourceRange } from "./diagnostics.ts"
 
+export type CssSelectorSegmentWithoutTag = {
+	/** The compound as authored. */
+	text: string
+	/**
+	 * Where the compound sits, when that decides how to repair it.
+	 * - `opens-nested-selector`: it starts a nested selector with no combinator,
+	 *   so it selects a descendant where `&` would have qualified the parent.
+	 * - `before-parent`: a later compound of the nested selector holds `&`.
+	 * - `before-root`: a later compound of the top-level selector holds `.class`.
+	 * - `unanchored`: it starts a top-level selector that never names `.class`.
+	 */
+	position?:
+		| `before-parent`
+		| `before-root`
+		| `opens-nested-selector`
+		| `unanchored`
+}
+
 export type CssSelectorAnalysis = {
 	selector: string
 	range: SourceRange
+	/**
+	 * Compounds this rule authored that name no element tag, such as
+	 * `[data-state]` or `:hover`. Compounds inherited from a parent rule,
+	 * `:global(...)` compounds, and compounds beneath a `:global(...)` that
+	 * descends from the root are not listed.
+	 */
+	segmentsWithoutTag?: CssSelectorSegmentWithoutTag[]
 	result:
 		| {
 				kind: `path`
@@ -27,6 +52,10 @@ type CssRule = {
 type SelectorWithRange = {
 	text: string
 	range: SourceRange
+	/** The selector as authored inside its parent rule, before flattening. */
+	nestedText?: string
+	/** The flattened selector of the rule this one is nested in. */
+	parentText?: string
 }
 
 type TokenizedSelectorPart = {
@@ -200,6 +229,35 @@ function trimRange(
 	return { start: trimmedStart, end: trimmedEnd }
 }
 
+function isKeyframesRule(prelude: string): boolean {
+	return /^@(?:-[a-z]+-)?keyframes(?![-\w])/i.test(prelude)
+}
+
+function stripComments(text: string): string {
+	let stripped = ``
+	let quote: `"` | `'` | undefined
+
+	for (let index = 0; index < text.length; index += 1) {
+		const character = text[index] ?? ``
+
+		if (quote) {
+			if (character === quote && text[index - 1] !== `\\`) quote = undefined
+		} else if (character === `"` || character === `'`) {
+			quote = character
+		} else if (character === `/` && text[index + 1] === `*`) {
+			const commentEnd = text.indexOf(`*/`, index + 2)
+
+			stripped += ` `
+			index = commentEnd === -1 ? text.length : commentEnd + 1
+			continue
+		}
+
+		stripped += character
+	}
+
+	return stripped
+}
+
 function parseRules(sourceText: string, start: number, end: number): CssRule[] {
 	const rules: CssRule[] = []
 	let cursor = start
@@ -229,12 +287,16 @@ function parseRules(sourceText: string, start: number, end: number): CssRule[] {
 			selectorRange.end,
 		)
 		const blockEnd = findBlockEnd(sourceText, delimiter.index)
-		const children = parseRules(sourceText, delimiter.index + 1, blockEnd)
 
-		if (selectorText.startsWith(`@`)) {
-			rules.push(...children)
-		} else if (selectorText.length > 0) {
-			rules.push({ selectorText, selectorRange, children })
+		// `from`, `to`, and percentages select animation offsets, not elements.
+		if (!isKeyframesRule(selectorText)) {
+			const children = parseRules(sourceText, delimiter.index + 1, blockEnd)
+
+			if (selectorText.startsWith(`@`)) {
+				rules.push(...children)
+			} else if (selectorText.length > 0) {
+				rules.push({ selectorText, selectorRange, children })
+			}
 		}
 
 		cursor = blockEnd + 1
@@ -300,7 +362,9 @@ function splitSelectorList(
 				skipWhitespaceAndComments(selector, partStart),
 				index,
 			)
-			const text = selector.slice(partRange.start, partRange.end)
+			const text = stripComments(
+				selector.slice(partRange.start, partRange.end),
+			).trim()
 
 			if (text.length > 0) {
 				selectors.push({
@@ -352,6 +416,8 @@ function flattenRules(
 						ruleSelectors.map((selector) => ({
 							text: combineSelectors(parentSelector, selector.text),
 							range: selector.range,
+							nestedText: selector.text,
+							parentText: parentSelector,
 						})),
 					)
 
@@ -885,14 +951,143 @@ function parseSelectorPath(selector: string): CssSelectorAnalysis[`result`] {
 	return { kind: `path`, paths }
 }
 
+function splitAtSiblingCombinators(selector: string): string[] {
+	const sequences: string[] = []
+	let parenDepth = 0
+	let bracketDepth = 0
+	let sequenceStart = 0
+
+	for (let index = 0; index < selector.length; index += 1) {
+		const character = selector[index]
+
+		if (character === `(`) parenDepth += 1
+		else if (character === `)`) parenDepth = Math.max(parenDepth - 1, 0)
+		else if (character === `[`) bracketDepth += 1
+		else if (character === `]`) bracketDepth = Math.max(bracketDepth - 1, 0)
+		else if (
+			(character === `+` || character === `~`) &&
+			parenDepth === 0 &&
+			bracketDepth === 0
+		) {
+			sequences.push(selector.slice(sequenceStart, index))
+			sequenceStart = index + 1
+		}
+	}
+
+	sequences.push(selector.slice(sequenceStart))
+
+	return sequences
+}
+
+type AuthoredCompound = {
+	alternatives: string[]
+	isGlobal: boolean
+	text: string
+}
+
+function authoredCompounds(selector: string): AuthoredCompound[] {
+	return splitAtSiblingCombinators(selector)
+		.flatMap(tokenizeSelector)
+		.map(({ compound }) => {
+			const expansion = expandCompoundAlternatives(compound)
+
+			return {
+				alternatives: expansion.kind === `unknown` ? [] : expansion.compounds,
+				isGlobal: hasUnsupportedGlobalSelector(compound),
+				text: compound,
+			}
+		})
+}
+
+function findModuleClassIndex(compounds: AuthoredCompound[]): number {
+	return compounds.findIndex(({ alternatives }) =>
+		alternatives.some((alternative) =>
+			getCompoundClasses(alternative).includes(`class`),
+		),
+	)
+}
+
+/**
+ * `:global(...)` beneath the root descends into DOM this component does not
+ * author. Before the root, it only sets the context the component appears in.
+ */
+function leavesOwnDom(selector: string): boolean {
+	const compounds = authoredCompounds(selector)
+	const rootIndex = findModuleClassIndex(compounds)
+
+	return compounds.some(({ isGlobal }, index) => isGlobal && index > rootIndex)
+}
+
+function findSegmentsWithoutTag(
+	selector: SelectorWithRange,
+): CssSelectorSegmentWithoutTag[] {
+	const authoredText = selector.nestedText ?? selector.text
+	const isNested = selector.nestedText !== undefined
+	const compounds = authoredCompounds(authoredText)
+	// The element this rule is anchored to: `&` when nested, `.class` otherwise.
+	const anchorIndex = isNested
+		? compounds.findIndex(({ alternatives }) =>
+				alternatives.some((alternative) =>
+					stripNonStructuralSections(alternative).includes(`&`),
+				),
+			)
+		: findModuleClassIndex(compounds)
+	const firstLocalIndex = compounds.findIndex(({ isGlobal }) => !isGlobal)
+	const segments: CssSelectorSegmentWithoutTag[] = []
+	let hasLeftOwnDom =
+		selector.parentText !== undefined && leavesOwnDom(selector.parentText)
+
+	for (const [index, { alternatives, isGlobal, text }] of compounds.entries()) {
+		if (isGlobal) {
+			hasLeftOwnDom ||= index > anchorIndex
+			continue
+		}
+
+		if (hasLeftOwnDom) continue
+
+		const allowsModuleClass = index === firstLocalIndex && !isNested
+		const hasAlternativeWithoutTag = alternatives.some(
+			(alternative) =>
+				// `&` continues the parent's compound; the parent rule answers for it.
+				!stripNonStructuralSections(alternative).includes(`&`) &&
+				getCompoundTagName(alternative) === undefined &&
+				// A stray local class is reported as `impossible-local-class`.
+				getCompoundClasses(alternative).every(
+					(className) => allowsModuleClass && className === `class`,
+				),
+		)
+
+		if (!hasAlternativeWithoutTag) continue
+
+		let position: CssSelectorSegmentWithoutTag[`position`]
+
+		if (index < anchorIndex) {
+			position = isNested ? `before-parent` : `before-root`
+		} else if (index === 0 && isNested && authoredText.startsWith(text)) {
+			position = `opens-nested-selector`
+		} else if (index === firstLocalIndex && !isNested && anchorIndex === -1) {
+			position = `unanchored`
+		}
+
+		segments.push({ text, ...(position ? { position } : {}) })
+	}
+
+	return segments
+}
+
 export function analyzeCssModuleSelectors(
 	sourceText: string,
 ): CssSelectorAnalysis[] {
 	return flattenRules(parseRules(sourceText, 0, sourceText.length)).map(
-		(selector) => ({
-			selector: selector.text,
-			range: selector.range,
-			result: parseSelectorPath(selector.text),
-		}),
+		(selector) => {
+			const segmentsWithoutTag = findSegmentsWithoutTag(selector)
+
+			return {
+				selector: selector.text,
+				range: selector.range,
+				...(segmentsWithoutTag.length > 0 ? { segmentsWithoutTag } : {}),
+				result: parseSelectorPath(selector.text),
+			}
+		},
 	)
 }

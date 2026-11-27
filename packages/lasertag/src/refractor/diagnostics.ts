@@ -89,6 +89,7 @@ export type CssReachabilityDiagnostic = {
 		| `opaque-component-root-may-collide`
 		| `selector-matches-foreign-component-root`
 		| `selector-crosses-ownership-boundary`
+		| `selector-segment-without-tag`
 		| `unused-disable`
 		| `unused-enable`
 		| `unused-expect-error`

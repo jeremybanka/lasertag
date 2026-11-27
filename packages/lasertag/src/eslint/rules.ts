@@ -1,4 +1,5 @@
 export * from "./rules/access-css-module-class-only.ts"
+export * from "./rules/attach-css-class-to-own-tag.ts"
 export * from "./rules/ban-div.ts"
 export * from "./rules/header-main-footer-as-group.ts"
 export * from "./rules/name-imported-css-module-as-css.ts"

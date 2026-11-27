@@ -2,6 +2,7 @@ import type { ESLint } from "eslint"
 
 import {
 	accessCssModuleClassOnly,
+	attachCssClassToOwnTag,
 	banDiv,
 	exportOwnComponentOnly,
 	headerMainFooterAsGroup,
@@ -12,6 +13,7 @@ import {
 
 export const Rules = {
 	accessCssModuleClassOnly,
+	attachCssClassToOwnTag,
 	banDiv,
 	exportOwnComponentOnly,
 	headerMainFooterAsGroup,
@@ -23,6 +25,7 @@ export const Rules = {
 const plugin: ESLint.Plugin = {
 	rules: {
 		"access-css-module-class-only": accessCssModuleClassOnly,
+		"attach-css-class-to-own-tag": attachCssClassToOwnTag,
 		"ban-div": banDiv,
 		"export-own-component-only": exportOwnComponentOnly,
 		"header-main-footer-as-group": headerMainFooterAsGroup,
