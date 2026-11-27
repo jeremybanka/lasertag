@@ -1,8 +1,24 @@
 import type { SelectorPath, SourceRange } from "./diagnostics.ts"
 
+export type CssSelectorSegmentWithoutTag = {
+	/** The compound as authored. */
+	text: string
+	/**
+	 * The compound opens a nested selector with no combinator, so it selects a
+	 * descendant where `&` would have qualified the parent.
+	 */
+	opensNestedSelector?: true
+}
+
 export type CssSelectorAnalysis = {
 	selector: string
 	range: SourceRange
+	/**
+	 * Compounds this rule authored that name no element tag, such as
+	 * `[data-state]` or `:hover`. Compounds inherited from a parent rule, and
+	 * anything beneath `:global(...)`, are not listed.
+	 */
+	segmentsWithoutTag?: CssSelectorSegmentWithoutTag[]
 	result:
 		| {
 				kind: `path`
@@ -27,6 +43,8 @@ type CssRule = {
 type SelectorWithRange = {
 	text: string
 	range: SourceRange
+	/** The selector as authored inside its parent rule, before flattening. */
+	nestedText?: string
 }
 
 type TokenizedSelectorPart = {
@@ -200,6 +218,35 @@ function trimRange(
 	return { start: trimmedStart, end: trimmedEnd }
 }
 
+function isKeyframesRule(prelude: string): boolean {
+	return /^@(?:-[a-z]+-)?keyframes(?![-\w])/i.test(prelude)
+}
+
+function stripComments(text: string): string {
+	let stripped = ``
+	let quote: `"` | `'` | undefined
+
+	for (let index = 0; index < text.length; index += 1) {
+		const character = text[index] ?? ``
+
+		if (quote) {
+			if (character === quote && text[index - 1] !== `\\`) quote = undefined
+		} else if (character === `"` || character === `'`) {
+			quote = character
+		} else if (character === `/` && text[index + 1] === `*`) {
+			const commentEnd = text.indexOf(`*/`, index + 2)
+
+			stripped += ` `
+			index = commentEnd === -1 ? text.length : commentEnd + 1
+			continue
+		}
+
+		stripped += character
+	}
+
+	return stripped
+}
+
 function parseRules(sourceText: string, start: number, end: number): CssRule[] {
 	const rules: CssRule[] = []
 	let cursor = start
@@ -229,12 +276,16 @@ function parseRules(sourceText: string, start: number, end: number): CssRule[] {
 			selectorRange.end,
 		)
 		const blockEnd = findBlockEnd(sourceText, delimiter.index)
-		const children = parseRules(sourceText, delimiter.index + 1, blockEnd)
 
-		if (selectorText.startsWith(`@`)) {
-			rules.push(...children)
-		} else if (selectorText.length > 0) {
-			rules.push({ selectorText, selectorRange, children })
+		// `from`, `to`, and percentages select animation offsets, not elements.
+		if (!isKeyframesRule(selectorText)) {
+			const children = parseRules(sourceText, delimiter.index + 1, blockEnd)
+
+			if (selectorText.startsWith(`@`)) {
+				rules.push(...children)
+			} else if (selectorText.length > 0) {
+				rules.push({ selectorText, selectorRange, children })
+			}
 		}
 
 		cursor = blockEnd + 1
@@ -300,7 +351,9 @@ function splitSelectorList(
 				skipWhitespaceAndComments(selector, partStart),
 				index,
 			)
-			const text = selector.slice(partRange.start, partRange.end)
+			const text = stripComments(
+				selector.slice(partRange.start, partRange.end),
+			).trim()
 
 			if (text.length > 0) {
 				selectors.push({
@@ -352,6 +405,7 @@ function flattenRules(
 						ruleSelectors.map((selector) => ({
 							text: combineSelectors(parentSelector, selector.text),
 							range: selector.range,
+							nestedText: selector.text,
 						})),
 					)
 
@@ -885,14 +939,95 @@ function parseSelectorPath(selector: string): CssSelectorAnalysis[`result`] {
 	return { kind: `path`, paths }
 }
 
+function splitAtSiblingCombinators(selector: string): string[] {
+	const sequences: string[] = []
+	let parenDepth = 0
+	let bracketDepth = 0
+	let sequenceStart = 0
+
+	for (let index = 0; index < selector.length; index += 1) {
+		const character = selector[index]
+
+		if (character === `(`) parenDepth += 1
+		else if (character === `)`) parenDepth = Math.max(parenDepth - 1, 0)
+		else if (character === `[`) bracketDepth += 1
+		else if (character === `]`) bracketDepth = Math.max(bracketDepth - 1, 0)
+		else if (
+			(character === `+` || character === `~`) &&
+			parenDepth === 0 &&
+			bracketDepth === 0
+		) {
+			sequences.push(selector.slice(sequenceStart, index))
+			sequenceStart = index + 1
+		}
+	}
+
+	sequences.push(selector.slice(sequenceStart))
+
+	return sequences
+}
+
+function findSegmentsWithoutTag(
+	selector: SelectorWithRange,
+): CssSelectorSegmentWithoutTag[] {
+	// `:global(...)` is the explicit way to leave Lasertag's structure.
+	if (hasUnsupportedGlobalSelector(selector.text)) return []
+
+	const segments: CssSelectorSegmentWithoutTag[] = []
+	const authoredText = selector.nestedText ?? selector.text
+	const isNested = selector.nestedText !== undefined
+	let isFirstCompound = true
+
+	for (const sequence of splitAtSiblingCombinators(authoredText)) {
+		for (const part of tokenizeSelector(sequence)) {
+			const allowsModuleClass = isFirstCompound && !isNested
+			const opensNestedSelector =
+				isFirstCompound && isNested && authoredText.startsWith(part.compound)
+
+			isFirstCompound = false
+
+			const expansion = expandCompoundAlternatives(part.compound)
+
+			if (expansion.kind === `unknown`) continue
+
+			const hasAlternativeWithoutTag = expansion.compounds.some(
+				(compound) =>
+					// `&` continues the parent's compound; the parent rule answers for it.
+					!stripNonStructuralSections(compound).includes(`&`) &&
+					getCompoundTagName(compound) === undefined &&
+					// A stray local class is reported as `impossible-local-class`.
+					getCompoundClasses(compound).every(
+						(className) => allowsModuleClass && className === `class`,
+					),
+			)
+
+			if (hasAlternativeWithoutTag) {
+				segments.push({
+					text: part.compound,
+					...(opensNestedSelector
+						? { opensNestedSelector: true as const }
+						: {}),
+				})
+			}
+		}
+	}
+
+	return segments
+}
+
 export function analyzeCssModuleSelectors(
 	sourceText: string,
 ): CssSelectorAnalysis[] {
 	return flattenRules(parseRules(sourceText, 0, sourceText.length)).map(
-		(selector) => ({
-			selector: selector.text,
-			range: selector.range,
-			result: parseSelectorPath(selector.text),
-		}),
+		(selector) => {
+			const segmentsWithoutTag = findSegmentsWithoutTag(selector)
+
+			return {
+				selector: selector.text,
+				range: selector.range,
+				...(segmentsWithoutTag.length > 0 ? { segmentsWithoutTag } : {}),
+				result: parseSelectorPath(selector.text),
+			}
+		},
 	)
 }

@@ -4,6 +4,10 @@ const EXPECT_ERROR_DIRECTIVE = `@lasertag-expect-error`
 const DISABLE_DIRECTIVE = `@lasertag-disable`
 const ENABLE_DIRECTIVE = `@lasertag-enable`
 const MINIMUM_EXPLANATION_LENGTH = 3
+/** Naming a tag is always possible, so no explanation excuses its absence. */
+const UNSUPPRESSIBLE_DIAGNOSTIC_CODES: ReadonlySet<string> = new Set([
+	`selector-segment-without-tag`,
+])
 
 type ExpectErrorDirective = {
 	explanation: string
@@ -186,6 +190,16 @@ function directiveDiagnostic(
 	}
 }
 
+function compareDiagnosticRanges(
+	left: CssReachabilityDiagnostic,
+	right: CssReachabilityDiagnostic,
+): number {
+	return (
+		(left.range?.start ?? 0) - (right.range?.start ?? 0) ||
+		(left.range?.end ?? 0) - (right.range?.end ?? 0)
+	)
+}
+
 function applyExpectErrorDirectives(
 	sourceText: string,
 	diagnostics: CssReachabilityDiagnostic[],
@@ -234,11 +248,7 @@ function applyExpectErrorDirectives(
 			(diagnostic) => !suppressedDiagnostics.has(diagnostic),
 		),
 		...directiveDiagnostics,
-	].sort(
-		(left, right) =>
-			(left.range?.start ?? 0) - (right.range?.start ?? 0) ||
-			(left.range?.end ?? 0) - (right.range?.end ?? 0),
-	)
+	].sort(compareDiagnosticRanges)
 }
 
 function applyRegionDirectives(
@@ -271,7 +281,9 @@ function applyRegionDirectives(
 			directiveDiagnostics.push(
 				directiveDiagnostic(
 					`unused-disable`,
-					`Unused "${DISABLE_DIRECTIVE} [${diagnosticCode}]" directive; no "${diagnosticCode}" diagnostics occur before it is enabled.`,
+					UNSUPPRESSIBLE_DIAGNOSTIC_CODES.has(diagnosticCode)
+						? `Unused "${DISABLE_DIRECTIVE} [${diagnosticCode}]" directive; "${diagnosticCode}" diagnostics cannot be suppressed.`
+						: `Unused "${DISABLE_DIRECTIVE} [${diagnosticCode}]" directive; no "${diagnosticCode}" diagnostics occur before it is enabled.`,
 					disableDirective,
 					sourceText,
 				),
@@ -334,11 +346,7 @@ function applyRegionDirectives(
 			(diagnostic) => !suppressedDiagnostics.has(diagnostic),
 		),
 		...directiveDiagnostics,
-	].sort(
-		(left, right) =>
-			(left.range?.start ?? 0) - (right.range?.start ?? 0) ||
-			(left.range?.end ?? 0) - (right.range?.end ?? 0),
-	)
+	].sort(compareDiagnosticRanges)
 }
 
 export function applyLasertagSuppressionDirectives(
@@ -358,9 +366,24 @@ export function applyLasertagSuppressionDirectives(
 			directive.kind === `disable` || directive.kind === `enable`,
 	)
 
-	return applyRegionDirectives(
+	const unsuppressibleDiagnostics = diagnostics.filter((diagnostic) =>
+		UNSUPPRESSIBLE_DIAGNOSTIC_CODES.has(diagnostic.code),
+	)
+	const remainingDiagnostics = applyRegionDirectives(
 		sourceText,
-		applyExpectErrorDirectives(sourceText, diagnostics, expectErrorDirectives),
+		applyExpectErrorDirectives(
+			sourceText,
+			diagnostics.filter(
+				(diagnostic) => !UNSUPPRESSIBLE_DIAGNOSTIC_CODES.has(diagnostic.code),
+			),
+			expectErrorDirectives,
+		),
 		regionDirectives,
 	)
+
+	return unsuppressibleDiagnostics.length === 0
+		? remainingDiagnostics
+		: [...remainingDiagnostics, ...unsuppressibleDiagnostics].sort(
+				compareDiagnosticRanges,
+			)
 }

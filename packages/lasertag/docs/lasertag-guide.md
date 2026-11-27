@@ -67,7 +67,10 @@ Local, non-exported components may use a native or semantic root when that is
 the clearest structure. The `render-tag-with-own-name` ESLint rule checks
 directly exported named declarations by default. Set
 `checkAllComponentFunctions: true` to apply the component-named root convention
-to every PascalCase component function, including local components.
+to every PascalCase component function, including local components. The
+`attach-css-class-to-own-tag` rule checks that an exported component's root
+carries `css.class`. A component without its own CSS Module has nowhere to keep
+its styles, and they drift into a parent's stylesheet.
 
 ## Solid JSX
 
@@ -348,7 +351,7 @@ the shipped semantic structure:
 lexical-markdown-editor.class {
 	> mosaic-lexical-text-editor {
 		> lexical-editor {
-			> [contenteditable="true"] {}
+			> editable-region[contenteditable="true"] {}
 			> collaborator-overlays > collaborator-caret {}
 		}
 	}
@@ -423,6 +426,23 @@ Never use `<div>`. Use a semantic HTML element, form control, or highly local cu
 
 Avoid single-child wrapper tags unless the wrapper distinguishes a meaningful thing, such as a form control, image, SVG, layout boundary, or independently styled repeated item.
 
+### Every Selector Segment Names a Tag
+
+Tags identify elements; attributes and pseudo-classes describe their state. Each segment of a selector therefore starts with a tag:
+
+```css
+project-card.class {
+	> button[data-open] {}
+	> project-summary {
+		&:hover {}
+	}
+}
+```
+
+Lasertag reports `selector-segment-without-tag` for a segment such as `> [data-open]` or a nested `:hover`. The render story is made of tags, so a segment without one can be neither proven dead nor checked against a child component's ownership. When the render story shows which element carries the attribute, the diagnostic names it.
+
+If an attribute exists only so CSS can find the element, such as `<span data-title>`, give the element a custom tag instead: `<card-title>`. Use `*` when a rule really does apply to any element, and `:global(...)` to leave the component's structure. A missing tag always has one of these fixes, so this diagnostic cannot be suppressed.
+
 ## Expected Reachability Errors
 
 When runtime behavior adds an element that Lasertag cannot see in the component's render story, suppress the diagnostic on the immediately following line with an explained `@lasertag-expect-error` comment:
@@ -451,7 +471,7 @@ app-canvas.class {
 }
 ```
 
-Put the diagnostic code in brackets. A disable also requires an explanation of at least three characters after the closing bracket; an enable does not accept an explanation. The supported reachability diagnostic codes are `dead-selector`, `impossible-local-class`, `opaque-component-root-may-collide`, `selector-crosses-ownership-boundary`, and `selector-matches-foreign-component-root`. Regions for different codes may overlap, and a disable without a matching enable remains active through the end of the file. Lasertag reports `disable-explanation-too-short` when the explanation is missing or too short, `unused-disable` when a disable suppresses no matching diagnostics, and `unused-enable` when an enable appears outside an active region for the same code.
+Put the diagnostic code in brackets. A disable also requires an explanation of at least three characters after the closing bracket; an enable does not accept an explanation. The supported reachability diagnostic codes are `dead-selector`, `impossible-local-class`, `opaque-component-root-may-collide`, `selector-crosses-ownership-boundary`, and `selector-matches-foreign-component-root`. Neither directive suppresses `selector-segment-without-tag`. Regions for different codes may overlap, and a disable without a matching enable remains active through the end of the file. Lasertag reports `disable-explanation-too-short` when the explanation is missing or too short, `unused-disable` when a disable suppresses no matching diagnostics, and `unused-enable` when an enable appears outside an active region for the same code.
 
 ### Conservative JSX cleanup
 

@@ -43,7 +43,8 @@ from the component name. `children` render slots, unresolved imports,
 declaration-only packages, and render expressions it cannot prove become opaque
 paths. Foreign opaque paths carry ownership metadata so selectors that may
 match their DOM can be distinguished from selectors that are merely
-inconclusive. Unsupported selector shapes are unknown too.
+inconclusive. Unsupported selector shapes such as `:has()` and sibling
+combinators are unknown too. A segment without a tag is reported instead.
 
 DOM injected through `innerHTML` or `dangerouslySetInnerHTML` is outside this
 contract. Lasertag does not parse HTML strings or guarantee diagnostics,
@@ -110,8 +111,8 @@ When that attachment is uncertain, cleanup preserves its possible CSS scope;
 this can retain selectors that would otherwise look dead beside a known root.
 When Refractor cannot discover
 an attachment, validation uses an opaque ownership root and makes no
-dead-selector claims; ESLint is responsible for reporting a missing or misplaced
-attachment.
+dead-selector claims; the `attach-css-class-to-own-tag` ESLint rule reports an
+exported component whose root lacks the attachment.
 
 That uncertainty is intentional: a selector is reported as dead only when every
 supported path is provably unreachable. An unknown path prevents that report.
@@ -123,6 +124,13 @@ a selector enters DOM supplied by a foreign component, render prop, slot, or
 has an ordinary reachable match in owned DOM.
 Refractor also reports a local class other than `.class` as
 `impossible-local-class`, because Lasertag CSS Modules expose only `css.class`.
+A selector segment that names no tag, such as `[data-state]` or a nested
+`:hover`, is reported as `selector-segment-without-tag`, once, on the rule that
+authors it. Such a segment can be neither proven dead nor checked for
+ownership. The message names the element when the render story identifies
+which one carries the attribute. Suppression directives do not apply to this
+diagnostic; `*` and `:global(...)` remain available. `@keyframes` blocks hold
+animation offsets rather than selectors and are not analyzed.
 Use `renderStory.warnings` and its opaque nodes when investigating why analysis
 was conservative.
 
@@ -158,9 +166,9 @@ for (const diagnostic of diagnostics) console.error(diagnostic)
 
 The result contains the render story plus `dead-selector`,
 `impossible-local-class`, `opaque-component-root-may-collide`,
-`selector-crosses-ownership-boundary`, and
-`selector-matches-foreign-component-root` diagnostics with source ranges when
-available. Pass
+`selector-crosses-ownership-boundary`,
+`selector-matches-foreign-component-root`, and `selector-segment-without-tag`
+diagnostics with source ranges when available. Pass
 `componentName` when a file contains multiple exported components and the main
 component cannot be selected by convention. Reusing
 `createTypescriptAstSession()` avoids starting a TypeScript AST session for every
@@ -378,8 +386,9 @@ The server provides:
 
 - `dead-selector`, `impossible-local-class`,
   `opaque-component-root-may-collide`,
-  `selector-crosses-ownership-boundary`, and
-  `selector-matches-foreign-component-root` diagnostics in CSS Modules
+  `selector-crosses-ownership-boundary`,
+  `selector-matches-foreign-component-root`, and
+  `selector-segment-without-tag` diagnostics in CSS Modules
 - `disable-explanation-too-short`, `unused-disable`, and `unused-enable`
   diagnostics for invalid or redundant suppression regions
 - an `ambiguous-render-source` error when both source siblings exist

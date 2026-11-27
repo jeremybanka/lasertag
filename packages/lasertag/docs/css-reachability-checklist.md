@@ -20,7 +20,8 @@ before refractor starts powering the CLI and LSP diagnostics in earnest.
 
 - [x] `:global(...)` as an explicit external escape hatch
 - [x] wildcard selectors such as `*`
-- [x] tagless selectors such as `[role="button"]`
+- [x] tagless selectors such as `[role="button"]`, reported as
+      `selector-segment-without-tag`
 - [x] unsupported sibling combinators `+` and `~`
 - [x] unsupported `:has(...)`
 - [x] unsupported namespace selectors
@@ -30,6 +31,7 @@ before refractor starts powering the CLI and LSP diagnostics in earnest.
 - [x] selector-list entries validated independently
 - [x] multiple root selector alternatives
 - [x] nested selectors inside `@media`, `@supports`, `@container`, and `@layer`
+- [x] `@keyframes` offsets such as `from` and `50%` are not selectors
 - [x] nested ampersand selectors such as `& &`
 - [x] selectors that use `&` inside `:is(...)` or `:where(...)`
 
