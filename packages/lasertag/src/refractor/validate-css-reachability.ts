@@ -158,11 +158,20 @@ function quotedAlternatives(alternatives: string[]): string {
 
 function segmentWithoutTagMessage(
 	renderStory: RenderStory,
-	{ opensNestedSelector, text: segment }: CssSelectorSegmentWithoutTag,
+	{ position, text: segment }: CssSelectorSegmentWithoutTag,
 ): string {
 	const problem = `Selector segment "${segment}" names no tag, so it cannot be checked against the render story.`
 	const structure = withoutParentheses(segment)
 	const tagNames = new Set<string>()
+
+	// A tag here would not help: the root has to come first in the selector.
+	if (position === `before-root`) {
+		return `${problem} It comes before the component's root, so it selects an element outside this component: write ":global(${segment})".`
+	}
+
+	if (position === `before-parent`) {
+		return `${problem} It comes before "&", so it selects an element above this rule's: write ":global(${segment})" if that element is outside this component.`
+	}
 
 	if (/\.class(?![-\w])/.test(structure)) {
 		collectTagNames(renderStory.roots, undefined, tagNames)
@@ -170,6 +179,17 @@ function segmentWithoutTagMessage(
 		return tagNames.size > 0 && tagNames.size <= MAX_SUGGESTED_TAGS
 			? `${problem} Name the root: ${quotedAlternatives([...tagNames].map((tagName) => `${tagName}${segment}`))}.`
 			: `${problem} Put the component's root tag before it.`
+	}
+
+	if (position === `unanchored`) {
+		collectTagNames(renderStory.roots, undefined, tagNames)
+
+		const root =
+			tagNames.size === 1
+				? `"${[...tagNames][0]}.class"`
+				: `the component's root`
+
+		return `${problem} Start the selector at ${root}, or write ":global(${segment})" to style an element outside this component.`
 	}
 
 	const attributes = selectedAttributes(structure)
@@ -187,7 +207,7 @@ function segmentWithoutTagMessage(
 	}
 
 	if (segment.startsWith(`:`)) {
-		return opensNestedSelector
+		return position === `opens-nested-selector`
 			? `${problem} Write "&${segment}" to qualify the parent element, or put the descendant's tag before it.`
 			: `${problem} Put the element's tag before it, or "*" to match any element.`
 	}

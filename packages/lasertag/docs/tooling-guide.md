@@ -128,9 +128,12 @@ A selector segment that names no tag, such as `[data-state]` or a nested
 `:hover`, is reported as `selector-segment-without-tag`, once, on the rule that
 authors it. Such a segment can be neither proven dead nor checked for
 ownership. The message names the element when the render story identifies
-which one carries the attribute. Suppression directives do not apply to this
-diagnostic; `*` and `:global(...)` remain available. `@keyframes` blocks hold
-animation offsets rather than selectors and are not analyzed.
+which one carries the attribute, and points a segment that comes before the
+root at `:global(...)`. Suppression directives do not apply to this
+diagnostic; `*` and `:global(...)` remain available. A `:global(...)` before
+the root does not exempt the component's own segments; one beneath the root
+exempts the segments after it. `@keyframes` blocks hold animation offsets
+rather than selectors and are not analyzed.
 Use `renderStory.warnings` and its opaque nodes when investigating why analysis
 was conservative.
 

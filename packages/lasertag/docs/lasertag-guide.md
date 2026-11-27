@@ -441,7 +441,23 @@ project-card.class {
 
 Lasertag reports `selector-segment-without-tag` for a segment such as `> [data-open]` or a nested `:hover`. The render story is made of tags, so a segment without one can be neither proven dead nor checked against a child component's ownership. When the render story shows which element carries the attribute, the diagnostic names it.
 
-If an attribute exists only so CSS can find the element, such as `<span data-title>`, give the element a custom tag instead: `<card-title>`. Use `*` when a rule really does apply to any element, and `:global(...)` to leave the component's structure. A missing tag always has one of these fixes, so this diagnostic cannot be suppressed.
+If an attribute exists only so CSS can find the element, such as `<span data-title>`, give the element a custom tag instead: `<card-title>`. Use `*` when a rule really does apply to any element.
+
+A segment that comes before the root selects an element outside the component, such as a theme attribute on the document. No tag would tie it to the render story, so wrap it in `:global(...)`:
+
+```css
+:global([data-theme="dark"]) project-card.class {}
+
+project-card.class {
+	> button {
+		:global([data-theme="dark"]) & {}
+	}
+}
+```
+
+`:global(...)` before the root only sets the context the component appears in; the component's own segments are still checked. `:global(...)` beneath the root descends into DOM the component does not author, and the segments after it are not checked.
+
+A missing tag always has one of these fixes, so this diagnostic cannot be suppressed.
 
 ## Expected Reachability Errors
 

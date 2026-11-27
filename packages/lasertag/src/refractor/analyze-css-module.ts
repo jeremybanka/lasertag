@@ -4,10 +4,18 @@ export type CssSelectorSegmentWithoutTag = {
 	/** The compound as authored. */
 	text: string
 	/**
-	 * The compound opens a nested selector with no combinator, so it selects a
-	 * descendant where `&` would have qualified the parent.
+	 * Where the compound sits, when that decides how to repair it.
+	 * - `opens-nested-selector`: it starts a nested selector with no combinator,
+	 *   so it selects a descendant where `&` would have qualified the parent.
+	 * - `before-parent`: a later compound of the nested selector holds `&`.
+	 * - `before-root`: a later compound of the top-level selector holds `.class`.
+	 * - `unanchored`: it starts a top-level selector that never names `.class`.
 	 */
-	opensNestedSelector?: true
+	position?:
+		| `before-parent`
+		| `before-root`
+		| `opens-nested-selector`
+		| `unanchored`
 }
 
 export type CssSelectorAnalysis = {
@@ -15,8 +23,9 @@ export type CssSelectorAnalysis = {
 	range: SourceRange
 	/**
 	 * Compounds this rule authored that name no element tag, such as
-	 * `[data-state]` or `:hover`. Compounds inherited from a parent rule, and
-	 * anything beneath `:global(...)`, are not listed.
+	 * `[data-state]` or `:hover`. Compounds inherited from a parent rule,
+	 * `:global(...)` compounds, and compounds beneath a `:global(...)` that
+	 * descends from the root are not listed.
 	 */
 	segmentsWithoutTag?: CssSelectorSegmentWithoutTag[]
 	result:
@@ -45,6 +54,8 @@ type SelectorWithRange = {
 	range: SourceRange
 	/** The selector as authored inside its parent rule, before flattening. */
 	nestedText?: string
+	/** The flattened selector of the rule this one is nested in. */
+	parentText?: string
 }
 
 type TokenizedSelectorPart = {
@@ -406,6 +417,7 @@ function flattenRules(
 							text: combineSelectors(parentSelector, selector.text),
 							range: selector.range,
 							nestedText: selector.text,
+							parentText: parentSelector,
 						})),
 					)
 
@@ -967,49 +979,97 @@ function splitAtSiblingCombinators(selector: string): string[] {
 	return sequences
 }
 
+type AuthoredCompound = {
+	alternatives: string[]
+	isGlobal: boolean
+	text: string
+}
+
+function authoredCompounds(selector: string): AuthoredCompound[] {
+	return splitAtSiblingCombinators(selector)
+		.flatMap(tokenizeSelector)
+		.map(({ compound }) => {
+			const expansion = expandCompoundAlternatives(compound)
+
+			return {
+				alternatives: expansion.kind === `unknown` ? [] : expansion.compounds,
+				isGlobal: hasUnsupportedGlobalSelector(compound),
+				text: compound,
+			}
+		})
+}
+
+function findModuleClassIndex(compounds: AuthoredCompound[]): number {
+	return compounds.findIndex(({ alternatives }) =>
+		alternatives.some((alternative) =>
+			getCompoundClasses(alternative).includes(`class`),
+		),
+	)
+}
+
+/**
+ * `:global(...)` beneath the root descends into DOM this component does not
+ * author. Before the root, it only sets the context the component appears in.
+ */
+function leavesOwnDom(selector: string): boolean {
+	const compounds = authoredCompounds(selector)
+	const rootIndex = findModuleClassIndex(compounds)
+
+	return compounds.some(({ isGlobal }, index) => isGlobal && index > rootIndex)
+}
+
 function findSegmentsWithoutTag(
 	selector: SelectorWithRange,
 ): CssSelectorSegmentWithoutTag[] {
-	// `:global(...)` is the explicit way to leave Lasertag's structure.
-	if (hasUnsupportedGlobalSelector(selector.text)) return []
-
-	const segments: CssSelectorSegmentWithoutTag[] = []
 	const authoredText = selector.nestedText ?? selector.text
 	const isNested = selector.nestedText !== undefined
-	let isFirstCompound = true
-
-	for (const sequence of splitAtSiblingCombinators(authoredText)) {
-		for (const part of tokenizeSelector(sequence)) {
-			const allowsModuleClass = isFirstCompound && !isNested
-			const opensNestedSelector =
-				isFirstCompound && isNested && authoredText.startsWith(part.compound)
-
-			isFirstCompound = false
-
-			const expansion = expandCompoundAlternatives(part.compound)
-
-			if (expansion.kind === `unknown`) continue
-
-			const hasAlternativeWithoutTag = expansion.compounds.some(
-				(compound) =>
-					// `&` continues the parent's compound; the parent rule answers for it.
-					!stripNonStructuralSections(compound).includes(`&`) &&
-					getCompoundTagName(compound) === undefined &&
-					// A stray local class is reported as `impossible-local-class`.
-					getCompoundClasses(compound).every(
-						(className) => allowsModuleClass && className === `class`,
-					),
+	const compounds = authoredCompounds(authoredText)
+	// The element this rule is anchored to: `&` when nested, `.class` otherwise.
+	const anchorIndex = isNested
+		? compounds.findIndex(({ alternatives }) =>
+				alternatives.some((alternative) =>
+					stripNonStructuralSections(alternative).includes(`&`),
+				),
 			)
+		: findModuleClassIndex(compounds)
+	const firstLocalIndex = compounds.findIndex(({ isGlobal }) => !isGlobal)
+	const segments: CssSelectorSegmentWithoutTag[] = []
+	let hasLeftOwnDom =
+		selector.parentText !== undefined && leavesOwnDom(selector.parentText)
 
-			if (hasAlternativeWithoutTag) {
-				segments.push({
-					text: part.compound,
-					...(opensNestedSelector
-						? { opensNestedSelector: true as const }
-						: {}),
-				})
-			}
+	for (const [index, { alternatives, isGlobal, text }] of compounds.entries()) {
+		if (isGlobal) {
+			hasLeftOwnDom ||= index > anchorIndex
+			continue
 		}
+
+		if (hasLeftOwnDom) continue
+
+		const allowsModuleClass = index === firstLocalIndex && !isNested
+		const hasAlternativeWithoutTag = alternatives.some(
+			(alternative) =>
+				// `&` continues the parent's compound; the parent rule answers for it.
+				!stripNonStructuralSections(alternative).includes(`&`) &&
+				getCompoundTagName(alternative) === undefined &&
+				// A stray local class is reported as `impossible-local-class`.
+				getCompoundClasses(alternative).every(
+					(className) => allowsModuleClass && className === `class`,
+				),
+		)
+
+		if (!hasAlternativeWithoutTag) continue
+
+		let position: CssSelectorSegmentWithoutTag[`position`]
+
+		if (index < anchorIndex) {
+			position = isNested ? `before-parent` : `before-root`
+		} else if (index === 0 && isNested && authoredText.startsWith(text)) {
+			position = `opens-nested-selector`
+		} else if (index === firstLocalIndex && !isNested && anchorIndex === -1) {
+			position = `unanchored`
+		}
+
+		segments.push({ text, ...(position ? { position } : {}) })
 	}
 
 	return segments

@@ -1603,6 +1603,41 @@ describe(`module.css selector segments without a tag`, () => {
 		])
 	})
 
+	it(`points a segment that comes before the root at :global()`, () => {
+		expect(
+			taglessMessages(`
+				[data-theme="dark"] app-panel.class {}
+				:global([data-theme="dark"]) app-panel.class {}
+				app-panel.class {
+					[data-theme="dark"] & {}
+					:global([data-theme="dark"]) & {}
+				}
+				:root {}
+				:global(:root) {}
+			`),
+		).toEqual([
+			`${problem(`[data-theme="dark"]`)} It comes before the component's root, so it selects an element outside this component: write ":global([data-theme="dark"])".`,
+			`${problem(`[data-theme="dark"]`)} It comes before "&", so it selects an element above this rule's: write ":global([data-theme="dark"])" if that element is outside this component.`,
+			`${problem(`:root`)} Start the selector at "app-panel.class", or write ":global(:root)" to style an element outside this component.`,
+		])
+	})
+
+	it(`still checks the component's own DOM beneath a :global() context`, () => {
+		expect(
+			taglessMessages(`
+				:global(.dark) app-panel.class {
+					> [data-title] {}
+				}
+				app-panel.class {
+					:global(.dark) & > [data-title] {}
+				}
+			`),
+		).toEqual([
+			`${problem(`[data-title]`)} Name the element: "h1[data-title]".`,
+			`${problem(`[data-title]`)} Name the element: "h1[data-title]".`,
+		])
+	})
+
 	it(`cannot be suppressed`, () => {
 		const { diagnostics } = validateCssReachability({
 			tsxPath: `/project/src/AppPanel.tsx`,
